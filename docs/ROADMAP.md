@@ -40,7 +40,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phase 0 — Project skeleton** (pending). We'll start with it on the user's command.
+**Phase 2 — Forward engine (native SSH, -L)** (pending). We'll continue MVP with it on the user's command.
 
 Phases 1–6 — detailed MVP plan; 7–11 — outline (goal + DoD), refined as they are approached.
 
