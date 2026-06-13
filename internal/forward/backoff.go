@@ -19,3 +19,14 @@ func nextBackoff(attempt int) time.Duration {
 	}
 	return d
 }
+
+// nextAttemptAfterDisconnect computes the attempt counter to use after a
+// connection drops. A connection that stayed up for at least stableResetInterval
+// resets the counter (so the next reconnect uses the base delay again);
+// otherwise the counter advances, growing the backoff.
+func nextAttemptAfterDisconnect(stable time.Duration, attempt int) int {
+	if stable >= stableResetInterval {
+		return 0
+	}
+	return attempt + 1
+}

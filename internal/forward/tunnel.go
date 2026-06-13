@@ -178,10 +178,7 @@ func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{})
 		t.serveConnected(ctx, client)
 
 		stable := time.Since(t.connectedAt)
-		attempt++
-		if stable >= stableResetInterval {
-			attempt = 0
-		}
+		attempt = nextAttemptAfterDisconnect(stable, attempt)
 		t.mu.Lock()
 		t.client = nil
 		t.mu.Unlock()
