@@ -21,7 +21,7 @@
 
 | Purpose           | Library                                        |
 |-------------------|------------------------------------------------|
-| Language          | Go 1.22+                                        |
+| Language          | Go 1.25+                                        |
 | CLI               | `github.com/spf13/cobra`                       |
 | TUI               | `github.com/charmbracelet/bubbletea` + `bubbles` + `lipgloss` |
 | SSH               | `golang.org/x/crypto/ssh` + `golang.org/x/crypto/ssh/knownhosts` (native, no system `ssh`) |
