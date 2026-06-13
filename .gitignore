@@ -4,3 +4,4 @@ dist/
 *.sock
 *.pid
 .idea/
+config.yaml
