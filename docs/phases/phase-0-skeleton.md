@@ -29,16 +29,16 @@ here we bring them together with a working skeleton.
 
 ## Tasks
 
-- [ ] `glm-complex/go.mod` via `go mod init github.com/kipkaev55/portato`.
-- [ ] Add dependencies (`go get …`).
-- [ ] Create the directory tree:
+- [x] `glm-complex/go.mod` via `go mod init github.com/kipkaev55/portato`.
+- [x] Add dependencies (`go get …`).
+- [x] Create the directory tree:
   - `glm-complex/cmd/portato/main.go`
   - `glm-complex/internal/{config,forward,controller,daemon,client,tui,service,cmd,log}/`
-- [ ] `cmd/portato/main.go`: calls `internal/cmd.Execute()`.
-- [ ] `internal/cmd/root.go`: cobra root command `portato` with a `--config` flag and a `RunE` handler that for now prints "TUI not implemented yet" (this will be the smart-launcher in Phase 5).
-- [ ] `internal/cmd/daemon.go`, `attach.go`, `list.go`, `enable.go`, `disable.go`, `restart.go`, `install.go`, `uninstall.go` — each subcommand as a stub: `RunE: func(...) { return fmt.Errorf("not implemented yet") }`.
-- [ ] `.gitignore`: `bin/`, `*.log`, `*.sock`, `*.pid`, `.idea/`, `dist/`.
-- [ ] `Makefile`:
+- [x] `cmd/portato/main.go`: calls `internal/cmd.Execute()`.
+- [x] `internal/cmd/root.go`: cobra root command `portato` with a `--config` flag and a `RunE` handler that for now prints "TUI not implemented yet" (this will be the smart-launcher in Phase 5).
+- [x] `internal/cmd/daemon.go`, `attach.go`, `list.go`, `enable.go`, `disable.go`, `restart.go`, `install.go`, `uninstall.go` — each subcommand as a stub: `RunE: func(...) { return fmt.Errorf("not implemented yet") }`.
+- [x] `.gitignore`: `bin/`, `*.log`, `*.sock`, `*.pid`, `.idea/`, `dist/`.
+- [x] `Makefile`:
   ```make
   .PHONY: build run test fmt vet
   build:
@@ -52,17 +52,17 @@ here we bring them together with a working skeleton.
   vet:
   	go vet ./...
   ```
-- [ ] `glm-complex/README.md`: a brief project description, a link to `docs/SPEC.md`, the `make build` / `make run` commands.
+- [x] `glm-complex/README.md`: a brief project description, a link to `docs/SPEC.md`, the `make build` / `make run` commands.
 
 ## Definition of Done
 
-- [ ] `go build ./...` completes without errors.
-- [ ] `./bin/portato --help` shows the root help and the list of all subcommands (daemon, attach, list, enable, disable, restart, install, uninstall).
-- [ ] Each subcommand responds "not implemented yet" when called, without panicking.
-- [ ] The `--config <path>` flag is available on the root command.
-- [ ] `make build`, `make run`, `make test`, `make vet`, `make fmt` work.
-- [ ] `go vet ./...` is clean, `gofmt -l .` is empty.
-- [ ] The directory structure matches SPEC §4.
+- [x] `go build ./...` completes without errors.
+- [x] `./bin/portato --help` shows the root help and the list of all subcommands (daemon, attach, list, enable, disable, restart, install, uninstall).
+- [x] Each subcommand responds "not implemented yet" when called, without panicking.
+- [x] The `--config <path>` flag is available on the root command.
+- [x] `make build`, `make run`, `make test`, `make vet`, `make fmt` work.
+- [x] `go vet ./...` is clean, `gofmt -l .` is empty.
+- [x] The directory structure matches SPEC §4.
 
 ## Verification
 
