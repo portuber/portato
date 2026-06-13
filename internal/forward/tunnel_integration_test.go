@@ -3,7 +3,9 @@ package forward
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"crypto/ed25519"
+	"crypto/elliptic"
 	"crypto/rand"
 	"encoding/pem"
 	"fmt"
@@ -19,6 +21,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 // directTCPIP mirrors the wire payload of a "direct-tcpip" channel open.
@@ -67,18 +70,30 @@ type sshd struct {
 	port       int
 	listener   net.Listener
 	tracker    *connTracker
-	hostSigner ssh.Signer
+	ed25519Pub ssh.PublicKey
 }
 
+// newSSHD configures a test server that offers BOTH an ECDSA and an ED25519
+// host key. x/crypto/ssh's default preference negotiates ECDSA first, so a
+// client that records only the ED25519 key would otherwise hit a spurious
+// "host key mismatch" — the regression this setup guards against.
 func newSSHD(t *testing.T, authorizedKey ssh.PublicKey) *sshd {
 	t.Helper()
-	_, hostPriv, err := ed25519.GenerateKey(rand.Reader)
+	_, edPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
-		t.Fatalf("gen host key: %v", err)
+		t.Fatalf("gen ed25519 host key: %v", err)
 	}
-	hostSigner, err := ssh.NewSignerFromSigner(hostPriv)
+	edSigner, err := ssh.NewSignerFromSigner(edPriv)
 	if err != nil {
-		t.Fatalf("host signer: %v", err)
+		t.Fatalf("ed25519 signer: %v", err)
+	}
+	ecPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	if err != nil {
+		t.Fatalf("gen ecdsa host key: %v", err)
+	}
+	ecSigner, err := ssh.NewSignerFromKey(ecPriv)
+	if err != nil {
+		t.Fatalf("ecdsa signer: %v", err)
 	}
 	cfg := &ssh.ServerConfig{
 		PublicKeyCallback: func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
@@ -88,8 +103,9 @@ func newSSHD(t *testing.T, authorizedKey ssh.PublicKey) *sshd {
 			return nil, fmt.Errorf("unknown public key")
 		},
 	}
-	cfg.AddHostKey(hostSigner)
-	return &sshd{t: t, cfg: cfg, tracker: &connTracker{}, hostSigner: hostSigner}
+	cfg.AddHostKey(edSigner)
+	cfg.AddHostKey(ecSigner)
+	return &sshd{t: t, cfg: cfg, tracker: &connTracker{}, ed25519Pub: edSigner.PublicKey()}
 }
 
 func (s *sshd) start() {
@@ -335,5 +351,88 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 	if err == nil {
 		c.Close()
 		t.Error("local port still open after Stop")
+	}
+}
+
+// TestTunnelHonoursKnownHostKeyType guards against golang/go#36126: the server
+// offers both ECDSA (preferred by x/crypto's default order) and ED25519, but
+// known_hosts only has the ED25519 key. The client must negotiate the key type
+// it already trusts instead of bailing out with "host key mismatch".
+func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen client key: %v", err)
+	}
+	authorizedKey, _ := ssh.NewPublicKey(pub)
+	block, err := ssh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		t.Fatalf("marshal client priv: %v", err)
+	}
+	dir := t.TempDir()
+	idPath := filepath.Join(dir, "id_ed25519")
+	if err := os.WriteFile(idPath, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write identity: %v", err)
+	}
+
+	srv := newSSHD(t, authorizedKey)
+	srv.start()
+	defer srv.stop()
+
+	// Seed known_hosts with ONLY the server's ED25519 host key (strict mode).
+	knownHosts := filepath.Join(dir, "known_hosts")
+	line := knownhosts.Line([]string{knownhosts.Normalize(srv.addr())}, srv.ed25519Pub)
+	if err := os.WriteFile(knownHosts, []byte(line+"\n"), 0o600); err != nil {
+		t.Fatalf("seed known_hosts: %v", err)
+	}
+
+	localPort := freePort(t)
+	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	cfg := config.Tunnel{
+		Name:     "kh-test",
+		Type:     "local",
+		Local:    strconv.Itoa(localPort),
+		Remote:   echoAddr,
+		SSH:      "u@" + srv.addr(),
+		Identity: idPath,
+		User:     "u",
+		Host:     "127.0.0.1",
+		Port:     srv.port,
+	}
+	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: false}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	if !waitForState(tun, Connected, 5*time.Second) {
+		s := tun.Status()
+		t.Fatalf("expected ED25519 to be negotiated despite ECDSA being preferred; state=%s err=%q", s.State, s.Error)
+	}
+
+	conn, err := net.Dial("tcp", localAddr)
+	if err != nil {
+		t.Fatalf("dial local: %v", err)
+	}
+	defer conn.Close()
+	msg := []byte("kh")
+	if _, err := conn.Write(msg); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	buf := make([]byte, len(msg))
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !bytes.Equal(buf, msg) {
+		t.Errorf("echo %q, want %q", buf, msg)
 	}
 }

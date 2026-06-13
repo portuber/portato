@@ -1,12 +1,18 @@
 package forward
 
 import (
+	"bufio"
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -30,13 +36,16 @@ func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *s
 	if err != nil {
 		return nil, err
 	}
+	addr := net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
 	sshCfg := &ssh.ClientConfig{
 		User:            cfg.User,
 		Auth:            auths,
 		HostKeyCallback: hostCb,
 		Timeout:         connectTimeout,
 	}
-	addr := net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
+	if algos := hostKeyAlgos(def.ResolvedKnownHosts(), addr); len(algos) > 0 {
+		sshCfg.HostKeyAlgorithms = algos
+	}
 
 	d := &net.Dialer{Timeout: connectTimeout}
 	conn, err := d.DialContext(ctx, "tcp", addr)
@@ -190,4 +199,142 @@ func mapDialError(err error) error {
 		return fmt.Errorf("connect timeout: %w", err)
 	}
 	return fmt.Errorf("ssh dial: %w", err)
+}
+
+// hostKeyAlgos derives the host-key algorithms to offer during the SSH
+// handshake from the key types recorded for addr in the known_hosts file.
+// This makes x/crypto/ssh negotiate a key type we already trust, matching
+// OpenSSH behaviour and avoiding spurious "host key mismatch" when the
+// server offers several key types but known_hosts only has one (the default
+// preference order in x/crypto puts ECDSA ahead of ED25519). See
+// golang/go#36126. Returns nil when addr is unknown (first connect), so the
+// caller leaves HostKeyAlgorithms at its default.
+func hostKeyAlgos(hostsFile, addr string) []string {
+	host, port, _ := net.SplitHostPort(addr)
+	if port == "" {
+		port = "22"
+	}
+	normalizedTarget := knownhosts.Normalize(net.JoinHostPort(host, port))
+
+	data, err := os.ReadFile(hostsFile)
+	if err != nil {
+		return nil
+	}
+
+	var algos []string
+	seen := make(map[string]bool)
+	add := func(in []string) {
+		for _, a := range in {
+			if !seen[a] {
+				seen[a] = true
+				algos = append(algos, a)
+			}
+		}
+	}
+
+	scanner := bufio.NewScanner(bytes.NewReader(data))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || line[0] == '#' {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 3 || strings.HasPrefix(fields[0], "@") {
+			continue
+		}
+		if !hostMatchesAny(fields[0], host, port, normalizedTarget) {
+			continue
+		}
+		add(algosForKeyType(fields[1]))
+	}
+	return algos
+}
+
+// hostMatchesAny reports whether any comma-separated pattern in `patterns`
+// matches the target, honouring negation ("!") which excludes the whole line.
+func hostMatchesAny(patterns, host, port, normalizedTarget string) bool {
+	matched := false
+	for _, p := range strings.Split(patterns, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if strings.HasPrefix(p, "!") {
+			if hostPatternMatches(p[1:], host, port, normalizedTarget) {
+				return false
+			}
+			continue
+		}
+		if hostPatternMatches(p, host, port, normalizedTarget) {
+			matched = true
+		}
+	}
+	return matched
+}
+
+func hostPatternMatches(pattern, host, port, normalizedTarget string) bool {
+	switch {
+	case strings.HasPrefix(pattern, "|1|"):
+		return hashedHostMatches(pattern, normalizedTarget)
+	case strings.HasPrefix(pattern, "["):
+		end := strings.Index(pattern, "]:")
+		if end < 0 {
+			return false
+		}
+		return pattern[1:end] == host && pattern[end+2:] == port
+	default:
+		// A plain hostname (possibly with wildcards) matches the default
+		// port only; non-default ports must be recorded as [host]:port.
+		if !wildcardMatch(pattern, host) {
+			return false
+		}
+		return port == "22"
+	}
+}
+
+// hashedHostMatches verifies a hashed known_hosts entry of the form
+// "|1|<base64 salt>|<base64 hmac-sha1>" against the normalized target.
+func hashedHostMatches(pattern, normalizedTarget string) bool {
+	parts := strings.Split(pattern, "|")
+	if len(parts) != 4 || parts[1] != "1" {
+		return false
+	}
+	salt, err := base64.StdEncoding.DecodeString(parts[2])
+	if err != nil {
+		return false
+	}
+	want, err := base64.StdEncoding.DecodeString(parts[3])
+	if err != nil {
+		return false
+	}
+	mac := hmac.New(sha1.New, salt)
+	mac.Write([]byte(normalizedTarget))
+	return hmac.Equal(mac.Sum(nil), want)
+}
+
+func wildcardMatch(pattern, name string) bool {
+	ok, err := path.Match(pattern, name)
+	return err == nil && ok
+}
+
+// algosForKeyType maps a known_hosts key-type field to the negotiable host-key
+// algorithms for that key. RSA keys are recorded as "ssh-rsa" but servers
+// negotiate the SHA-2 variants, so all three are offered.
+func algosForKeyType(keytype string) []string {
+	switch keytype {
+	case ssh.KeyAlgoED25519:
+		return []string{ssh.KeyAlgoED25519}
+	case ssh.KeyAlgoRSA:
+		return []string{ssh.KeyAlgoRSASHA512, ssh.KeyAlgoRSASHA256, ssh.KeyAlgoRSA}
+	case ssh.KeyAlgoECDSA256:
+		return []string{ssh.KeyAlgoECDSA256}
+	case ssh.KeyAlgoECDSA384:
+		return []string{ssh.KeyAlgoECDSA384}
+	case ssh.KeyAlgoECDSA521:
+		return []string{ssh.KeyAlgoECDSA521}
+	case ssh.InsecureKeyAlgoDSA:
+		return []string{ssh.InsecureKeyAlgoDSA}
+	default:
+		return []string{keytype}
+	}
 }
