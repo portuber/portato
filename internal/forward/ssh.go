@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
@@ -28,10 +29,11 @@ const connectTimeout = 5 * time.Second
 // dialSSH establishes an SSH client connection to the tunnel's server.
 // The TCP dial is context-aware so it can be interrupted by tunnel shutdown.
 func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger) (*ssh.Client, error) {
-	auths, err := authMethods(cfg, def, log)
+	auths, closeAgent, err := authMethods(cfg, def, log)
 	if err != nil {
 		return nil, err
 	}
+	defer closeAgent()
 	hostCb, err := hostKeyCallback(def, log)
 	if err != nil {
 		return nil, err
@@ -65,10 +67,24 @@ func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *s
 	return ssh.NewClient(sc, chans, reqs), nil
 }
 
-func authMethods(cfg config.Tunnel, def config.Defaults, log *slog.Logger) ([]ssh.AuthMethod, error) {
-	var methods []ssh.AuthMethod
-	if sock := os.Getenv("SSH_AUTH_SOCK"); strings.TrimSpace(sock) != "" {
-		methods = append(methods, agentAuthMethod(sock))
+// authMethods builds the SSH auth-method chain. The returned closer must be
+// invoked once the SSH handshake is done; it keeps the ssh-agent connection
+// open for the lifetime of the agent-backed signers (which sign lazily during
+// the handshake) and is a no-op when no agent is used.
+func authMethods(cfg config.Tunnel, def config.Defaults, log *slog.Logger) ([]ssh.AuthMethod, func() error, error) {
+	var (
+		methods []ssh.AuthMethod
+		closers []io.Closer
+	)
+	if sock := strings.TrimSpace(os.Getenv("SSH_AUTH_SOCK")); sock != "" {
+		conn, err := net.Dial("unix", sock)
+		if err != nil {
+			log.Warn("dial ssh-agent failed; falling back to identity", "err", err)
+		} else {
+			ag := agent.NewClient(conn)
+			methods = append(methods, ssh.PublicKeysCallback(ag.Signers))
+			closers = append(closers, conn)
+		}
 	}
 	if idPath := cfg.ResolvedIdentity(def); idPath != "" {
 		signer, err := loadIdentity(idPath)
@@ -79,20 +95,15 @@ func authMethods(cfg config.Tunnel, def config.Defaults, log *slog.Logger) ([]ss
 		}
 	}
 	if len(methods) == 0 {
-		return nil, errors.New("no ssh auth method available: start ssh-agent (SSH_AUTH_SOCK) or configure an identity key")
+		return nil, nil, errors.New("no ssh auth method available: start ssh-agent (SSH_AUTH_SOCK) or configure an identity key")
 	}
-	return methods, nil
-}
-
-func agentAuthMethod(sock string) ssh.AuthMethod {
-	return ssh.PublicKeysCallback(func() ([]ssh.Signer, error) {
-		conn, err := net.Dial("unix", sock)
-		if err != nil {
-			return nil, fmt.Errorf("dial ssh-agent: %w", err)
+	closeAgent := func() error {
+		for _, c := range closers {
+			_ = c.Close()
 		}
-		defer conn.Close()
-		return agent.NewClient(conn).Signers()
-	})
+		return nil
+	}
+	return methods, closeAgent, nil
 }
 
 func loadIdentity(path string) (ssh.Signer, error) {

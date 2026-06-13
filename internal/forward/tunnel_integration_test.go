@@ -21,6 +21,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
@@ -226,6 +227,35 @@ func freePort(t *testing.T) int {
 	return port
 }
 
+// startTestAgent serves an in-process ssh-agent on a unix socket with the
+// given private key loaded, so the agent-auth path can be exercised without
+// touching the host's SSH_AUTH_SOCK.
+func startTestAgent(t *testing.T, priv any) (sock string, cleanup func()) {
+	t.Helper()
+	sock = filepath.Join(t.TempDir(), "agent.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatalf("agent listen: %v", err)
+	}
+	keyring := agent.NewKeyring()
+	if err := keyring.Add(agent.AddedKey{PrivateKey: priv}); err != nil {
+		t.Fatalf("agent add key: %v", err)
+	}
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				_ = agent.ServeAgent(keyring, c)
+			}(c)
+		}
+	}()
+	return sock, func() { _ = ln.Close() }
+}
+
 func waitForState(t *Tunnel, want State, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -424,6 +454,77 @@ func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
 	}
 	defer conn.Close()
 	msg := []byte("kh")
+	if _, err := conn.Write(msg); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	buf := make([]byte, len(msg))
+	_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	if _, err := io.ReadFull(conn, buf); err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !bytes.Equal(buf, msg) {
+		t.Errorf("echo %q, want %q", buf, msg)
+	}
+}
+
+// TestTunnelAuthViaAgent exercises the ssh-agent auth path end-to-end: the
+// tunnel has no identity file, so authentication must come from the in-process
+// agent. Guards against the "use of closed network connection" bug where the
+// agent connection was closed before the lazy signers signed during the
+// handshake.
+func TestTunnelAuthViaAgent(t *testing.T) {
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen client key: %v", err)
+	}
+	authorizedKey, _ := ssh.NewPublicKey(pub)
+
+	sock, stopAgent := startTestAgent(t, priv)
+	defer stopAgent()
+	t.Setenv("SSH_AUTH_SOCK", sock)
+
+	srv := newSSHD(t, authorizedKey)
+	srv.start()
+	defer srv.stop()
+
+	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
+	localPort := freePort(t)
+	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
+	cfg := config.Tunnel{
+		Name:   "agent-test",
+		Type:   "local",
+		Local:  strconv.Itoa(localPort),
+		Remote: echoAddr,
+		SSH:    "u@" + srv.addr(),
+		User:   "u",
+		Host:   "127.0.0.1",
+		Port:   srv.port,
+		// no Identity -> agent is the only auth source
+	}
+	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	if !waitForState(tun, Connected, 5*time.Second) {
+		s := tun.Status()
+		t.Fatalf("agent auth did not reach Connected: state=%s err=%q", s.State, s.Error)
+	}
+
+	conn, err := net.Dial("tcp", localAddr)
+	if err != nil {
+		t.Fatalf("dial local: %v", err)
+	}
+	defer conn.Close()
+	msg := []byte("via-agent")
 	if _, err := conn.Write(msg); err != nil {
 		t.Fatalf("write: %v", err)
 	}
