@@ -1,7 +1,7 @@
 ---
 phase: 0
 title: Project skeleton + GSD
-status: todo
+status: in-progress
 depends_on: []
 ---
 
