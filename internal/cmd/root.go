@@ -45,6 +45,7 @@ func Execute() error {
 		restartCmd,
 		installCmd,
 		uninstallCmd,
+		forwardCmd,
 	)
 	return rootCmd.Execute()
 }
