@@ -11,7 +11,7 @@
 | #  | Name                                  | Status | File                                                  |
 |----|---------------------------------------|--------|-------------------------------------------------------|
 | 0  | Project skeleton + GSD                | `[x]`  | [phase-0-skeleton.md](./phases/phase-0-skeleton.md)   |
-| 1  | Config                                | `[~]`  | [phase-1-config.md](./phases/phase-1-config.md)       |
+| 1  | Config                                | `[x]`  | [phase-1-config.md](./phases/phase-1-config.md)       |
 | 2  | Forward engine (native SSH, -L)       | `[ ]`  | [phase-2-forward-engine.md](./phases/phase-2-forward-engine.md) |
 | 3  | Standalone TUI                        | `[ ]`  | [phase-3-standalone-tui.md](./phases/phase-3-standalone-tui.md) |
 | 4  | Daemon and HTTP-over-unix-socket IPC  | `[ ]`  | [phase-4-daemon-ipc.md](./phases/phase-4-daemon-ipc.md) |
