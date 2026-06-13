@@ -97,18 +97,42 @@ depends_on: [<list of numbers>]
 
 ## Commits (when the repository is under git)
 
-- **Every phase status change** (`[ ]→[~]`, `[~]→[x]`) is a separate commit with a message of the form `phase N: start` / `phase N: complete`.
-- Implementation commits within a phase are ordinary, but without mixing them with a status change.
-- Changes to SPEC.md / CONVENTIONS.md are a separate commit with the `docs:` prefix.
-- Message format: below is the general convention (it can be adapted):
+The project follows **Conventional Commits** (conventionalcommits.org). The commit
+header is `<type>[scope]: <subject>` (up to 72 characters). Non-trivial changes
+must have a **body**: what changed and **why**.
 
-  ```
-  phase N: start        — phase start (status: todo → in-progress)
-  phase N: complete     — phase completion (status: in-progress → done)
-  phase N: <topic>      — implementation commit within a phase
-  docs: <topic>         — SPEC/CONVENTIONS/ROADMAP edits unrelated to a status change
-  chore: <topic>        — Makefile, .gitignore, etc.
-  ```
+- **Every phase status change** (`[ ]→[~]`, `[~]→[x]`) is a separate commit
+  of the form `docs(phase-N): start` / `docs(phase-N): complete`.
+- Implementation commits within a phase are `feat(<scope>): …`, without mixing
+  them with a status change.
+- Changes to SPEC.md / CONVENTIONS.md / ROADMAP.md — `docs(<scope>): …`.
+- Makefile, .gitignore, dependencies, tooling — `chore(<scope>): …`.
+
+### Types
+
+`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`,
+`chore`, `revert`.
+
+### Scope (optional)
+
+A package or area: `config`, `forward`, `controller`, `daemon`, `client`,
+`tui`, `service`, `cmd`, `agents`, `conventions`, `build`. For the phase lifecycle
+— `phase-N`.
+
+### Breaking changes
+
+`feat!: …` (or `feat(scope)!: …`) + a `BREAKING CHANGE: <description>` footer.
+
+### Examples
+
+```
+docs(phase-1): start
+feat(config): add YAML config load, validation and persistence
+docs(phase-1): complete
+fix(forward): reset backoff after stable connection
+docs(conventions): switch to conventional commits
+chore(build): bump go toolchain to 1.22
+```
 
 ## If a phase is blocked
 
