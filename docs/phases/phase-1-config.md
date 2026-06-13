@@ -1,7 +1,7 @@
 ---
 phase: 1
 title: Config
-status: todo
+status: in-progress
 depends_on: [0]
 ---
 
