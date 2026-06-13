@@ -28,45 +28,45 @@ background» hand-off in Phase 5. Clear validation and defaults. Full unit cover
 
 ## Tasks
 
-- [ ] `glm-complex/internal/config/config.go`:
-  - [ ] `type Tunnel struct` with fields: `Name, Type, Local, Remote, SSH, Identity, Enabled`, plus parsed `User, Host, Port` (not serialized, populated from `SSH`).
-  - [ ] `type Defaults struct { Identity, KnownHosts string; AcceptNewHosts bool }`.
-  - [ ] `type Config struct { Defaults Defaults; Tunnels []Tunnel }`.
-  - [ ] All fields with yaml tags (for example `yaml:"name"`, `yaml:"local"`).
-- [ ] `func DefaultPath() string` — via `xdg.ConfigHome` (see SPEC §7).
-- [ ] `func Load(path string) (*Config, error)`:
-  - [ ] `~` expansion via `os.UserHomeDir`.
-  - [ ] Applying defaults (Defaults.Identity → to tunnels without their own identity, Defaults.KnownHosts → when empty).
-  - [ ] Parsing the `SSH` string `user@host:port` → `User/Host/Port` fields; defaults `$USER` and `22`.
-  - [ ] Normalizing `Local`: if only a port → `127.0.0.1:<port>`.
-- [ ] `func (c *Config) Validate() error`:
-  - [ ] `Name` uniqueness (map by name).
-  - [ ] `Name` non-empty, alphanumeric+dash.
-  - [ ] `Type == "local"` (MVP); otherwise an explicit error «type X not supported yet, supported: local».
-  - [ ] `Remote` and `Host` non-empty.
-  - [ ] `Port` in the range 1–65535.
-- [ ] `func (c *Config) Save(path string) error`:
-  - [ ] `yaml.Marshal` + `os.WriteFile` with mode `0600`.
-  - [ ] Do not fail on an empty config.
-- [ ] `func EnsureExample(path string) (created bool, err error)`:
-  - [ ] If the file does not exist — create one with a single example tunnel (`enabled: false`), return `created=true`.
-- [ ] `glm-complex/config.example.yaml` — reference example.
-- [ ] Unit tests (`config_test.go`):
-  - [ ] Parsing valid YAML.
-  - [ ] Applying defaults (local host, known_hosts, ssh port/user).
-  - [ ] Round-trip: `Load` → change `Enabled` → `Save` → `Load` again yields the same state.
-  - [ ] Validation error: duplicate `name`, broken port, empty `ssh`, unsupported `type`.
-  - [ ] `~` expansion in `identity` and `known_hosts`.
+- [x] `glm-complex/internal/config/config.go`:
+  - [x] `type Tunnel struct` with fields: `Name, Type, Local, Remote, SSH, Identity, Enabled`, plus parsed `User, Host, Port` (not serialized, populated from `SSH`).
+  - [x] `type Defaults struct { Identity, KnownHosts string; AcceptNewHosts bool }`.
+  - [x] `type Config struct { Defaults Defaults; Tunnels []Tunnel }`.
+  - [x] All fields with yaml tags (for example `yaml:"name"`, `yaml:"local"`).
+- [x] `func DefaultPath() string` — via `xdg.ConfigHome` (see SPEC §7).
+- [x] `func Load(path string) (*Config, error)`:
+  - [x] `~` expansion via `os.UserHomeDir`.
+  - [x] Applying defaults (Defaults.Identity → to tunnels without their own identity, Defaults.KnownHosts → when empty).
+  - [x] Parsing the `SSH` string `user@host:port` → `User/Host/Port` fields; defaults `$USER` and `22`.
+  - [x] Normalizing `Local`: if only a port → `127.0.0.1:<port>`.
+- [x] `func (c *Config) Validate() error`:
+  - [x] `Name` uniqueness (map by name).
+  - [x] `Name` non-empty, alphanumeric+dash.
+  - [x] `Type == "local"` (MVP); otherwise an explicit error «type X not supported yet, supported: local».
+  - [x] `Remote` and `Host` non-empty.
+  - [x] `Port` in the range 1–65535.
+- [x] `func (c *Config) Save(path string) error`:
+  - [x] `yaml.Marshal` + `os.WriteFile` with mode `0600`.
+  - [x] Do not fail on an empty config.
+- [x] `func EnsureExample(path string) (created bool, err error)`:
+  - [x] If the file does not exist — create one with a single example tunnel (`enabled: false`), return `created=true`.
+- [x] `glm-complex/config.example.yaml` — reference example.
+- [x] Unit tests (`config_test.go`):
+  - [x] Parsing valid YAML.
+  - [x] Applying defaults (local host, known_hosts, ssh port/user).
+  - [x] Round-trip: `Load` → change `Enabled` → `Save` → `Load` again yields the same state.
+  - [x] Validation error: duplicate `name`, broken port, empty `ssh`, unsupported `type`.
+  - [x] `~` expansion in `identity` and `known_hosts`.
 
 ## Definition of Done
 
-- [ ] `go test ./internal/config/...` is green, all the tests above are present.
-- [ ] `Load(DefaultPath())` on an empty system creates an example (`EnsureExample` ran).
-- [ ] Round-trip works: after `Save` the file remains valid YAML and is read by the same `Load`.
-- [ ] The config file is created with `0600` permissions.
-- [ ] The `ssh: user@host:port` field is correctly parsed into three values; the variants `host:port`, `user@host`, `host` work (with defaults).
-- [ ] `Validate` produces readable errors for every invalid case.
-- [ ] `go vet ./...` and `gofmt -l .` are clean.
+- [x] `go test ./internal/config/...` is green, all the tests above are present.
+- [x] `Load(DefaultPath())` on an empty system creates an example (`EnsureExample` ran).
+- [x] Round-trip works: after `Save` the file remains valid YAML and is read by the same `Load`.
+- [x] The config file is created with `0600` permissions.
+- [x] The `ssh: user@host:port` field is correctly parsed into three values; the variants `host:port`, `user@host`, `host` work (with defaults).
+- [x] `Validate` produces readable errors for every invalid case.
+- [x] `go vet ./...` and `gofmt -l .` are clean.
 
 ## Verification
 
