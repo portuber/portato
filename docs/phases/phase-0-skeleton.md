@@ -1,16 +1,16 @@
 ---
 phase: 0
 title: Project skeleton + GSD
-status: in-progress
+status: done
 depends_on: []
 ---
 
 ## Goal
 
-Initialize the Go module, dependencies, and package skeleton so that subsequent phases
-can fill it with code. Set up cobra with all subcommands (as stubs for now), so that
-`portato --help` immediately shows the full picture. The GSD files are already in place —
-here we bring them together with a working skeleton.
+Initialize the Go module, dependencies, and package scaffold so that subsequent
+phases can fill it with code. Set up cobra with all subcommands (as stubs for
+now), so that `portato --help` immediately shows the full picture. The GSD
+files are already in place — here we tie them together with a working skeleton.
 
 ## Phase scope (what we do)
 
@@ -20,7 +20,7 @@ here we bring them together with a working skeleton.
 - cobra root + all subcommands as stubs (`not implemented yet`).
 - Makefile (`make build`, `make run`, `make test`).
 - `.gitignore`.
-- A minimal `README.md` (what it is, how to run it, a link to `docs/`).
+- A minimal `README.md` (what it is, how to run, link to `docs/`).
 
 ## Phase scope (what we do NOT do)
 
@@ -35,7 +35,7 @@ here we bring them together with a working skeleton.
   - `glm-complex/cmd/portato/main.go`
   - `glm-complex/internal/{config,forward,controller,daemon,client,tui,service,cmd,log}/`
 - [x] `cmd/portato/main.go`: calls `internal/cmd.Execute()`.
-- [x] `internal/cmd/root.go`: cobra root command `portato` with a `--config` flag and a `RunE` handler that for now prints "TUI not implemented yet" (this will be the smart-launcher in Phase 5).
+- [x] `internal/cmd/root.go`: cobra root command `portato` with a `--config` flag and a `RunE` handler that for now prints "TUI not implemented yet" (this will become the smart-launcher in Phase 5).
 - [x] `internal/cmd/daemon.go`, `attach.go`, `list.go`, `enable.go`, `disable.go`, `restart.go`, `install.go`, `uninstall.go` — each subcommand as a stub: `RunE: func(...) { return fmt.Errorf("not implemented yet") }`.
 - [x] `.gitignore`: `bin/`, `*.log`, `*.sock`, `*.pid`, `.idea/`, `dist/`.
 - [x] `Makefile`:
@@ -58,7 +58,7 @@ here we bring them together with a working skeleton.
 
 - [x] `go build ./...` completes without errors.
 - [x] `./bin/portato --help` shows the root help and the list of all subcommands (daemon, attach, list, enable, disable, restart, install, uninstall).
-- [x] Each subcommand responds "not implemented yet" when called, without panicking.
+- [x] Each subcommand responds "not implemented yet" when invoked, without panicking.
 - [x] The `--config <path>` flag is available on the root command.
 - [x] `make build`, `make run`, `make test`, `make vet`, `make fmt` work.
 - [x] `go vet ./...` is clean, `gofmt -l .` is empty.
@@ -71,17 +71,17 @@ cd glm-complex
 go build ./...
 ./bin/portato --help
 ./bin/portato daemon            # expected: not implemented yet
-make fmt && make vet         # should be clean
+make fmt && make vet         # must be clean
 ```
 
 ## Technical details
 
 - **Module path:** `github.com/kipkaev55/portato`. Use this prefix everywhere in `import`.
-- **Go version:** set `go 1.22` in `go.mod` (the environment may contain 1.26 — that's fine, the lower bound is 1.22).
-- **Cobra layout:** root + subcommands in separate files under `internal/cmd/`; each `cobra.Command` is registered via `rootCmd.AddCommand(...)` in `Execute()`.
-- **Do not introduce** own config/Tunnel/Engine types yet — only empty packages, with `doc.go` if necessary (optional).
-- **README** — short (for now); the primary source of knowledge lives in `docs/`.
+- **Go version:** set `go 1.22` in `go.mod` (the environment may have 1.26 — that's fine, the lower bound is 1.22).
+- **Cobra layout:** root + subcommands in separate files in `internal/cmd/`; each `cobra.Command` is registered via `rootCmd.AddCommand(...)` in `Execute()`.
+- **Do not** introduce custom config/Tunnel/Engine types yet — only empty packages with a `doc.go` if needed (optional).
+- **README** — short (for now); the primary source of knowledge is `docs/`.
 
-## Phase deliverable
+## Phase output artifact
 
-- A working `bin/portato` stub that responds to `--help` and the subcommands, ready to be filled with logic in Phase 1.
+- A working `bin/portato` binary that responds to `--help` and subcommands, ready to be filled with logic in Phase 1.
