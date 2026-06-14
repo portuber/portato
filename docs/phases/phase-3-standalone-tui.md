@@ -35,47 +35,47 @@ the root command `portato` simply brings up `localController` + TUI.
 
 ## Tasks
 
-- [ ] `glm-complex/internal/controller/controller.go`:
-  - [ ] `type State int` (re-export from forward, or define here and convert — choose).
-  - [ ] `type Status struct { Name string; State State; Error string; Type string; Local, Remote string; Uptime time.Duration }`.
-  - [ ] `type Controller interface { List() []Status; Enable(name) error; Disable(name) error; Restart(name) error; Reload() error; Changes() <-chan struct{}; Close() error }`.
-- [ ] `glm-complex/internal/controller/local.go`:
-  - [ ] `type Local struct { engine *forward.Engine; cfg *config.Config; cfgPath string; changes chan struct{}; }`.
-  - [ ] `func NewLocal(cfg, cfgPath, log) *Local` — creates the Engine, does not start it.
-  - [ ] `Enable/Disable/Restart` → `engine.*` + a non-blocking signal to `changes`.
-  - [ ] `Reload()` → `config.Load` + `engine.Reload`.
-  - [ ] `Changes()` → return the channel; launch a goroutine with a `time.Ticker` 1s that non-blockingly sends to the channel.
-  - [ ] `Close()` → `engine.StopAll()` + close the channel.
-- [ ] `glm-complex/internal/tui/styles.go`:
-  - [ ] Lipgloss styles: header, table rows, footer with hotkeys, colored status indicators (green connected, gray off, yellow connecting/reconnecting, red error).
-- [ ] `glm-complex/internal/tui/model.go`:
-  - [ ] `type Model struct { ctrl controller.Controller; list []controller.Status; cursor int; width, height int; mode string; help bool; quit bool; pendingQuit bool }`.
-  - [ ] `mode` = `"standalone"` (later it will be `"attach @ <socket>"`).
-- [ ] `glm-complex/internal/tui/update.go`:
-  - [ ] `Init()` — initial `List()` + subscription to `Changes()`.
-  - [ ] `Update(msg)`:
+- [x] `glm-complex/internal/controller/controller.go`:
+  - [x] `type State int` (re-export from forward, or define here and convert — choose). **Resolved:** re-export (`type State = forward.State`, `type Status = forward.Status`) + state constants.
+  - [x] `type Status struct { ... }` — re-exported from forward; the interface uses `controller.Status`.
+  - [x] `type Controller interface { List() []Status; Enable(name) error; Disable(name) error; Restart(name) error; Reload() error; Changes() <-chan struct{}; Close() error }`.
+- [x] `glm-complex/internal/controller/local.go`:
+  - [x] `type Local struct { engine *forward.Engine; cfgPath string; ... changes chan struct{} }` (+ ctx/cancel, interval, Once-guards).
+  - [x] `func NewLocal(cfg, cfgPath, log) *Local` — creates the Engine, does not start it.
+  - [x] `Enable/Disable/Restart` → `engine.*` (the signal to `changes` is driven by a separate ticker, see below).
+  - [x] `Reload()` → `config.Load` + `engine.Reload`.
+  - [x] `Changes()` → return the channel; lazily launch a goroutine with `time.NewTicker(1s)` that non-blockingly sends to the channel. The controller package does NOT depend on bubbletea.
+  - [x] `Close()` → idempotent (sync.Once): cancel ctx + stop ticker + wait for the goroutine + close the channel + `engine.StopAll()`.
+- [x] `glm-complex/internal/tui/styles.go`:
+  - [x] Lipgloss styles: header, table rows, footer with hotkeys, colored status indicators (green connected, gray off, yellow connecting/reconnecting, red error).
+- [x] `glm-complex/internal/tui/model.go`:
+  - [x] `type Model struct { ctrl controller.Controller; list []controller.Status; cursor int; width, height int; mode string; help bool; quit bool }` (`pendingQuit` is not needed — in Phase 3 `q` exits immediately).
+  - [x] `mode` = `"standalone"` (later it will be `"attach @ <socket>"`).
+- [x] `glm-complex/internal/tui/update.go`:
+  - [x] `Init()` — initial `List()` + subscription to `Changes()` (via a channel-listening `tea.Cmd`).
+  - [x] `Update(msg)`:
     - `tea.KeyPressMsg` (v2):
       - `↑`/`k` — cursor up; `↓`/`j` — cursor down.
-      - `space` — if Off is selected → `Enable`; if Connected/Connecting → `Disable`.
+      - `space` — if Off is selected → `Enable`; otherwise → `Disable`.
       - `r` — `Restart` the selected one.
       - `a` — `Enable` all; `x` — `Disable` all.
       - `R` — `Reload()` the config.
       - `?` — toggle the help window (an inset at the bottom or a modal).
-      - `q` / `ctrl+c` — `Close()` + `tea.Quit`.
+      - `q` / `ctrl+c` — `tea.Quit` (`ctrl.Close()` is called by a defer in root.go).
     - `tea.WindowSizeMsg` — update `width/height`.
     - signal from `Changes()` → `ctrl.List()` + redraw.
-- [ ] `glm-complex/internal/tui/view.go`:
-  - [ ] Header: `portato — Port Forwarding` + `mode: standalone`.
-  - [ ] Table: `●/○` | `name` | `type` | `local → remote` | `status` | `uptime`.
-  - [ ] Footer: hotkeys `↑↓ move · space toggle · r restart · a/x all · R reload · ? help · q quit`.
-  - [ ] Highlight the selected row (like the blue bar in MCP).
-  - [ ] When `help=true` — an additional panel describing all hotkeys.
-- [ ] `glm-complex/internal/tui/run.go`:
-  - [ ] `func Run(ctrl controller.Controller, mode string) error` — `tea.NewProgram(model)`, `Run()`, handle the error. AltScreen and `tea.KeyPressMsg`/`tea.NewView` — per the v2 API (`view.AltScreen = true` in `View()`, not the `tea.WithAltScreen()` option).
-- [ ] `glm-complex/internal/cmd/root.go` (replacing the stub):
-  - [ ] `rootCmd.RunE`: load the config (`config.Load` or `EnsureExample`), create a logger (stderr + file), create `controller.NewLocal(...)`, call `tui.Run(ctrl)`.
-  - [ ] Graceful shutdown: on TUI exit — `ctrl.Close()` (which does `StopAll()`).
-  - [ ] The `--config` flag is honored.
+- [x] `glm-complex/internal/tui/view.go`:
+  - [x] Header: `portato — Port Forwarding` + `mode: standalone`.
+  - [x] Table: `●/○` | `name` | `type` | `local → remote` | `status` | `uptime`.
+  - [x] Footer: hotkeys `↑↓ move · space toggle · r restart · a/x all · R reload · ? help · q quit`.
+  - [x] Highlight the selected row (blue bar).
+  - [x] When `help=true` — an additional panel describing all hotkeys.
+- [x] `glm-complex/internal/tui/run.go`:
+  - [x] `func Run(ctrl controller.Controller, mode string) error` — `tea.NewProgram(model)`, `Run()`, handle the error. AltScreen and `tea.KeyPressMsg`/`tea.NewView` — per the v2 API (`view.AltScreen = true` in `View()`, not the `tea.WithAltScreen()` option).
+- [x] `glm-complex/internal/cmd/root.go` (replacing the stub):
+  - [x] `rootCmd.RunE`: load the config (`config.Load`, on absence a sample is created), create a logger (file under the XDG state home — stderr removed because it breaks the alt-screen), create `controller.NewLocal(...)`, call `tui.Run(ctrl, "standalone")`.
+  - [x] Graceful shutdown: on TUI exit — `ctrl.Close()` (which does `StopAll()`).
+  - [x] The `--config` flag is honored.
 
 ## Definition of Done
 
