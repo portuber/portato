@@ -4,9 +4,9 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
-
 	"github.com/kipkaev55/portato/internal/controller"
 )
 
@@ -203,7 +203,7 @@ func TestModel_RenderContainsTunnels(t *testing.T) {
 	m.width = 100
 
 	out := m.render()
-	for _, want := range []string{"portato", "mode: standalone", "alpha", "beta", "5432 → db:5432"} {
+	for _, want := range []string{"Portato", "mode: standalone", "alpha", "beta", "5432 → db:5432"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("render missing %q", want)
 		}
@@ -230,5 +230,25 @@ func TestModel_EmptyList(t *testing.T) {
 	}
 	if !strings.Contains(m.render(), "no tunnels") {
 		t.Error("empty list should render placeholder")
+	}
+}
+
+func TestFormatUptime(t *testing.T) {
+	cases := []struct {
+		d   time.Duration
+		out string
+	}{
+		{45 * time.Second, "45s"},
+		{2*time.Minute + 3*time.Second, "2m3s"},
+		{time.Hour + 5*time.Minute, "1h5m"},
+		{3*24*time.Hour + 2*time.Hour, "3d2h"},
+		{time.Minute, "1m0s"},
+		{time.Hour, "1h0m"},
+		{24 * time.Hour, "1d0h"},
+	}
+	for _, c := range cases {
+		if got := formatUptime(c.d); got != c.out {
+			t.Errorf("formatUptime(%v) = %q, want %q", c.d, got, c.out)
+		}
 	}
 }

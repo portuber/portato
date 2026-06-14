@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -38,7 +39,7 @@ func (m Model) render() string {
 }
 
 func (m Model) header() string {
-	left := titleStyle.Render("portato") + " " + dimStyle.Render("— Port Forwarding")
+	left := titleStyle.Render("Portato") + " " + dimStyle.Render("— Port Forwarding")
 	right := modeStyle.Render("mode: " + m.mode)
 	return joinRight(left, right, m.width)
 }
@@ -117,7 +118,20 @@ func uptime(s controller.Status) string {
 	if d <= 0 {
 		return ""
 	}
-	return d.Round(time.Second).String()
+	return formatUptime(d)
+}
+
+func formatUptime(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d.Seconds()))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm%ds", int(d.Minutes()), int(d.Seconds())%60)
+	case d < 24*time.Hour:
+		return fmt.Sprintf("%dh%dm", int(d.Hours()), int(d.Minutes())%60)
+	default:
+		return fmt.Sprintf("%dd%dh", int(d.Hours()/24), int(d.Hours())%24)
+	}
 }
 
 func (m Model) footer() string {
