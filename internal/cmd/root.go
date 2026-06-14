@@ -4,6 +4,11 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/kipkaev55/portato/internal/config"
+	"github.com/kipkaev55/portato/internal/controller"
+	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/kipkaev55/portato/internal/tui"
 )
 
 var cfgFile string
@@ -26,9 +31,29 @@ Modes:
   portato uninstall  remove system autostart
 
 See docs/SPEC.md for the full specification.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return fmt.Errorf("TUI not implemented yet")
-	},
+	RunE: rootRunE,
+}
+
+func rootRunE(cmd *cobra.Command, args []string) error {
+	path := cfgFile
+	if path == "" {
+		path = config.DefaultPath()
+	}
+	cfg, err := config.Load(path)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	logger, closer, err := routelog.Setup("")
+	if err != nil {
+		return fmt.Errorf("setup logger: %w", err)
+	}
+	defer closer.Close()
+
+	ctrl := controller.NewLocal(cfg, path, logger)
+	defer ctrl.Close()
+
+	return tui.Run(ctrl, "standalone")
 }
 
 func init() {
