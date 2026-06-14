@@ -1,7 +1,7 @@
 ---
 phase: 3
 title: Standalone TUI
-status: todo
+status: in-progress
 depends_on: [2]
 ---
 
@@ -24,7 +24,7 @@ the root command `portato` simply brings up `localController` + TUI.
 - Bubble Tea TUI: list of tunnels, navigation, toggle, hotkeys.
 - Lipgloss styles, colored statuses.
 - Wiring into `cmd/root.go` (replacing the stub with a real launch).
-- `tea.Tick` 1s for live statuses.
+- `time.Ticker` 1s for live statuses (inside `Local`; the TUI subscribes to the channel via a channel-listening `tea.Cmd`).
 
 ## Phase scope (what we do NOT do)
 
@@ -44,7 +44,7 @@ the root command `portato` simply brings up `localController` + TUI.
   - [ ] `func NewLocal(cfg, cfgPath, log) *Local` — creates the Engine, does not start it.
   - [ ] `Enable/Disable/Restart` → `engine.*` + a non-blocking signal to `changes`.
   - [ ] `Reload()` → `config.Load` + `engine.Reload`.
-  - [ ] `Changes()` → return the channel; launch a goroutine with `tea.Tick` 1s that sends to the channel.
+  - [ ] `Changes()` → return the channel; launch a goroutine with a `time.Ticker` 1s that non-blockingly sends to the channel.
   - [ ] `Close()` → `engine.StopAll()` + close the channel.
 - [ ] `glm-complex/internal/tui/styles.go`:
   - [ ] Lipgloss styles: header, table rows, footer with hotkeys, colored status indicators (green connected, gray off, yellow connecting/reconnecting, red error).
@@ -54,7 +54,7 @@ the root command `portato` simply brings up `localController` + TUI.
 - [ ] `glm-complex/internal/tui/update.go`:
   - [ ] `Init()` — initial `List()` + subscription to `Changes()`.
   - [ ] `Update(msg)`:
-    - `tea.KeyMsg`:
+    - `tea.KeyPressMsg` (v2):
       - `↑`/`k` — cursor up; `↓`/`j` — cursor down.
       - `space` — if Off is selected → `Enable`; if Connected/Connecting → `Disable`.
       - `r` — `Restart` the selected one.
@@ -71,7 +71,7 @@ the root command `portato` simply brings up `localController` + TUI.
   - [ ] Highlight the selected row (like the blue bar in MCP).
   - [ ] When `help=true` — an additional panel describing all hotkeys.
 - [ ] `glm-complex/internal/tui/run.go`:
-  - [ ] `func Run(ctrl controller.Controller) error` — create `tea.NewProgram(Model, tea.WithAltScreen())`, `Run()`, handle the error.
+  - [ ] `func Run(ctrl controller.Controller, mode string) error` — `tea.NewProgram(model)`, `Run()`, handle the error. AltScreen and `tea.KeyPressMsg`/`tea.NewView` — per the v2 API (`view.AltScreen = true` in `View()`, not the `tea.WithAltScreen()` option).
 - [ ] `glm-complex/internal/cmd/root.go` (replacing the stub):
   - [ ] `rootCmd.RunE`: load the config (`config.Load` or `EnsureExample`), create a logger (stderr + file), create `controller.NewLocal(...)`, call `tui.Run(ctrl)`.
   - [ ] Graceful shutdown: on TUI exit — `ctrl.Close()` (which does `StopAll()`).
@@ -119,10 +119,9 @@ curl http://localhost:<local_port>/...   # traffic reaches the remote
 
 ## Technical details
 
-- **Changes channel pattern:** the local `Controller` launches a `tea.Tick(time.Second)` goroutine that non-blockingly sends `struct{}{}` to the channel. The TUI maps this channel to a `tea.Msg` (via a `tea.Cmd` returned from `Init`/`Update`). On every message — `ctrl.List()` + redraw.
-- **1s polling is a temporary MVP solution.** In Phase 9 we will replace it with push events from the Engine (the Engine sends to the channel on any `state` change, the TUI is subscribed). The local mode will be able to switch to push without changing the `Controller` interface — only the `Changes()` implementation changes.
+- **Changes channel pattern:** the local `Controller` launches a goroutine with `time.NewTicker(time.Second)` that non-blockingly sends `struct{}{}` to the channel. The controller does **not** depend on bubbletea (this matters for `remoteController` in Phase 4). The TUI subscribes: from `Init()`/`Update()` it returns a `tea.Cmd` that blocks on `<-changes` and emits a local `tickMsg`, after which it re-subscribes. On every message — `ctrl.List()` + redraw. In Phase 9, `Changes()` will switch to push from the Engine without changing the interface.
+- **Bubble Tea v2:** the project uses `charm.land/bubbletea/v2`. Hence `View() tea.View` (via `tea.NewView`), `tea.KeyPressMsg` (not `tea.KeyMsg`), space is `case "space":`, and AltScreen is the field `view.AltScreen = true` in `View()`, not the `tea.WithAltScreen()` option on `NewProgram`.
 - **Non-blocking operations:** `Enable/Disable/Restart` launch the SSH connection in a goroutine (inside the Engine) and return immediately; the TUI must not hang on SSH operations. The status is updated via `Changes()`.
-- **AltScreen:** use `tea.WithAltScreen()` — the TUI takes over the whole terminal and restores it on exit.
 - **MouseOption:** do NOT enable (many terminals glitch); keyboard only.
 - **Lipgloss colors:** test on dark and light themes; use standard ANSI colors, don't hardcode RGB.
 - **Reload semantics:** after `R` — `config.Load` + `engine.Reload`. Running tunnels that haven't changed in the config are NOT restarted (diff by the serialized view of the tunnel).

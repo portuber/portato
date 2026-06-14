@@ -23,7 +23,7 @@
 |-------------------|------------------------------------------------|
 | Language          | Go 1.25+                                        |
 | CLI               | `github.com/spf13/cobra`                       |
-| TUI               | `github.com/charmbracelet/bubbletea` + `bubbles` + `lipgloss` |
+| TUI               | `charm.land/bubbletea/v2` + `charm.land/bubbles/v2` + `charm.land/lipgloss/v2` |
 | SSH               | `golang.org/x/crypto/ssh` + `golang.org/x/crypto/ssh/knownhosts` (native, no system `ssh`) |
 | Config            | `gopkg.in/yaml.v3`                             |
 | Paths (XDG)       | `github.com/adrg/xdg`                          |
@@ -136,7 +136,7 @@ type Status struct {
 ```
 
 Implementations:
-- **`localController`** (`controller/local.go`): wraps `forward.Engine`. `Changes()` — a `tea.Tick` channel at 1s in the MVP; replaced by a push from the Engine in post-MVP.
+- **`localController`** (`controller/local.go`): wraps `forward.Engine`. `Changes()` — a channel fed by a `time.Ticker` at 1s in the MVP (the controller does not depend on bubbletea); replaced by a push from the Engine in post-MVP.
 - **`remoteController`** (`controller/remote.go`): HTTP client of the daemon. `Changes()` — polling `GET /tunnels` once per 1s in the MVP; replaced by SSE/stream in post-MVP (Phase 9).
 
 ## 6. IPC (daemon ↔ clients)
