@@ -32,60 +32,62 @@ this socket. The TUI can be closed — the tunnels keep running. This is the mod
 
 ## Tasks
 
-- [ ] `glm-complex/internal/daemon/server.go`:
-  - [ ] `type Server struct { engine *forward.Engine; cfg *config.Config; cfgPath, socketPath, pidPath string; log *slog.Logger; srv *http.Server; }`.
-  - [ ] `func New(cfg, cfgPath, log) (*Server, error)` — compute the socket/PID paths (see SPEC §6), check that no daemon is already running (PID file + live process).
-  - [ ] HTTP routes (via `http.ServeMux` or a chi analogue — stdlib is fine):
+- [x] `glm-complex/internal/daemon/server.go`:
+  - [x] `type Server struct { engine *forward.Engine; cfg *config.Config; cfgPath, socketPath, pidPath string; log *slog.Logger; srv *http.Server; }`.
+  - [x] `func New(cfg, cfgPath, log) (*Server, error)` — compute the socket/PID paths (see SPEC §6), check that no daemon is already running (PID file + live process).
+  - [x] HTTP routes (via `http.ServeMux` or a chi analogue — stdlib is fine):
     - `GET /healthz` → `{"ok":true}`.
     - `GET /tunnels` → `[]Status` (JSON, conversion from `engine.List()`).
     - `POST /tunnels/{name}/enable` → `engine.Enable(name)` + update `cfg` (`Enabled=true` for this tunnel) + `config.Save(cfgPath)`.
     - `POST /tunnels/{name}/disable` → `engine.Disable(name)` + `Enabled=false` + `config.Save`.
     - `POST /tunnels/{name}/restart` → `engine.Restart(name)` (no persistence, state does not change).
     - `POST /reload` → `config.Load(cfgPath)` + `engine.Reload(newCfg)` + update `cfg`.
-  - [ ] `func (s *Server) Start(ctx) error`:
+  - [x] `func (s *Server) Start(ctx) error`:
     - create `net.Listen("unix", socketPath)`.
     - `os.Chmod(socketPath, 0600)`.
     - write the PID to `pidPath`.
     - start `engine.StartEnabled()` (tunnels with `Enabled=true`).
     - start `srv.Serve(listener)` in a goroutine.
     - wait for `ctx.Done()` or a signal.
-  - [ ] `func (s *Server) Shutdown()` — `srv.Shutdown(ctx)`, `engine.StopAll()`, remove the socket and the PID file.
-  - [ ] Signal handling: `signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)` → triggers `Shutdown()`.
-- [ ] `glm-complex/internal/client/client.go`:
-  - [ ] `type Client struct { http *http.Client; socketPath string }`.
-  - [ ] `http.Client.Transport = &http.Transport{ DialContext: func(...) { net.Dial("unix", socketPath) } }`.
-  - [ ] `func New(socketPath string) *Client`.
-  - [ ] `func (c *Client) List() ([]controller.Status, error)`.
-  - [ ] `func (c *Client) Enable(name) error`, `Disable(name)`, `Restart(name)`.
-  - [ ] `func (c *Client) Reload() error`.
-  - [ ] `func (c *Client) Healthz() error` — `GET /healthz`.
-- [ ] `glm-complex/internal/controller/remote.go`:
-  - [ ] `type Remote struct { client *client.Client; changes chan struct{}; }`.
-  - [ ] Implementation of all `Controller` methods via `client.*`.
-  - [ ] `Changes()` — a goroutine with a `tea.Tick` of 1s, sending into the channel (polling).
-  - [ ] `Close()` — close the channel (do NOT close the client, it is stateless).
-- [ ] `glm-complex/internal/cmd/daemon.go` (replace the stub):
-  - [ ] `RunE`: load the config (`config.Load`), create a logger (file + stderr only), create `daemon.New(...)`, start it.
-  - [ ] Logs to `xdg.StateHome/portato/daemon.log`.
-- [ ] `glm-complex/internal/cmd/attach.go` (replace the stub):
-  - [ ] `RunE`: determine the socket path (same as in the daemon), create `client.New(socketPath)`, call `Healthz()` — on error, a clear message `«daemon not running, try 'portato daemon' or 'portato install'»`.
-  - [ ] Create `controller.Remote(client, ...)`, call `tui.Run(ctrl)`.
-  - [ ] The TUI header shows `mode: attach @ <socket>` — this string must be threaded into the Model (via a `Run` option or a field).
-- [ ] Verification: when the socket is taken (the daemon is already running) — a clear error, not a panic.
+  - [x] `func (s *Server) Shutdown()` — `srv.Shutdown(ctx)`, `engine.StopAll()`, remove the socket and the PID file.
+  - [x] Signal handling: `signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)` → triggers `Shutdown()`.
+- [x] `glm-complex/internal/client/client.go`:
+  - [x] `type Client struct { http *http.Client; socketPath string }`.
+  - [x] `http.Client.Transport = &http.Transport{ DialContext: func(...) { net.Dial("unix", socketPath) } }`.
+  - [x] `func New(socketPath string) *Client`.
+  - [x] `func (c *Client) List() ([]controller.Status, error)`.
+  - [x] `func (c *Client) Enable(name) error`, `Disable(name)`, `Restart(name)`.
+  - [x] `func (c *Client) Reload() error`.
+  - [x] `func (c *Client) Healthz() error` — `GET /healthz`.
+- [x] `glm-complex/internal/controller/remote.go`:
+  - [x] `type Remote struct { client *client.Client; changes chan struct{}; }`.
+  - [x] Implementation of all `Controller` methods via `client.*`.
+  - [x] `Changes()` — a goroutine with a `tea.Tick` of 1s, sending into the channel (polling).
+  - [x] `Close()` — close the channel (do NOT close the client, it is stateless).
+- [x] `glm-complex/internal/cmd/daemon.go` (replace the stub):
+  - [x] `RunE`: load the config (`config.Load`), create a logger (file + stderr only), create `daemon.New(...)`, start it.
+  - [x] Logs to `xdg.StateHome/portato/daemon.log`.
+- [x] `glm-complex/internal/cmd/attach.go` (replace the stub):
+  - [x] `RunE`: determine the socket path (same as in the daemon), create `client.New(socketPath)`, call `Healthz()` — on error, a clear message `«daemon not running, try 'portato daemon' or 'portato install'»`.
+  - [x] Create `controller.Remote(client, ...)`, call `tui.Run(ctrl)`.
+  - [x] The TUI header shows `mode: attach @ <socket>` — this string must be threaded into the Model (via a `Run` option or a field).
+- [x] Verification: when the socket is taken (the daemon is already running) — a clear error, not a panic.
 
 ## Definition of Done
 
-- [ ] `portato daemon` starts up, opens the socket, writes the PID file, handles SIGTERM/SIGINT, and shuts down cleanly (the socket and PID removed).
-- [ ] The socket has mode `0600`; another user cannot connect (check `curl --unix-socket` under another user — refused).
-- [ ] On a second `portato daemon` (the daemon already running) — a clear error, not a crash.
-- [ ] `curl --unix-socket <sock> http://x/healthz` → `{"ok":true}`.
-- [ ] `curl --unix-socket <sock> http://x/tunnels` → JSON with the list of statuses.
+- [x] `portato daemon` starts up, opens the socket, writes the PID file, handles SIGTERM/SIGINT, and shuts down cleanly (the socket and PID removed).
+- [x] The socket has mode `0600`; another user cannot connect (check `curl --unix-socket` under another user — refused).
+- [x] On a second `portato daemon` (the daemon already running) — a clear error, not a crash.
+- [x] `curl --unix-socket <sock> http://x/healthz` → `{"ok":true}`.
+- [x] `curl --unix-socket <sock> http://x/tunnels` → JSON with the list of statuses.
 - [ ] `curl -X POST --unix-socket <sock> http://x/tunnels/<name>/enable` enables the tunnel, and in the next `GET /tunnels` it is `Connected`; `enabled: true` has appeared in the YAML.
-- [ ] `curl -X POST --unix-socket <sock> http://x/tunnels/<name>/disable` → `Off`; `enabled: false` in the YAML.
+- [x] `curl -X POST --unix-socket <sock> http://x/tunnels/<name>/disable` → `Off`; `enabled: false` in the YAML.
 - [ ] `portato attach` in another terminal opens a TUI that actually drives the daemon's tunnels.
 - [ ] Closing `portato attach` (`q`) does **not** bring down the daemon's active tunnels (raise a tunnel → close the TUI → traffic still flows).
 - [ ] The TUI header shows `attach @ <socket>`.
-- [ ] `go vet ./...` and `gofmt -l .` are clean.
+- [x] `go vet ./...` and `gofmt -l .` are clean.
+
+> Implementation is complete. Clearing the remaining three items (enable→`Connected`, `attach` TUI, header, closing attach without losing tunnels) requires interactive verification against a live sshd — as in Phase 3. Persisting `enabled` to YAML, the transition to `Off`, and a clean lifecycle are confirmed by a smoke test (`curl --unix-socket`).
 
 ## Verification
 
