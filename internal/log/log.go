@@ -14,6 +14,11 @@ func DefaultPath() string {
 	return filepath.Join(xdg.StateHome, "portato", "portato.log")
 }
 
+// DaemonPath is the log file used by `portato daemon`.
+func DaemonPath() string {
+	return filepath.Join(xdg.StateHome, "portato", "daemon.log")
+}
+
 func Setup(path string) (*slog.Logger, io.Closer, error) {
 	if path == "" {
 		path = DefaultPath()
