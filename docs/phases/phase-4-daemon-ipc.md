@@ -1,7 +1,7 @@
 ---
 phase: 4
 title: Daemon and HTTP-over-unix-socket IPC
-status: todo
+status: in-progress
 depends_on: [3]
 ---
 

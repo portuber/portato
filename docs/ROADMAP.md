@@ -14,7 +14,7 @@
 | 1  | Config                                | `[x]`  | [phase-1-config.md](./phases/phase-1-config.md)       |
 | 2  | Forward engine (native SSH, -L)       | `[x]`  | [phase-2-forward-engine.md](./phases/phase-2-forward-engine.md) |
 | 3  | Standalone TUI                        | `[x]`  | [phase-3-standalone-tui.md](./phases/phase-3-standalone-tui.md) |
-| 4  | Daemon and HTTP-over-unix-socket IPC  | `[ ]`  | [phase-4-daemon-ipc.md](./phases/phase-4-daemon-ipc.md) |
+| 4  | Daemon and HTTP-over-unix-socket IPC  | `[~]`  | [phase-4-daemon-ipc.md](./phases/phase-4-daemon-ipc.md) |
 | 5  | CLI commands + smart launcher + hand-off | `[ ]`  | [phase-5-cli-smart-launcher.md](./phases/phase-5-cli-smart-launcher.md) |
 | 6  | Autostart (launchd/systemd) + E2E     | `[ ]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
 
@@ -40,7 +40,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phase 4 — Daemon and HTTP-over-unix-socket IPC** (pending). Phase 3 (Standalone TUI) is complete and verified interactively (live sshd + real MySQL traffic through the tunnel). We'll continue MVP with it on the user's command.
+**Phase 4 — Daemon and HTTP-over-unix-socket IPC** (in progress). Phase 3 (Standalone TUI) is complete and verified interactively (live sshd + real MySQL traffic through the tunnel). Phase 4 adds a background daemon with HTTP-over-unix-socket IPC and `portato attach`.
 
 Phases 1–6 — detailed MVP plan; 7–11 — outline (goal + DoD), refined as they are approached.
 
