@@ -330,16 +330,24 @@ func TestModel_ConfirmKeys(t *testing.T) {
 		t.Errorf("n: quit=%v confirmQuit=%v cmd=%v", mm.quit, mm.confirmQuit, cmd)
 	}
 
-	// esc and enter also decline
-	for _, k := range []string{"esc", "enter"} {
-		m3 := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
-		m3.list = []controller.Status{{Name: "a", State: controller.Connected}}
-		m3.confirmQuit = true
-		next, cmd = m3.handleKey(keyPress(k))
-		mm := next.(Model)
-		if !mm.quit || mm.confirmQuit {
-			t.Errorf("%s: quit=%v confirmQuit=%v", k, mm.quit, mm.confirmQuit)
-		}
+	// enter declines (same as n): stop + exit
+	mEnter := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	mEnter.list = []controller.Status{{Name: "a", State: controller.Connected}}
+	mEnter.confirmQuit = true
+	next, cmd = mEnter.handleKey(keyPress("enter"))
+	mm = next.(Model)
+	if !mm.quit || mm.confirmQuit || cmd == nil {
+		t.Errorf("enter: quit=%v confirmQuit=%v cmd=%v", mm.quit, mm.confirmQuit, cmd)
+	}
+
+	// esc cancels the modal: back to the list, no quit, tunnels untouched
+	mEsc := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	mEsc.list = []controller.Status{{Name: "a", State: controller.Connected}}
+	mEsc.confirmQuit = true
+	next, cmd = mEsc.handleKey(keyPress("esc"))
+	mm = next.(Model)
+	if mm.quit || mm.confirmQuit || cmd != nil {
+		t.Errorf("esc: want cancel (quit=false confirmQuit=false cmd=nil), got quit=%v confirmQuit=%v cmd=%v", mm.quit, mm.confirmQuit, cmd)
 	}
 }
 

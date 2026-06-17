@@ -181,7 +181,7 @@ func (m Model) confirmQuitView() string {
 			n++
 		}
 	}
-	line := fmt.Sprintf("%d tunnel(s) active.\nLeave them running in the background? [y/N]", n)
+	line := fmt.Sprintf("%d tunnel(s) active.\nLeave them running in the background? [y/N]\ny — yes (background)   n/enter — no (stop & exit)   esc — cancel", n)
 	return modalStyle.Render(line)
 }
 

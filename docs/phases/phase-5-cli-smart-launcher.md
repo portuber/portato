@@ -70,7 +70,7 @@ After this phase the utility fully matches the "three modes of operation" concep
       - If > 0 → `confirmQuit = true` (show the modal).
 - [x] Modal in `view.go`:
   - [x] Centered window: `«N tunnels are active. Leave work in the background? [y/N]»`.
-  - [x] Keys: `y` — yes, `n` / `Esc` / `enter` — no (default).
+  - [x] Keys: `y` — yes, `n` / `enter` — no (default, stop + exit), `Esc` — cancel (close the modal, return to the list).
 - [x] `glm-complex/internal/tui/handoff.go`:
   - [x] `func handoff(ctx) error`:
     - Before spawning, ensure that `cfg` on disk matches the current Engine state (if in standalone the user toggled, `localController` should already have persisted via `Enable/Disable` → `config.Save`). Check and save if necessary.
@@ -79,7 +79,7 @@ After this phase the utility fully matches the "three modes of operation" concep
     - On success — `tea.Quit`. On timeout — fallback: `Close()` + exit with a warning in the log/message.
 - [x] In `Update`:
   - `y` → run `handoff` asynchronously, show `«Starting daemon...»`, on success — `tea.Quit`.
-  - `n`/`Esc`/`enter` → `confirmQuit = false` + `Close()` + `tea.Quit`.
+  - `n`/`enter` → `confirmQuit = false` + `Close()` + `tea.Quit`; `Esc` → `confirmQuit = false` (cancel, return to the list, without exiting).
 
 ### Related minor items
 
@@ -99,7 +99,7 @@ After this phase the utility fully matches the "three modes of operation" concep
   - spawns a `portato daemon` process,
   - the TUI waits for the socket to come up (≤ 5s),
   - exits; the tunnels keep running in the daemon.
-- [ ] Answering `n` / `Esc` / `enter` → all tunnels are stopped correctly, the application exits.
+- [ ] Answering `n` / `enter` → all tunnels are stopped correctly, the application exits; `Esc` cancels the modal and returns to the list.
 - [ ] After hand-off: `portato list` confirms the tunnels are `Connected` in the daemon.
 - [ ] In attach mode, `q` simply closes the TUI (without a modal); the daemon's tunnels keep running.
 - [x] `go vet ./...` and `gofmt -l .` are clean.

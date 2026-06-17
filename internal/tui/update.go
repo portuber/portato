@@ -81,10 +81,13 @@ func (m Model) handleConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.handoffing = true
 		m.handoffErr = ""
 		return m, m.handoffCmd()
-	case "n", "esc", "enter":
+	case "n", "enter":
 		m.confirmQuit = false
 		m.quit = true
 		return m, tea.Quit
+	case "esc":
+		m.confirmQuit = false
+		return m, nil
 	}
 	return m, nil
 }
