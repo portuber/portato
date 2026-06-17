@@ -25,6 +25,12 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) render() string {
+	if m.confirmQuit {
+		return m.centered(m.confirmQuitView())
+	}
+	if m.handoffing {
+		return m.centered(modeStyle.Render("Starting daemon…"))
+	}
 	var b strings.Builder
 	b.WriteString(m.header())
 	b.WriteString("\n\n")
@@ -35,15 +41,17 @@ func (m Model) render() string {
 		b.WriteString("\n\n")
 		b.WriteString(m.helpBlock())
 	}
-	if m.confirmQuit {
-		b.WriteString("\n\n")
-		b.WriteString(m.confirmQuitView())
-	}
-	if m.handoffing {
-		b.WriteString("\n\n")
-		b.WriteString(modeStyle.Render("Starting daemon…"))
-	}
 	return b.String()
+}
+
+// centered overlays a single block in the middle of the screen. Width/height
+// are 0 before the first WindowSizeMsg (and in unit tests), in which case the
+// block is returned as-is.
+func (m Model) centered(block string) string {
+	if m.width > 0 && m.height > 0 {
+		return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, block)
+	}
+	return block
 }
 
 func (m Model) header() string {
@@ -173,8 +181,8 @@ func (m Model) confirmQuitView() string {
 			n++
 		}
 	}
-	line := fmt.Sprintf("%d tunnel(s) active. Leave them running in the background? [y/N]", n)
-	return helpPanel.Render(line)
+	line := fmt.Sprintf("%d tunnel(s) active.\nLeave them running in the background? [y/N]", n)
+	return modalStyle.Render(line)
 }
 
 func joinRight(left, right string, width int) string {

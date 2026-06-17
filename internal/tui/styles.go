@@ -15,6 +15,7 @@ var (
 	footerStyle   = lipgloss.NewStyle().Faint(true)
 	helpTitle     = lipgloss.NewStyle().Bold(true).Underline(true)
 	helpPanel     = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 2)
+	modalStyle    = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(1, 3).Bold(true)
 )
 
 var stateStyle = map[controller.State]lipgloss.Style{

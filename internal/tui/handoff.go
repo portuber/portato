@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/kipkaev55/portato/internal/client"
 	"github.com/kipkaev55/portato/internal/controller"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 const (
@@ -29,15 +31,36 @@ type handoffDoneMsg struct{ err error }
 
 // startCmd spawns a detached `portato daemon --config <cfgPath>`. It is a
 // package-level seam so tests can substitute a fake without forking.
+//
+// The child's stdout/stderr are routed to the daemon log so that a failure
+// before the daemon sets up its own file logger (e.g. a config error) is not
+// silently lost; the hand-off would otherwise only report a socket timeout.
 var startCmd = func(cfgPath string) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
 	cmd := exec.Command(exe, "daemon", "--config", cfgPath)
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = nil, nil, nil
+	cmd.Stdin = nil
+	if f, ferr := openDaemonLogAppend(); ferr == nil {
+		cmd.Stdout, cmd.Stderr = f, f
+		defer func() { _ = f.Close() }()
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	return cmd.Start()
+}
+
+// openDaemonLogAppend opens the daemon log for appending (creating its dir),
+// so the spawned daemon's early output is captured next to the daemon's own
+// log lines.
+func openDaemonLogAppend() (*os.File, error) {
+	path := routelog.DaemonPath()
+	if dir := filepath.Dir(path); dir != "" {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return nil, err
+		}
+	}
+	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 }
 
 // probeSocket reports whether the daemon is answering on the socket. Seam for
