@@ -249,3 +249,16 @@ func TestCLI_DaemonDownHint(t *testing.T) {
 		}
 	}
 }
+
+func TestProbeDaemon(t *testing.T) {
+	s := newStubServer(t, sampleStatuses())
+
+	if !probeDaemon(s.socket) {
+		t.Error("probeDaemon should report true for a live unix-socket server")
+	}
+
+	dead := filepath.Join(shortDir(t), "missing.sock")
+	if probeDaemon(dead) {
+		t.Error("probeDaemon should report false when nothing is listening")
+	}
+}

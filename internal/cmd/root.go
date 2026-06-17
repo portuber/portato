@@ -1,17 +1,28 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/kipkaev55/portato/internal/client"
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/kipkaev55/portato/internal/daemon"
 	routelog "github.com/kipkaev55/portato/internal/log"
 	"github.com/kipkaev55/portato/internal/tui"
 )
 
-var cfgFile string
+var (
+	cfgFile         string
+	forceStandalone bool
+)
+
+// probeTimeout caps the smart-launcher daemon probe: a live daemon (or
+// connection-refused) responds in well under this.
+const probeTimeout = 200 * time.Millisecond
 
 var rootCmd = &cobra.Command{
 	Use:   "portato",
@@ -34,7 +45,24 @@ See docs/SPEC.md for the full specification.`,
 	RunE: rootRunE,
 }
 
-func rootRunE(cmd *cobra.Command, args []string) error {
+func rootRunE(_ *cobra.Command, _ []string) error {
+	socket, err := daemon.SocketPath()
+	if err != nil {
+		return fmt.Errorf("resolve socket path: %w", err)
+	}
+
+	if !forceStandalone && probeDaemon(socket) {
+		ctrl := controller.NewRemote(client.New(socket))
+		defer ctrl.Close()
+		return tui.Run(ctrl, "attach @ "+socket)
+	}
+	return runStandalone()
+}
+
+// runStandalone loads the config, builds a local controller and runs the TUI
+// without a daemon. This is the fallback when no daemon answers, and the
+// forced path under --force-standalone.
+func runStandalone() error {
 	path := cfgFile
 	if path == "" {
 		path = config.DefaultPath()
@@ -56,8 +84,17 @@ func rootRunE(cmd *cobra.Command, args []string) error {
 	return tui.Run(ctrl, "standalone")
 }
 
+// probeDaemon reports whether a live daemon is answering on the socket within
+// probeTimeout. Any error (refused, timeout, bad response) means "not alive".
+func probeDaemon(socket string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), probeTimeout)
+	defer cancel()
+	return client.New(socket).HealthzCtx(ctx) == nil
+}
+
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to config file (default: XDG config home)")
+	rootCmd.Flags().BoolVar(&forceStandalone, "force-standalone", false, "skip daemon auto-detection and run a standalone TUI")
 }
 
 func Execute() error {

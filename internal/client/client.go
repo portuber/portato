@@ -46,6 +46,24 @@ func (c *Client) Healthz() error {
 	return c.get("/healthz", &resp)
 }
 
+// HealthzCtx is a context-aware liveness probe. The smart launcher uses it
+// with a short deadline (200ms) so a missing daemon does not stall startup.
+func (c *Client) HealthzCtx(ctx context.Context) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url("/healthz"), nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return decodeError(resp)
+	}
+	return nil
+}
+
 // List returns the current status of every tunnel.
 func (c *Client) List() ([]forward.Status, error) {
 	var out []forward.Status
