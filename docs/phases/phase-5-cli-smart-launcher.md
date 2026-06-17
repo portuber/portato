@@ -36,61 +36,61 @@ After this phase the utility fully matches the "three modes of operation" concep
 
 ### CLI commands
 
-- [ ] `glm-complex/internal/cmd/list.go` (replace the stub):
-  - [ ] Create `client.New(socketPath)`.
-  - [ ] `Healthz()` — on error, a clear message: `«portato daemon is not running. Start it with 'portato daemon' or set up autostart with 'portato install'.»` + exit code 1.
-  - [ ] `List()` → print a table to stdout (name, type, local→remote, status, uptime). Format — simple aligned text; post-MVP a `--json` flag can be added.
-- [ ] `glm-complex/internal/cmd/enable.go`, `disable.go`, `restart.go` (replace stubs):
-  - [ ] Common pattern: `client.New` → `Healthz` → call the corresponding method → on success, a short confirmation (`enabled: <name>`).
-  - [ ] Argument `<name>` via cobra `Args: ExactArgs(1)`.
-  - [ ] If no tunnel with that name exists — the daemon error is surfaced readably.
+- [x] `glm-complex/internal/cmd/list.go` (replace the stub):
+  - [x] Create `client.New(socketPath)`.
+  - [x] `Healthz()` — on error, a clear message: `«portato daemon is not running. Start it with 'portato daemon' or set up autostart with 'portato install'.»` + exit code 1.
+  - [x] `List()` → print a table to stdout (name, type, local→remote, status, uptime). Format — simple aligned text; post-MVP a `--json` flag can be added.
+- [x] `glm-complex/internal/cmd/enable.go`, `disable.go`, `restart.go` (replace stubs):
+  - [x] Common pattern: `client.New` → `Healthz` → call the corresponding method → on success, a short confirmation (`enabled: <name>`).
+  - [x] Argument `<name>` via cobra `Args: ExactArgs(1)`.
+  - [x] If no tunnel with that name exists — the daemon error is surfaced readably.
 
 ### Smart-launcher
 
-- [ ] `glm-complex/internal/cmd/root.go` (extend Phase 3):
-  - [ ] Before loading the config: probe the socket via `client.New(socketPath).Healthz()` with a short timeout (200ms).
-  - [ ] If the daemon is alive → **attach** mode:
+- [x] `glm-complex/internal/cmd/root.go` (extend Phase 3):
+  - [x] Before loading the config: probe the socket via `client.New(socketPath).Healthz()` with a short timeout (200ms).
+  - [x] If the daemon is alive → **attach** mode:
     - create `controller.Remote(client, ...)`, call `tui.Run(ctrl)`.
     - this is equivalent to `portato attach`, but implicit.
-  - [ ] If the daemon does not respond → **standalone** mode (as in Phase 3):
+  - [x] If the daemon does not respond → **standalone** mode (as in Phase 3):
     - `config.Load/EnsureExample` → `controller.NewLocal(...)` → `tui.Run(ctrl)`.
-  - [ ] The TUI header shows the selected mode: `standalone` or `attach @ <socket>`.
-  - [ ] Optional flag `--force-standalone` (to skip auto-detection).
+  - [x] The TUI header shows the selected mode: `standalone` or `attach @ <socket>`.
+  - [x] Optional flag `--force-standalone` (to skip auto-detection).
 
 ### Hand-off "leave in background?"
 
-- [ ] `glm-complex/internal/tui/model.go` (extend Phase 3):
-  - [ ] New field `mode string` (`"standalone"` | `"attach"`). If `attach` — normal exit without a modal.
-  - [ ] Field `confirmQuit bool` — flag to show the modal.
-  - [ ] In `Update` for `q` / `ctrl+c`:
+- [x] `glm-complex/internal/tui/model.go` (extend Phase 3):
+  - [x] New field `mode string` (`"standalone"` | `"attach"`). If `attach` — normal exit without a modal.
+  - [x] Field `confirmQuit bool` — flag to show the modal.
+  - [x] In `Update` for `q` / `ctrl+c`:
     - If `mode == "attach"` → immediately `Close()` + `tea.Quit`.
     - If `mode == "standalone"`:
       - Count live tunnels (`List()` filtered by `State ∈ {Connecting, Connected, Reconnecting}`).
       - If 0 → `Close()` + `tea.Quit`.
       - If > 0 → `confirmQuit = true` (show the modal).
-- [ ] Modal in `view.go`:
-  - [ ] Centered window: `«N tunnels are active. Leave work in the background? [y/N]»`.
-  - [ ] Keys: `y` — yes, `n` / `Esc` / `enter` — no (default).
-- [ ] `glm-complex/internal/tui/handoff.go`:
-  - [ ] `func handoff(ctx) error`:
+- [x] Modal in `view.go`:
+  - [x] Centered window: `«N tunnels are active. Leave work in the background? [y/N]»`.
+  - [x] Keys: `y` — yes, `n` / `Esc` / `enter` — no (default).
+- [x] `glm-complex/internal/tui/handoff.go`:
+  - [x] `func handoff(ctx) error`:
     - Before spawning, ensure that `cfg` on disk matches the current Engine state (if in standalone the user toggled, `localController` should already have persisted via `Enable/Disable` → `config.Save`). Check and save if necessary.
     - `exec.Command(os.Executable(), "daemon", "--config", cfgPath)` + `cmd.Stdin/Stdout/Stderr = nil` + `cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}` (detached). `cmd.Start()`.
     - Poll `client.New(socketPath).Healthz()` every 100ms up to a 5s timeout.
     - On success — `tea.Quit`. On timeout — fallback: `Close()` + exit with a warning in the log/message.
-- [ ] In `Update`:
+- [x] In `Update`:
   - `y` → run `handoff` asynchronously, show `«Starting daemon...»`, on success — `tea.Quit`.
   - `n`/`Esc`/`enter` → `confirmQuit = false` + `Close()` + `tea.Quit`.
 
 ### Related minor items
 
-- [ ] `glm-complex/internal/cmd/paths.go` (or in `daemon/paths.go`): a shared function `SocketPath() string` and `PIDPath() string`, used by all commands. Avoid duplication.
-- [ ] In `daemon.New` accept a flag `spawned bool` (or simply ignore it) — it does not matter whether the smart-launcher or the user manually spawns it.
+- [x] `glm-complex/internal/cmd/paths.go` (or in `daemon/paths.go`): a shared function `SocketPath() string` and `PIDPath() string`, used by all commands. Avoid duplication.
+- [x] In `daemon.New` accept a flag `spawned bool` (or simply ignore it) — it does not matter whether the smart-launcher or the user manually spawns it.
 
 ## Definition of Done
 
 - [ ] `portato list` prints a table of tunnels with their statuses (when the daemon is running).
 - [ ] `portato enable <name>`, `portato disable <name>`, `portato restart <name>` work and are confirmed by the next `portato list`.
-- [ ] Without the daemon, all CLI commands produce a clear error with a hint (no panic/stack trace).
+- [x] Without the daemon, all CLI commands produce a clear error with a hint (no panic/stack trace).
 - [ ] `portato` with no arguments:
   - With the daemon running, opens the TUI in attach mode; the header shows `attach @ <socket>`.
   - Without the daemon, opens the TUI in standalone mode; the header shows `standalone`.
@@ -102,7 +102,7 @@ After this phase the utility fully matches the "three modes of operation" concep
 - [ ] Answering `n` / `Esc` / `enter` → all tunnels are stopped correctly, the application exits.
 - [ ] After hand-off: `portato list` confirms the tunnels are `Connected` in the daemon.
 - [ ] In attach mode, `q` simply closes the TUI (without a modal); the daemon's tunnels keep running.
-- [ ] `go vet ./...` and `gofmt -l .` are clean.
+- [x] `go vet ./...` and `gofmt -l .` are clean.
 
 ## Verification
 
@@ -150,6 +150,13 @@ kill -TERM $(cat "$HOME/.config/portato/portato.pid")
 - **Spawn mechanism:** `exec.Command(os.Executable(), "daemon", "--config", cfgPath)` — we take the same binary as standalone. Cheap and symmetric.
 - **Default in the modal = N:** a safe default — a stray enter from the user will drop the tunnels (explicit expectation), but will not leave a daemon running in the background by accident.
 - **Hand-off logging:** if spawn failed (executable deleted / no permissions), show a readable error in the TUI and fall back to `Close()` + exit.
+
+## Implementation notes (deviations from the plan)
+
+- **Persisting `enabled` in standalone.** The plan assumed that `localController.Enable/Disable` already persists `enabled` to YAML. In fact, before Phase 5 only the daemon side (`server.go`) persisted it; the standalone toggle did not write to disk. This is fixed within the phase (`feat(controller): persist enabled flag on standalone toggle`) — without it, hand-off would have brought up a stale set of tunnels.
+- **Hand-off sequence = `Close` → `spawn` → `wait`.** The plan/SPEC described `spawn` → `wait`. The implementation first calls `ctrl.Close()` (`StopAll`, releasing local ports), then spawns, then waits for the socket. Reason: `Tunnel.Start` binds the listener synchronously and does not retry a failed bind — the ports must be free by the time the daemon starts, otherwise the daemon's tunnel falls into `Error` with no recovery. SPEC §12 has been updated.
+- **The `spawned` flag on `daemon.New` is omitted** (the plan allowed "or simply ignore it"): a spawn from hand-off and a manual `portato daemon` are indistinguishable, so the flag is unnecessary.
+- **TUI API:** `tui.Run`/`tui.New` take an `Options{Mode, CfgPath, SocketPath}` instead of a mode string — to thread the paths through for hand-off.
 
 ## Phase deliverable
 

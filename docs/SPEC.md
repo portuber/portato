@@ -263,10 +263,10 @@ On exit from standalone mode (`q`):
 
 1. If there are no live (Connecting/Connected/Reconnecting) tunnels → exit immediately with `StopAll()`.
 2. If there are live tunnels → modal: `"N tunnels are active. Leave them in the background? [y/N]"`.
-3. **`y`**: spawn `portato daemon` as a separate detached process (`exec.Command` + `cmd.Start()`, without waiting). The standalone process periodically (every 100ms, up to a 5s timeout) tries `GET /healthz` on the socket; as soon as it gets a 200 — exit. The tunnels are not disturbed: they are already up in the fresh daemon (it has read `enabled:true` from the config that we just persisted on toggle).
-4. **`n`** or `Esc`: `StopAll()` + exit.
+3. **`y`**: standalone first runs `StopAll()` (this releases the local ports), then spawns `portato daemon --config <cfg>` as a separate detached process (`exec.Command` + `cmd.Start()`, `Setsid`). Ports are released before the spawn on purpose: `Tunnel.Start` binds the listener synchronously and does not retry a failed bind, so by the time the daemon starts the ports must be free — otherwise the daemon's tunnel will fall into `Error` without recovery. The standalone process periodically (every 100ms, up to a 5s timeout) tries `GET /healthz` on the socket; as soon as it gets a 200 — exit. The fresh daemon reads `enabled:true` from the persisted config (the invariant in §6) and brings up the same set of tunnels.
+4. **`n`** or `Esc`/`enter`: `StopAll()` + exit.
 
-MVP limitation: between the daemon's start and readiness there may be a slight flicker on client connections (the tunnel is re-initialized with a fresh SSH session). Post-MVP, tunnel FDs can be passed to the daemon via FD-passing, but this is not critical.
+MVP limitation: between the standalone's `StopAll()` and the bind/SSH handshake of the daemon's tunnels there is a window (~hundreds of ms to seconds) during which the local port is unavailable. This is an MVP trade-off. Post-MVP — passing tunnel FDs to the daemon via FD-passing (a flicker-free transition).
 
 ## 13. Autostart
 
