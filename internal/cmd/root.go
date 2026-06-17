@@ -54,15 +54,15 @@ func rootRunE(_ *cobra.Command, _ []string) error {
 	if !forceStandalone && probeDaemon(socket) {
 		ctrl := controller.NewRemote(client.New(socket))
 		defer ctrl.Close()
-		return tui.Run(ctrl, "attach @ "+socket)
+		return tui.Run(ctrl, tui.Options{Mode: "attach @ " + socket})
 	}
-	return runStandalone()
+	return runStandalone(socket)
 }
 
 // runStandalone loads the config, builds a local controller and runs the TUI
 // without a daemon. This is the fallback when no daemon answers, and the
 // forced path under --force-standalone.
-func runStandalone() error {
+func runStandalone(socket string) error {
 	path := cfgFile
 	if path == "" {
 		path = config.DefaultPath()
@@ -81,7 +81,7 @@ func runStandalone() error {
 	ctrl := controller.NewLocal(cfg, path, logger)
 	defer ctrl.Close()
 
-	return tui.Run(ctrl, "standalone")
+	return tui.Run(ctrl, tui.Options{Mode: "standalone", CfgPath: path, SocketPath: socket})
 }
 
 // probeDaemon reports whether a live daemon is answering on the socket within

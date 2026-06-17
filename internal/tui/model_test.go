@@ -80,7 +80,7 @@ func TestModel_Navigation(t *testing.T) {
 		controller.Status{Name: "b", Type: "local", Local: "2", Remote: "r"},
 		controller.Status{Name: "c", Type: "local", Local: "3", Remote: "r"},
 	)
-	m := New(f, "standalone")
+	m := New(f, Options{Mode: "standalone"})
 
 	for _, k := range []string{"j", "j"} {
 		next, _ := m.handleKey(keyPress(k))
@@ -122,7 +122,7 @@ func TestModel_Navigation(t *testing.T) {
 
 func TestModel_SpaceToggles(t *testing.T) {
 	f := newFake(controller.Status{Name: "a", Type: "local", Local: "1", Remote: "r", State: controller.Off})
-	m := New(f, "standalone")
+	m := New(f, Options{Mode: "standalone"})
 
 	next, _ := m.handleKey(specialKey(tea.KeySpace))
 	m = next.(Model)
@@ -142,7 +142,7 @@ func TestModel_RestartAndReloadAndAll(t *testing.T) {
 		controller.Status{Name: "a", State: controller.Off},
 		controller.Status{Name: "b", State: controller.Connected},
 	)
-	m := New(f, "standalone")
+	m := New(f, Options{Mode: "standalone"})
 
 	m2, _ := m.handleKey(keyPress("r"))
 	m = m2.(Model)
@@ -173,7 +173,7 @@ func TestModel_RestartAndReloadAndAll(t *testing.T) {
 
 func TestModel_HelpAndQuit(t *testing.T) {
 	f := newFake(controller.Status{Name: "a"})
-	m := New(f, "standalone")
+	m := New(f, Options{Mode: "standalone"})
 	if m.help {
 		t.Fatal("help should start hidden")
 	}
@@ -199,7 +199,7 @@ func TestModel_RenderContainsTunnels(t *testing.T) {
 		controller.Status{Name: "alpha", Type: "local", Local: "5432", Remote: "db:5432", State: controller.Connected},
 		controller.Status{Name: "beta", Type: "local", Local: "8080", Remote: "web:80", State: controller.Off, Error: "boom"},
 	)
-	m := New(f, "standalone")
+	m := New(f, Options{Mode: "standalone"})
 	m.width = 100
 
 	out := m.render()
@@ -223,7 +223,7 @@ func TestModel_RenderContainsTunnels(t *testing.T) {
 
 func TestModel_EmptyList(t *testing.T) {
 	f := newFake()
-	m := New(f, "standalone")
+	m := New(f, Options{Mode: "standalone"})
 	m2, _ := m.handleKey(keyPress("space"))
 	if mm, ok := m2.(Model); !ok || mm.cursor != 0 {
 		t.Error("space on empty list should be a no-op")
@@ -250,5 +250,110 @@ func TestFormatUptime(t *testing.T) {
 		if got := formatUptime(c.d); got != c.out {
 			t.Errorf("formatUptime(%v) = %q, want %q", c.d, got, c.out)
 		}
+	}
+}
+
+func TestModel_QuitStandaloneLiveShowsModal(t *testing.T) {
+	f := newFake(controller.Status{Name: "a", State: controller.Connected})
+	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+
+	next, cmd := m.handleKey(keyPress("q"))
+	m = next.(Model)
+	if m.confirmQuit {
+		// expected
+	} else {
+		t.Fatal("standalone q with live tunnels should raise confirm modal")
+	}
+	if m.quit {
+		t.Error("should not quit immediately while modal is up")
+	}
+	if cmd != nil {
+		t.Error("no command expected when raising modal")
+	}
+	if !strings.Contains(m.render(), "background") {
+		t.Error("modal should be rendered")
+	}
+}
+
+func TestModel_QuitStandaloneNoLiveQuits(t *testing.T) {
+	f := newFake(controller.Status{Name: "a", State: controller.Off})
+	m := New(f, Options{Mode: "standalone"})
+	_, cmd := m.handleKey(keyPress("q"))
+	if cmd == nil {
+		t.Error("standalone q with no live tunnels should quit immediately")
+	}
+}
+
+func TestModel_QuitAttachNoModal(t *testing.T) {
+	f := newFake(controller.Status{Name: "a", State: controller.Connected})
+	m := New(f, Options{Mode: "attach @ /sock"})
+	if !m.attach {
+		t.Fatal("attach mode should be detected")
+	}
+	next, cmd := m.handleKey(keyPress("q"))
+	mm := next.(Model)
+	if !mm.quit || cmd == nil {
+		t.Error("attach q should quit immediately without modal")
+	}
+	if mm.confirmQuit {
+		t.Error("no modal in attach mode")
+	}
+}
+
+func TestModel_ConfirmKeys(t *testing.T) {
+	restoreHandoffSeams(t)
+	startCmd = func(string) error { return nil }
+	probeSocket = func(string) bool { return true }
+
+	f := newFake(controller.Status{Name: "a", State: controller.Connected})
+	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	next, _ := m.handleKey(keyPress("q"))
+	m = next.(Model)
+	if !m.confirmQuit {
+		t.Fatal("precondition: modal should be up")
+	}
+
+	// "y" -> handoff
+	next, cmd := m.handleKey(keyPress("y"))
+	m = next.(Model)
+	if !m.handoffing || m.confirmQuit || cmd == nil {
+		t.Errorf("y: handoffing=%v confirmQuit=%v cmd=%v", m.handoffing, m.confirmQuit, cmd)
+	}
+
+	// reset to modal, then "n" -> quit
+	m2 := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	m2.list = []controller.Status{{Name: "a", State: controller.Connected}}
+	m2.confirmQuit = true
+	next, cmd = m2.handleKey(keyPress("n"))
+	mm := next.(Model)
+	if !mm.quit || mm.confirmQuit || cmd == nil {
+		t.Errorf("n: quit=%v confirmQuit=%v cmd=%v", mm.quit, mm.confirmQuit, cmd)
+	}
+
+	// esc and enter also decline
+	for _, k := range []string{"esc", "enter"} {
+		m3 := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+		m3.list = []controller.Status{{Name: "a", State: controller.Connected}}
+		m3.confirmQuit = true
+		next, cmd = m3.handleKey(keyPress(k))
+		mm := next.(Model)
+		if !mm.quit || mm.confirmQuit {
+			t.Errorf("%s: quit=%v confirmQuit=%v", k, mm.quit, mm.confirmQuit)
+		}
+	}
+}
+
+func TestModel_TickIgnoredDuringHandoff(t *testing.T) {
+	f := newFake(controller.Status{Name: "a", State: controller.Connected})
+	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	m.handoffing = true
+
+	next, cmd := m.Update(tickMsg{})
+	mm := next.(Model)
+	if cmd != nil {
+		t.Error("tick during handoff should not schedule another wait")
+	}
+	if mm.handoffing != true {
+		t.Error("handoffing flag should be preserved")
 	}
 }

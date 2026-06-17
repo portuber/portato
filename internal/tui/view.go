@@ -35,6 +35,14 @@ func (m Model) render() string {
 		b.WriteString("\n\n")
 		b.WriteString(m.helpBlock())
 	}
+	if m.confirmQuit {
+		b.WriteString("\n\n")
+		b.WriteString(m.confirmQuitView())
+	}
+	if m.handoffing {
+		b.WriteString("\n\n")
+		b.WriteString(modeStyle.Render("Starting daemon…"))
+	}
 	return b.String()
 }
 
@@ -153,6 +161,20 @@ func (m Model) helpBlock() string {
 		"q / ctrl+c   quit (stops all tunnels)",
 	}
 	return helpPanel.Render(strings.Join(lines, "\n"))
+}
+
+// confirmQuitView renders the "leave running in background?" modal shown when
+// quitting a standalone TUI that still has live tunnels.
+func (m Model) confirmQuitView() string {
+	n := 0
+	for _, s := range m.list {
+		switch s.State {
+		case controller.Connecting, controller.Connected, controller.Reconnecting:
+			n++
+		}
+	}
+	line := fmt.Sprintf("%d tunnel(s) active. Leave them running in the background? [y/N]", n)
+	return helpPanel.Render(line)
 }
 
 func joinRight(left, right string, width int) string {

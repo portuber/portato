@@ -12,9 +12,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		return m, nil
 	case tickMsg:
+		if m.handoffing {
+			return m, nil
+		}
 		m.list = m.ctrl.List()
 		m.clampCursor()
 		return m, waitForChange(m.ctrl.Changes())
+	case handoffDoneMsg:
+		m.handoffing = false
+		m.quit = true
+		if msg.err != nil {
+			m.handoffErr = msg.err.Error()
+		}
+		return m, tea.Quit
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	}
@@ -22,10 +32,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.confirmQuit {
+		return m.handleConfirm(k)
+	}
 	switch k.String() {
 	case "q", "ctrl+c":
-		m.quit = true
-		return m, tea.Quit
+		if m.handoffing {
+			return m, nil
+		}
+		if m.attach || !m.hasLiveTunnels() {
+			m.quit = true
+			return m, tea.Quit
+		}
+		m.confirmQuit = true
+		return m, nil
 	case "esc", "?":
 		m.help = !m.help
 		return m, nil
@@ -51,6 +71,39 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.clampCursor()
 	}
 	return m, nil
+}
+
+// handleConfirm dispatches the "leave running in background?" modal keys.
+func (m Model) handleConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "y":
+		m.confirmQuit = false
+		m.handoffing = true
+		m.handoffErr = ""
+		return m, m.handoffCmd()
+	case "n", "esc", "enter":
+		m.confirmQuit = false
+		m.quit = true
+		return m, tea.Quit
+	}
+	return m, nil
+}
+
+func (m Model) handoffCmd() tea.Cmd {
+	ctrl := m.ctrl
+	return func() tea.Msg {
+		return handoffDoneMsg{err: handoffToDaemon(ctrl, m.cfgPath, m.socketURI)}
+	}
+}
+
+func (m Model) hasLiveTunnels() bool {
+	for _, s := range m.list {
+		switch s.State {
+		case controller.Connecting, controller.Connected, controller.Reconnecting:
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Model) clampCursor() {
