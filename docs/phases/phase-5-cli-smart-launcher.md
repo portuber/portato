@@ -1,7 +1,7 @@
 ---
 phase: 5
 title: CLI commands, smart launcher, and hand-off
-status: todo
+status: in-progress
 depends_on: [4]
 ---
 
