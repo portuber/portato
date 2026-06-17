@@ -97,6 +97,49 @@ func TestLocal_ReloadBadConfig(t *testing.T) {
 	_ = l.Close()
 }
 
+func TestLocal_EnableDisablePersists(t *testing.T) {
+	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
+	cfg := mustLoad(t, p)
+	l := NewLocal(cfg, p, nil)
+	defer l.Close()
+
+	if err := l.Enable("t1"); err != nil {
+		t.Fatalf("Enable: %v", err)
+	}
+	if reloaded := mustLoad(t, p); !reloaded.Tunnels[0].Enabled {
+		t.Errorf("after Enable, config on disk has enabled=false; want true (hand-off invariant)")
+	}
+
+	if err := l.Disable("t1"); err != nil {
+		t.Fatalf("Disable: %v", err)
+	}
+	if reloaded := mustLoad(t, p); reloaded.Tunnels[0].Enabled {
+		t.Errorf("after Disable, config on disk has enabled=true; want false")
+	}
+}
+
+func TestLocal_EnableUnknownDoesNotPersist(t *testing.T) {
+	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
+	before, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	cfg := mustLoad(t, p)
+	l := NewLocal(cfg, p, nil)
+	defer l.Close()
+
+	if err := l.Enable("nope"); err == nil {
+		t.Fatal("Enable(unknown): want error, got nil")
+	}
+	after, err := os.ReadFile(p)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if string(after) != string(before) {
+		t.Errorf("Enable(unknown) should not have rewritten the config file")
+	}
+}
+
 func TestLocal_ChangesTicksAndCloses(t *testing.T) {
 	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
 	cfg := mustLoad(t, p)

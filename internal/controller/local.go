@@ -12,6 +12,7 @@ import (
 
 type Local struct {
 	engine   *forward.Engine
+	cfg      *config.Config
 	cfgPath  string
 	log      *slog.Logger
 	interval time.Duration
@@ -38,6 +39,7 @@ func newLocal(cfg *config.Config, cfgPath string, log *slog.Logger, interval tim
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Local{
 		engine:   forward.NewEngine(ctx, cfg, log),
+		cfg:      cfg,
 		cfgPath:  cfgPath,
 		log:      log,
 		interval: interval,
@@ -48,8 +50,27 @@ func newLocal(cfg *config.Config, cfgPath string, log *slog.Logger, interval tim
 
 func (l *Local) List() []Status { return l.engine.List() }
 
-func (l *Local) Enable(name string) error  { return l.engine.Enable(name) }
-func (l *Local) Disable(name string) error { return l.engine.Disable(name) }
+// Enable starts a tunnel and persists enabled=true to the config file. This
+// is the standalone-side mirror of the daemon's enable handler and the
+// invariant the standalone->daemon hand-off relies on (SPEC §6): the config
+// on disk is always the source of truth for which tunnels should be up.
+func (l *Local) Enable(name string) error {
+	if err := l.engine.Enable(name); err != nil {
+		return err
+	}
+	l.setEnabled(name, true)
+	return l.cfg.Save(l.cfgPath)
+}
+
+// Disable stops a tunnel and persists enabled=false to the config file.
+func (l *Local) Disable(name string) error {
+	if err := l.engine.Disable(name); err != nil {
+		return err
+	}
+	l.setEnabled(name, false)
+	return l.cfg.Save(l.cfgPath)
+}
+
 func (l *Local) Restart(name string) error { return l.engine.Restart(name) }
 
 func (l *Local) Reload() error {
@@ -58,7 +79,17 @@ func (l *Local) Reload() error {
 		return err
 	}
 	l.engine.Reload(cfg)
+	l.cfg = cfg
 	return nil
+}
+
+func (l *Local) setEnabled(name string, enabled bool) {
+	for i := range l.cfg.Tunnels {
+		if l.cfg.Tunnels[i].Name == name {
+			l.cfg.Tunnels[i].Enabled = enabled
+			return
+		}
+	}
 }
 
 func (l *Local) Changes() <-chan struct{} {
