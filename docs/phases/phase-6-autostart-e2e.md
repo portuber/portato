@@ -1,7 +1,7 @@
 ---
 phase: 6
 title: Autostart (launchd/systemd) and final E2E MVP
-status: todo
+status: in-progress
 depends_on: [5]
 ---
 

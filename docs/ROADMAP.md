@@ -16,7 +16,7 @@
 | 3   | Standalone TUI                        | `[x]`  | [phase-3-standalone-tui.md](./phases/phase-3-standalone-tui.md) |
 | 4   | Daemon and HTTP-over-unix-socket IPC  | `[x]`  | [phase-4-daemon-ipc.md](./phases/phase-4-daemon-ipc.md) |
 | 5   | CLI commands + smart launcher + hand-off | `[x]`  | [phase-5-cli-smart-launcher.md](./phases/phase-5-cli-smart-launcher.md) |
-| 6   | Autostart (launchd/systemd) + E2E     | `[ ]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
+| 6   | Autostart (launchd/systemd) + E2E     | `[~]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
 
 ### Post-MVP (phases 7–11, outline — detailed when reached)
 
@@ -40,7 +40,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phase 6 — Autostart (launchd/systemd) + E2E** (pending). Phase 5 (CLI commands, smart launcher, and hand-off) is complete and was verified interactively against a live sshd with a real tunnel: the `list/enable/disable/restart` CLI (plus a friendly error when the daemon is down), the smart launcher with auto attach/standalone, and the "leave in background?" hand-off modal (`y` spawns a daemon and the tunnel stays `Connected`; `n`/`enter` — stop + exit; `Esc` — cancel). Phase 6 will add `portato install/uninstall` (launchd / systemd --user) and the final MVP E2E checklist.
+**Phase 6 — Autostart (launchd/systemd) + E2E** (in progress). Phase 5 (CLI commands, smart launcher, and hand-off) is complete and was verified interactively against a live sshd with a real tunnel: the `list/enable/disable/restart` CLI (plus a friendly error when the daemon is down), the smart launcher with auto attach/standalone, and the "leave in background?" hand-off modal (`y` spawns a daemon and the tunnel stays `Connected`; `n`/`enter` — stop + exit; `Esc` — cancel). Phase 6 adds `portato install/uninstall` (`internal/service/` with per-OS build tags: launchd on macOS, systemd --user on Linux) and the final MVP E2E checklist.
 
 Phases 1–6 are the detailed MVP plan; 7–11 are outline (goal + DoD), refined as we approach them.
 
