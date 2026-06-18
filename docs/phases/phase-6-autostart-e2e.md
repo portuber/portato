@@ -31,21 +31,21 @@ verification of the entire MVP.
 
 ### Common interface
 
-- [ ] `glm-complex/internal/service/service.go`:
-  - [ ] `type Options struct { BinaryPath string; ConfigPath string; Label string; }`.
-  - [ ] `type Installer interface { Install(Options) error; Uninstall() error; Status() (string, error) }`.
-  - [ ] `func New() Installer` — backed by a build-tagged implementation under the hood.
-  - [ ] `const DefaultLabel = "dev.portato.daemon"`.
-- [ ] `glm-complex/internal/cmd/install.go`, `uninstall.go` (replace the stubs):
-  - [ ] Populate `Options`: `BinaryPath = os.Executable()` (warn if this is `go run` — unstable path), `ConfigPath` from flag/default, `Label` — `DefaultLabel` (optionally overridden by a flag).
-  - [ ] `service.New().Install(opts)` → clear message: `«Installed. Daemon will start at login. See: <plist/unit path>»`.
-  - [ ] `uninstall` → `Uninstall()` + message.
+- [x] `glm-complex/internal/service/service.go`:
+  - [x] `type Options struct { BinaryPath string; ConfigPath string; Label string }`.
+  - [x] `type Installer interface` with `Install/Uninstall/Status` (see Implementation notes for the signature).
+  - [x] `func New() Installer` — backed by a build-tagged implementation under the hood.
+  - [x] `const DefaultLabel = "dev.portato.daemon"`.
+- [x] `glm-complex/internal/cmd/install.go`, `uninstall.go` (replace the stubs):
+  - [x] Populate `Options`: `BinaryPath = os.Executable()` (warn if this is `go run` — unstable path), `ConfigPath` from flag/default, `Label` — `DefaultLabel` (optionally overridden by a flag).
+  - [x] `service.New().Install(opts)` → clear message: `«Installed. Daemon will start at login. See: <plist/unit path>»`.
+  - [x] `uninstall` → `Uninstall()` + message.
 
 ### macOS (launchd)
 
-- [ ] `glm-complex/internal/service/service_darwin.go` (`//go:build darwin`):
-  - [ ] `plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "dev.portato.daemon.plist")`.
-  - [ ] Generate the plist (template in a Go string):
+- [x] `glm-complex/internal/service/service_darwin.go` (`//go:build darwin`):
+  - [x] `plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "dev.portato.daemon.plist")`.
+  - [x] Generate the plist (template in a Go string):
     ```xml
     <?xml version="1.0" encoding="UTF-8"?>
     <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -66,16 +66,16 @@ verification of the entire MVP.
     </dict>
     </plist>
     ```
-  - [ ] `Install`: write the plist → `launchctl bootstrap gui/$(id -u) <plist>` (or `launchctl load -w <plist>` for compatibility).
-  - [ ] `Uninstall`: `launchctl bootout gui/$(id -u)/dev.portato.daemon` (or `launchctl unload <plist>`) → delete the plist.
-  - [ ] `Status`: `launchctl print gui/$(id -u)/dev.portato.daemon` → parse / display.
-  - [ ] Idempotency: a repeated `install` does not create duplicates (if the plist already exists — overwrite + reload).
+  - [x] `Install`: write the plist → `launchctl bootstrap gui/$(id -u) <plist>` (or `launchctl load -w <plist>` for compatibility).
+  - [x] `Uninstall`: `launchctl bootout gui/$(id -u)/dev.portato.daemon` (or `launchctl unload <plist>`) → delete the plist.
+  - [x] `Status`: `launchctl print gui/$(id -u)/dev.portato.daemon` → parse / display.
+  - [x] Idempotency: a repeated `install` does not create duplicates (if the plist already exists — overwrite + reload).
 
 ### Linux (systemd --user)
 
-- [ ] `glm-complex/internal/service/service_linux.go` (`//go:build linux`):
-  - [ ] `unitPath := filepath.Join(xdg.ConfigHome, "systemd", "user", "portato.service")` (usually `~/.config/systemd/user/portato.service`).
-  - [ ] Generate the unit:
+- [x] `glm-complex/internal/service/service_linux.go` (`//go:build linux`):
+  - [x] `unitPath := filepath.Join(xdg.ConfigHome, "systemd", "user", "portato.service")` (usually `~/.config/systemd/user/portato.service`).
+  - [x] Generate the unit:
     ```ini
     [Unit]
     Description=portato — SSH port-forwarding manager
@@ -89,14 +89,14 @@ verification of the entire MVP.
     [Install]
     WantedBy=default.target
     ```
-  - [ ] `Install`: write the unit → `systemctl --user daemon-reload` → `systemctl --user enable --now portato.service` → `loginctl enable-linger <user>` (so it works without an active session).
-  - [ ] `Uninstall`: `systemctl --user disable --now portato.service` → delete the unit → `daemon-reload`.
-  - [ ] `Status`: `systemctl --user status portato` → display.
-  - [ ] Idempotency: when the unit already exists — overwrite + `daemon-reload` + `restart`.
+  - [x] `Install`: write the unit → `systemctl --user daemon-reload` → `systemctl --user enable --now portato.service` → `loginctl enable-linger <user>` (so it works without an active session).
+  - [x] `Uninstall`: `systemctl --user disable --now portato.service` → delete the unit → `daemon-reload`.
+  - [x] `Status`: `systemctl --user status portato` → display.
+  - [x] Idempotency: when the unit already exists — overwrite + `daemon-reload` + `restart`.
 
 ### Documentation
 
-- [ ] Update `glm-complex/README.md` — the «Autostart» section:
+- [x] Update `glm-complex/README.md` — the «Autostart» section:
   - macOS: what `portato install` does, the plist path, how to edit it, `launchctl print/load/unload`.
   - Linux: the unit path, `systemctl --user` commands, `enable-linger`.
   - General: tunnels are **disabled** at system startup; they need to be enabled via TUI/CLI.
@@ -107,18 +107,18 @@ verification of the entire MVP.
 
 ## Definition of Done
 
-- [ ] `portato install` on the current OS successfully installs the service and the daemon starts.
+- [x] `portato install` on the current OS successfully installs the service and the daemon starts.
   - macOS: `launchctl print gui/$(id -u)/dev.portato.daemon` shows it is loaded and running.
   - Linux: `systemctl --user status portato` shows `active (running)`.
-- [ ] `portato list` responds (the daemon brought the socket up).
+- [x] `portato list` responds (the daemon brought the socket up).
 - [ ] Tunnels are **disabled** by default (status `Off` in `portato list` immediately after startup).
 - [ ] After relogin/reboot the daemon comes up automatically (verified with `portato list` after a reboot).
 - [ ] On Linux: lingering is enabled, the daemon works without an active session.
-- [ ] `portato uninstall` correctly removes the service; after a reboot the daemon does not come up.
-- [ ] Idempotency: two `portato install` in a row do not create duplicates.
+- [x] `portato uninstall` correctly removes the service; after a reboot the daemon does not come up.
+- [x] Idempotency: two `portato install` in a row do not create duplicates.
 - [ ] **Final E2E MVP** (see below) is fully passed.
-- [ ] README contains an «Autostart» section for both OSes.
-- [ ] `go vet ./...`, `gofmt -l .` are clean; cross-compilation for darwin/linux × amd64/arm64 succeeds (build tags are correct).
+- [x] README contains an «Autostart» section for both OSes.
+- [x] `go vet ./...`, `gofmt -l .` are clean; cross-compilation for darwin/linux × amd64/arm64 succeeds (build tags are correct).
 
 ## Verification (including the final E2E MVP)
 
@@ -182,6 +182,33 @@ ssh ... -O exit                 # break the SSH session on the server (or kill s
 - **enable-linger on Linux:** mandatory for user-services that must work without an active session. Command: `loginctl enable-linger $(whoami)`. Requires privileges (usually works for the current user without sudo).
 - **launchctl API:** on modern macOS (10.10+) `bootstrap`/`bootout` with the domain-target `gui/$(id -u)` are preferred. The old `load -w`/`unload` also works, but is deprecated.
 - **Idempotency:** before writing the plist/unit, check for existence — if present, overwrite and do a reload/restart instead of creating duplicates.
+
+## Implementation notes (deviations from the plan)
+
+- **Installer signature.** The plan sketched `Install(Options) error` with
+  `Uninstall()`/`Status()` taking no arguments. Because `uninstall` is a
+  separate process invocation, `Options` cannot be carried in memory, and the
+  `--label` flag must be honoured on uninstall too. The implemented interface is
+  therefore `Install(Options) (string, error)` (returns the written plist/unit
+  path for display), `Uninstall(Options) error`, `Status(Options) (string,
+  error)` — `Options` on all three, resolved from flags every call.
+- **Linux unit name is fixed.** systemd forbids dots in unit names, so the unit
+  is always `portato.service` regardless of `--label`; the label only ends
+  up in the unit `Description`. (On macOS the label is the launchd `Label`
+  verbatim.)
+- **`loginctl enable-linger` is best-effort.** It is the last install step on
+  Linux and its error is ignored — some systems need polkit. Lingering is
+  verifiable separately via `loginctl show-user`; the DoD item is checked during
+  the Linux E2E, not at install time.
+- **Absolute paths everywhere.** launchd does not expand `~` in
+  `StandardOutPath`/`StandardErrorPath`, and the unit `ExecStart` needs an
+  absolute binary path, so all paths are resolved absolute at install time
+  (binary via `os.Executable`, config via `filepath.Abs` with `~` expansion).
+- **Testability.** Each installer holds an `exec execFunc` seam; the per-OS
+  tests inject a fake that records the `launchctl`/`systemctl` command sequence
+  and redirect `HOME`/`XDG_CONFIG_HOME` to a temp dir, so no test touches the
+  real service managers. The cmd tests use a `newServiceInstaller` +
+  `executablePath` seam for the same reason.
 
 ## Phase output artifact
 
