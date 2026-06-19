@@ -1,7 +1,7 @@
 ---
 phase: 8
 title: Dynamic (-D) SOCKS5
-status: in-progress
+status: done
 depends_on: [7]
 ---
 
@@ -52,36 +52,36 @@ from `local` is the per-connection handler (a SOCKS5 server instead of a fixed
 
 ## Tasks
 
-- [ ] Dependency: add `github.com/armon/go-socks5`.
-- [ ] `internal/config/config.go`:
-  - [ ] `Validate` accepts `type == "local" | "remote" | "dynamic"`; unknown
+- [x] Dependency: add `github.com/armon/go-socks5`.
+- [x] `internal/config/config.go`:
+  - [x] `Validate` accepts `type == "local" | "remote" | "dynamic"`; unknown
     types still rejected with a clear message.
-  - [ ] For `dynamic`, `local` is required but `remote` is **not** (skip the
+  - [x] For `dynamic`, `local` is required but `remote` is **not** (skip the
     empty-`remote` check for dynamic); SSH host/port checks still apply.
-- [ ] `internal/forward/tunnel.go`:
-  - [ ] accept-loop branches by type: `dynamic` → `handleDynamicConn`, local →
+- [x] `internal/forward/tunnel.go`:
+  - [x] accept-loop branches by type: `dynamic` → `handleDynamicConn`, local →
     `handleConn` (unchanged). `Start`/`run`/`serveConnected` reused unchanged
     (dynamic already takes the local-listener path).
-  - [ ] `handleDynamicConn(client, conn)`: `socks5.New(&socks5.Config{ Dial:
+  - [x] `handleDynamicConn(client, conn)`: `socks5.New(&socks5.Config{ Dial:
     func(ctx, network, addr) (net.Conn, error) { return client.Dial(network,
     addr) } })` then `srv.ServeConn(conn)`.
-- [ ] `internal/forward/state.go`:
-  - [ ] `Status.Endpoint()` gains a dynamic branch: `dynamic` → `{Local} ⇄ *`.
-- [ ] `config.example.yaml`: a commented `type: dynamic` example; update the
+- [x] `internal/forward/state.go`:
+  - [x] `Status.Endpoint()` gains a dynamic branch: `dynamic` → `{Local} ⇄ *`.
+- [x] `config.example.yaml`: a commented `type: dynamic` example; update the
   `type` comment.
-- [ ] `README.md`: a "Dynamic (SOCKS5) tunnels" section + `curl --socks5` /
+- [x] `README.md`: a "Dynamic (SOCKS5) tunnels" section + `curl --socks5` /
   browser configuration.
-- [ ] `docs/SPEC.md` §5/§7/§8: mark `dynamic` implemented, document field
+- [x] `docs/SPEC.md` §5/§7/§8: mark `dynamic` implemented, document field
   semantics (local = SOCKS5 listen addr, remote unused).
-- [ ] Tests:
-  - [ ] `config_test.go`: `type: dynamic` is valid; `dynamic` with empty
+- [x] Tests:
+  - [x] `config_test.go`: `type: dynamic` is valid; `dynamic` with empty
     `local` is rejected; `dynamic` with empty `remote` is valid; `local`/`remote`
     with empty `remote` still rejected; an unknown type is rejected
     (re-baseline the existing `not supported` case from `dynamic` to a truly-
     unsupported type).
-  - [ ] `state_test.go`: add a dynamic case to `TestStatusEndpointDirection`
+  - [x] `state_test.go`: add a dynamic case to `TestStatusEndpointDirection`
     (`{Local} ⇄ *`).
-  - [ ] `tunnel_integration_test.go`: a dynamic-tunnel integration test that
+  - [x] `tunnel_integration_test.go`: a dynamic-tunnel integration test that
     hand-rolls a minimal SOCKS5 client (no-auth + CONNECT), connects through
     the local proxy to the test echo server, verifies a round-trip, then drops
     and restarts sshd and verifies reconnect + a second round-trip. The test
@@ -90,15 +90,15 @@ from `local` is the per-connection handler (a SOCKS5 server instead of a fixed
 
 ## Definition of Done
 
-- [ ] `type: dynamic` works: a SOCKS5 proxy on `local`; a request through it
+- [x] `type: dynamic` works: a SOCKS5 proxy on `local`; a request through it
   (`curl --socks5 127.0.0.1:<local>`) reaches the destination via the bastion
   (integration test + manual verification).
-- [ ] Reconnect works for a dynamic tunnel (sshd drop → recovery), covered by an
+- [x] Reconnect works for a dynamic tunnel (sshd drop → recovery), covered by an
   integration test.
-- [ ] Direction is displayed correctly in the TUI and `portato list`
+- [x] Direction is displayed correctly in the TUI and `portato list`
   (`⇄ *` for dynamic).
-- [ ] README describes the dynamic scenario + curl/browser configuration.
-- [ ] Tests (unit + integration) are green; `go vet ./...` and `gofmt -l .` are
+- [x] README describes the dynamic scenario + curl/browser configuration.
+- [x] Tests (unit + integration) are green; `go vet ./...` and `gofmt -l .` are
   clean; `go build ./...` succeeds.
 
 ## Verification
