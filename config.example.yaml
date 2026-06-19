@@ -11,9 +11,20 @@ defaults:
 
 tunnels:
   - name: db-stage                # unique, required
-    type: local                   # MVP: only "local"; post-MVP: "remote" | "dynamic"
+    type: local                   # "local" (-L) or "remote" (-R); "dynamic" (-D) is post-MVP
     local: 5432                   # port or host:port (defaults to 127.0.0.1)
     remote: 10.0.0.5:5432         # destination address, relative to the ssh server
     ssh: user@bastion.example.com:22   # required; user and port optional
     identity: ~/.ssh/id_ed25519   # optional; overrides defaults
     enabled: false                # off by default; the daemon persists toggles here
+
+  # Remote (-R): listen on the ssh server, forward back to this machine.
+  # `remote` is listened on the server (a bare port binds loopback; a non-
+  # loopback host needs `GatewayPorts yes` in sshd_config); `local` is where
+  # connections are forwarded here.
+  - name: pull-redis
+    type: remote
+    remote: 16379                # listened on the server -> 127.0.0.1:16379
+    local: 6379                  # forwarded to the local redis
+    ssh: user@bastion.example.com:22
+    enabled: false

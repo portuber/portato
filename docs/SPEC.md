@@ -128,7 +128,7 @@ type Status struct {
     Name   string
     State  State               // Off | Connecting | Connected | Reconnecting | Error
     Error  string              // human-readable error when State == Error
-    Type   string              // "local" (MVP); "remote", "dynamic" — post-MVP
+    Type   string              // "local" | "remote"; "dynamic" — post-MVP
     Local  string              // local address
     Remote string              // remote address
     Uptime time.Duration       // since entering Connected
@@ -186,13 +186,21 @@ defaults:
 
 tunnels:
   - name: db-stage                # unique, required
-    type: local                   # MVP: "local" only; post-MVP: "remote" | "dynamic"
+    type: local                   # "local" (-L) or "remote" (-R); "dynamic" (-D) is post-MVP
     local: 5432                   # port or host:port (defaults to 127.0.0.1)
-    remote: 10.0.0.5:5432         # destination address relative to the ssh server
+    remote: 10.0.0.5:5432         # see below — meaning depends on type
     ssh: user@bastion.example.com:22   # required; user and port are optional
     identity: ~/.ssh/id_ed25519   # optional; overrides defaults
     enabled: false                # off by default; the daemon persists toggles here
 ```
+
+The meaning of `local`/`remote` depends on `type`:
+
+- **`local` (`-L`)**: `local` is listened on this machine; `remote` is the
+  destination dialed **on the host**.
+- **`remote` (`-R`)**: `remote` is listened **on the host** (a bare port binds
+  loopback, the OpenSSH default; a non-loopback host needs `GatewayPorts yes` in
+  `sshd_config`); `local` is the address connections are forwarded to here.
 
 ### Authentication
 
@@ -205,10 +213,14 @@ tunnels:
 | Type      | SSH flag | Semantics                                            | Phase      |
 |-----------|----------|------------------------------------------------------|------------|
 | `local`   | `-L`     | `local` (on this machine) -> `remote` (on the host)  | **MVP**    |
-| `remote`  | `-R`     | listen on the host, forward to `local` on this machine | Phase 7    |
+| `remote`  | `-R`     | listen on the host, forward to `local` on this machine | **Phase 7** |
 | `dynamic` | `-D`     | a SOCKS5 proxy on `local`, traffic via the `host`    | Phase 8    |
 
 The local implementation in the MVP: `net.Listen(local)` -> `ssh.Client.Dial("tcp", remote)` -> bidirectional `io.Copy`.
+The remote implementation (Phase 7): `ssh.Client.Listen("tcp", remote)` -> accept
+-> `net.Dial("tcp", local)` -> bidirectional `io.Copy`. The remote listener is
+tied to the SSH client's lifetime, so it is re-established on every reconnect;
+the dial/backoff/keepalive scaffolding is shared with the local path.
 
 ## 9. SSH client (native)
 

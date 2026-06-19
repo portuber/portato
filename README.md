@@ -39,6 +39,32 @@ hand-off all work. Phase 6 adds system autostart (`portato install` /
 
 See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase status.
 
+## Tunnel types
+
+Each tunnel has a `type`:
+
+| `type`    | SSH flag | Meaning                                                        |
+|-----------|----------|----------------------------------------------------------------|
+| `local`   | `-L`     | listen **here**, forward to `remote` on the host (`→` in UI).  |
+| `remote`  | `-R`     | listen **on the host**, forward back here (`←` in UI).         |
+
+For a `remote` tunnel, `remote` is the address listened on the SSH server (a
+bare port binds loopback, the OpenSSH default), and `local` is the address
+connections are forwarded to on this machine:
+
+```yaml
+tunnels:
+  - name: pull-redis
+    type: remote
+    remote: 16379        # listened on the server (127.0.0.1:16379)
+    local: 6379          # forwarded to the local redis
+    ssh: user@bastion.example.com
+```
+
+**Binding a non-loopback address on the host** (e.g. `remote: 0.0.0.0:16379`)
+requires `GatewayPorts yes` in the server's `sshd_config`. Otherwise the server
+refuses the bind and the tunnel reports a `GatewayPorts` error.
+
 ## Autostart
 
 `portato install` registers the daemon with your OS's service manager so it

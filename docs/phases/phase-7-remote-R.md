@@ -83,15 +83,15 @@ while the data path dials a local address.
 
 ## Definition of Done
 
-- [ ] `type: remote` works: the port is listened on the remote host, traffic
+- [x] `type: remote` works: the port is listened on the remote host, traffic
   arrives at the local address (integration test + manual verification).
-- [ ] Direction is displayed correctly in the TUI and `portato list`
+- [x] Direction is displayed correctly in the TUI and `portato list`
   (`←` for remote).
-- [ ] Reconnect works for a remote tunnel (sshd drop → recovery), covered by an
+- [x] Reconnect works for a remote tunnel (sshd drop → recovery), covered by an
   integration test.
-- [ ] A forbidden server-side bind surfaces a friendly `GatewayPorts` hint.
-- [ ] README describes the remote scenario + the `GatewayPorts` requirement.
-- [ ] Tests (unit + integration) are green; `go vet ./...` and `gofmt -l .` are
+- [x] A forbidden server-side bind surfaces a friendly `GatewayPorts` hint.
+- [x] README describes the remote scenario + the `GatewayPorts` requirement.
+- [x] Tests (unit + integration) are green; `go vet ./...` and `gofmt -l .` are
   clean; `go build ./...` succeeds.
 
 ## Verification
