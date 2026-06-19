@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"crypto/elliptic"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -162,7 +163,7 @@ func (s *sshd) handleConn(nConn net.Conn) {
 		s.tracker.remove(sconn)
 		_ = sconn.Close()
 	}()
-	go ssh.DiscardRequests(reqs)
+	go s.serveForwards(sconn, reqs)
 	for nch := range chans {
 		if nch.ChannelType() != "direct-tcpip" {
 			_ = nch.Reject(ssh.UnknownChannelType, "only direct-tcpip")
@@ -193,6 +194,137 @@ func (s *sshd) serveDirect(ch ssh.Channel, creqs <-chan *ssh.Request, addr strin
 	go func() { _, _ = io.Copy(ch, backend); done <- struct{}{} }()
 	go func() { _, _ = io.Copy(backend, ch); done <- struct{}{} }()
 	<-done
+}
+
+// forwardRequest is the wire payload of a "tcpip-forward" / "cancel-tcpip-
+// forward" global request (RFC 4254 §7.1).
+type forwardRequest struct {
+	Addr string
+	Port uint32
+}
+
+// forwardedPayload is the wire payload of a "forwarded-tcpip" channel that the
+// server opens on the client when a connection arrives at the forwarded port
+// (RFC 4254 §7.2). Addr/Port identify the listened address (must match what
+// the client registered); OriginAddr/OriginPort identify the connecting peer.
+type forwardedPayload struct {
+	Addr       string
+	Port       uint32
+	OriginAddr string
+	OriginPort uint32
+}
+
+type fwdEntry struct {
+	ln   net.Listener
+	host string
+	port uint32
+}
+
+// serveForwards implements the server side of remote (-R) forwarding for the
+// test sshd: it honors tcpip-forward (binds a real loopback port on the test
+// host, modelling the "server side") and, on each accepted connection, opens a
+// forwarded-tcpip channel back to the client. This is what a type=remote
+// tunnel relies on via ssh.Client.Listen.
+func (s *sshd) serveForwards(sconn *ssh.ServerConn, reqs <-chan *ssh.Request) {
+	var (
+		mu  sync.Mutex
+		fwd = make(map[string]fwdEntry)
+	)
+	for r := range reqs {
+		switch r.Type {
+		case "tcpip-forward":
+			var p forwardRequest
+			if err := ssh.Unmarshal(r.Payload, &p); err != nil {
+				r.Reply(false, nil)
+				continue
+			}
+			bind := net.JoinHostPort(p.Addr, strconv.FormatUint(uint64(p.Port), 10))
+			ln, err := net.Listen("tcp", bind)
+			if err != nil {
+				r.Reply(false, nil)
+				continue
+			}
+			port := p.Port
+			if port == 0 {
+				port = uint32(addrPort(ln.Addr()))
+			}
+			mu.Lock()
+			fwd[bind] = fwdEntry{ln: ln, host: p.Addr, port: port}
+			mu.Unlock()
+			resp := make([]byte, 4)
+			binary.BigEndian.PutUint32(resp, port)
+			r.Reply(true, resp)
+			go s.acceptForwarded(sconn, ln, p.Addr, port)
+		case "cancel-tcpip-forward":
+			var p forwardRequest
+			if err := ssh.Unmarshal(r.Payload, &p); err != nil {
+				r.Reply(false, nil)
+				continue
+			}
+			bind := net.JoinHostPort(p.Addr, strconv.FormatUint(uint64(p.Port), 10))
+			mu.Lock()
+			e, ok := fwd[bind]
+			if ok {
+				delete(fwd, bind)
+			}
+			mu.Unlock()
+			if ok {
+				_ = e.ln.Close()
+			}
+			r.Reply(true, nil)
+		default:
+			if r.WantReply {
+				r.Reply(false, nil)
+			}
+		}
+	}
+	mu.Lock()
+	for key, e := range fwd {
+		_ = e.ln.Close()
+		delete(fwd, key)
+	}
+	mu.Unlock()
+}
+
+func (s *sshd) acceptForwarded(sconn *ssh.ServerConn, ln net.Listener, host string, port uint32) {
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		go func(conn net.Conn) {
+			defer conn.Close()
+			originHost := "127.0.0.1"
+			originPort := uint32(0)
+			if ta, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
+				originHost = ta.IP.String()
+				originPort = uint32(ta.Port)
+			}
+			payload := ssh.Marshal(&forwardedPayload{
+				Addr:       host,
+				Port:       port,
+				OriginAddr: originHost,
+				OriginPort: originPort,
+			})
+			ch, creqs, err := sconn.OpenChannel("forwarded-tcpip", payload)
+			if err != nil {
+				return
+			}
+			go ssh.DiscardRequests(creqs)
+			done := make(chan struct{}, 2)
+			go func() { _, _ = io.Copy(ch, conn); done <- struct{}{} }()
+			go func() { _, _ = io.Copy(conn, ch); done <- struct{}{} }()
+			<-done
+			_ = ch.Close()
+		}(conn)
+	}
+}
+
+func addrPort(a net.Addr) int {
+	if ta, ok := a.(*net.TCPAddr); ok {
+		return ta.Port
+	}
+	return 0
 }
 
 func startEcho(t *testing.T) (addr string, stop func()) {
@@ -535,5 +667,114 @@ func TestTunnelAuthViaAgent(t *testing.T) {
 	}
 	if !bytes.Equal(buf, msg) {
 		t.Errorf("echo %q, want %q", buf, msg)
+	}
+}
+
+// TestTunnelRemoteTrafficAndReconnect exercises a type=remote (-R) tunnel end
+// to end: the port is listened on the server side (via ssh.Client.Listen), and
+// traffic is forwarded back to a local echo server. It also confirms the
+// remote listener is re-established after an sshd drop/restart.
+func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen client key: %v", err)
+	}
+	authorizedKey, _ := ssh.NewPublicKey(pub)
+	block, err := ssh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		t.Fatalf("marshal client priv: %v", err)
+	}
+	dir := t.TempDir()
+	idPath := filepath.Join(dir, "id_ed25519")
+	if err := os.WriteFile(idPath, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write identity: %v", err)
+	}
+	knownHosts := filepath.Join(dir, "known_hosts")
+
+	srv := newSSHD(t, authorizedKey)
+	srv.start()
+	defer srv.stop()
+
+	// The port the remote tunnel will bind on the server side (loopback).
+	remotePort := freePort(t)
+	remoteBind := fmt.Sprintf("127.0.0.1:%d", remotePort)
+
+	cfg := config.Tunnel{
+		Name:     "r-test",
+		Type:     "remote",
+		Local:    echoAddr,                 // forward server-side conns to the local echo
+		Remote:   strconv.Itoa(remotePort), // server-side listen (bare port -> 127.0.0.1)
+		SSH:      "u@" + srv.addr(),
+		Identity: idPath,
+		User:     "u",
+		Host:     "127.0.0.1",
+		Port:     srv.port,
+	}
+	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	if !waitForState(tun, Connected, 5*time.Second) {
+		s := tun.Status()
+		t.Fatalf("did not reach Connected: state=%s err=%q", s.State, s.Error)
+	}
+
+	ping := func(label string) {
+		t.Helper()
+		// Dial the SERVER-SIDE port, modelling a client connecting on the host.
+		conn, err := net.Dial("tcp", remoteBind)
+		if err != nil {
+			t.Fatalf("%s: dial server-side port: %v", label, err)
+		}
+		defer conn.Close()
+		msg := []byte("hello-" + label)
+		if _, err := conn.Write(msg); err != nil {
+			t.Fatalf("%s: write: %v", label, err)
+		}
+		buf := make([]byte, len(msg))
+		_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			t.Fatalf("%s: read: %v", label, err)
+		}
+		if !bytes.Equal(buf, msg) {
+			t.Errorf("%s: echo %q, want %q", label, buf, msg)
+		}
+	}
+
+	ping("first")
+
+	// Kill the SSH server and confirm the remote listener is re-bound after
+	// the tunnel self-heals.
+	srv.stop()
+	if !waitForNotState(tun, Connected, 5*time.Second) {
+		t.Fatal("tunnel stayed Connected after server kill")
+	}
+	srv.restart()
+	if !waitForState(tun, Connected, 15*time.Second) {
+		s := tun.Status()
+		t.Fatalf("did not reconnect after server restart: state=%s err=%q", s.State, s.Error)
+	}
+
+	ping("after-reconnect")
+
+	// Disable must tear the remote listener down: the server-side port closes.
+	if err := tun.Stop(); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	c, err := net.Dial("tcp", remoteBind)
+	if err == nil {
+		c.Close()
+		t.Error("server-side port still reachable after Stop")
 	}
 }

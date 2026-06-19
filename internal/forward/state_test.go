@@ -38,6 +38,25 @@ func TestStateUnknownNameMapsToOff(t *testing.T) {
 	}
 }
 
+func TestStatusEndpointDirection(t *testing.T) {
+	cases := []struct {
+		typ  string
+		want string
+	}{
+		{"local", "5432 → db:5432"},
+		{"remote", "5432 ← db:5432"},
+		{"", "5432 → db:5432"}, // unknown/empty defaults to local direction
+	}
+	for _, tc := range cases {
+		t.Run(tc.typ, func(t *testing.T) {
+			s := Status{Type: tc.typ, Local: "5432", Remote: "db:5432"}
+			if got := s.Endpoint(); got != tc.want {
+				t.Errorf("Endpoint(type=%q) = %q, want %q", tc.typ, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestStatusJSONShape(t *testing.T) {
 	s := Status{
 		Name:   "db",

@@ -56,7 +56,11 @@ func NewTunnel(baseCtx context.Context, cfg config.Tunnel, def config.Defaults, 
 }
 
 // Start opens the local listener synchronously and spawns the run loop.
-// Dialing happens asynchronously; Start returns once the listener is bound.
+// For type=local it binds the local listener up front (so bind failures are
+// reported by Start and the local port is reserved before Start returns).
+// For type=remote there is no local listener — it is bound on the server after
+// each successful SSH dial inside runRemote, so Start always succeeds and
+// connect/listen errors surface via the state machine.
 func (t *Tunnel) Start(ctx context.Context) error {
 	if ctx == nil {
 		ctx = t.baseCtx
@@ -66,6 +70,20 @@ func (t *Tunnel) Start(ctx context.Context) error {
 		t.mu.Unlock()
 		return errors.New("tunnel already running")
 	}
+
+	if t.cfg.Type == "remote" {
+		cctx, cancel := context.WithCancel(ctx)
+		done := make(chan struct{})
+		t.cancel = cancel
+		t.done = done
+		t.running = true
+		t.state = Connecting
+		t.errMsg = ""
+		t.mu.Unlock()
+		go t.runRemote(cctx, done)
+		return nil
+	}
+
 	addr := t.cfg.ListenAddr()
 	ln, err := net.Listen("tcp", addr)
 	if err != nil {
@@ -221,6 +239,127 @@ func (t *Tunnel) handleConn(client *ssh.Client, conn net.Conn) {
 		return
 	}
 	pipe(conn, remote)
+}
+
+// runRemote is the reconnect loop for a type=remote (-R) tunnel. The listener
+// is bound on the SSH server via client.Listen, so it is created right after
+// each successful dial and torn down when the client drops. The
+// dial/backoff/keepalive scaffolding is shared with run.
+func (t *Tunnel) runRemote(ctx context.Context, done chan<- struct{}) {
+	defer close(done)
+	attempt := 0
+	for {
+		if err := ctx.Err(); err != nil {
+			return
+		}
+		t.setState(Connecting)
+		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log)
+		if err != nil {
+			t.setStateErr(Error, err.Error())
+			attempt++
+			if !t.sleep(ctx, nextBackoff(attempt)) {
+				return
+			}
+			t.setState(Reconnecting)
+			continue
+		}
+
+		bindAddr := t.cfg.RemoteListenAddr()
+		ln, lerr := client.Listen("tcp", bindAddr)
+		if lerr != nil {
+			t.setStateErr(Error, fmt.Sprintf("listen %s on server: %v (check GatewayPorts in sshd_config)", bindAddr, lerr))
+			_ = client.Close()
+			attempt++
+			if !t.sleep(ctx, nextBackoff(attempt)) {
+				return
+			}
+			t.setState(Reconnecting)
+			continue
+		}
+
+		t.mu.Lock()
+		t.client = client
+		t.errMsg = ""
+		t.connectedAt = time.Now()
+		t.state = Connected
+		t.mu.Unlock()
+		t.log.Info("remote tunnel connected", "bind", bindAddr)
+
+		t.serveRemoteConnected(ctx, client, ln)
+
+		stable := time.Since(t.connectedAt)
+		attempt = nextAttemptAfterDisconnect(stable, attempt)
+		t.mu.Lock()
+		t.client = nil
+		t.mu.Unlock()
+		_ = client.Close()
+
+		if err := ctx.Err(); err != nil {
+			return
+		}
+		t.setState(Reconnecting)
+		t.log.Info("remote tunnel disconnected, reconnecting")
+		if !t.sleep(ctx, nextBackoff(attempt)) {
+			return
+		}
+	}
+}
+
+// serveRemoteConnected blocks while a remote tunnel's SSH session is alive. It
+// runs the keepalive loop and the server-side accept loop in parallel, and
+// returns when the client drops or the context is cancelled (Stop). The remote
+// listener is closed here to unblock the accept loop.
+func (t *Tunnel) serveRemoteConnected(ctx context.Context, client *ssh.Client, ln net.Listener) {
+	stopKA := make(chan struct{})
+	kaExited := make(chan struct{})
+	go func() {
+		defer close(kaExited)
+		t.keepaliveLoop(ctx, client, stopKA)
+	}()
+
+	lnExited := make(chan struct{})
+	go func() {
+		defer close(lnExited)
+		t.remoteAcceptLoop(ln)
+	}()
+
+	waitDone := make(chan struct{})
+	go func() {
+		defer close(waitDone)
+		_ = client.Wait()
+	}()
+
+	select {
+	case <-waitDone:
+	case <-ctx.Done():
+	}
+	close(stopKA)
+	<-kaExited
+	_ = ln.Close()
+	<-lnExited
+}
+
+// remoteAcceptLoop accepts connections arriving on the server-side listener
+// (opened via client.Listen) and forwards each to the local address.
+func (t *Tunnel) remoteAcceptLoop(ln net.Listener) {
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			return
+		}
+		go t.handleRemoteConn(conn)
+	}
+}
+
+func (t *Tunnel) handleRemoteConn(conn net.Conn) {
+	target := t.cfg.ListenAddr()
+	local, err := net.Dial("tcp", target)
+	if err != nil {
+		t.log.Warn("dial local failed", "local", target, "err", err)
+		_ = conn.Close()
+		return
+	}
+	pipe(conn, local)
 }
 
 func pipe(a, b io.ReadWriteCloser) {

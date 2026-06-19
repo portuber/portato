@@ -76,3 +76,13 @@ func (s Status) Uptime() time.Duration {
 	}
 	return time.Since(s.ConnectedAt)
 }
+
+// Endpoint renders the directional endpoint string for display: "local →
+// remote" for a local tunnel, "local ← remote" for a remote tunnel (traffic
+// flows from the server to here). The arrow encodes the direction.
+func (s Status) Endpoint() string {
+	if s.Type == "remote" {
+		return s.Local + " ← " + s.Remote
+	}
+	return s.Local + " → " + s.Remote
+}
