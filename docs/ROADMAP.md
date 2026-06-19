@@ -23,7 +23,7 @@
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
 | 7   | Remote (-R) tunnels               | `[x]`  | [phase-7-remote-R.md](./phases/phase-7-remote-R.md)   |
-| 8   | Dynamic (-D) SOCKS5               | `[ ]`  | [phase-8-dynamic-D.md](./phases/phase-8-dynamic-D.md) |
+| 8   | Dynamic (-D) SOCKS5               | `[~]`  | [phase-8-dynamic-D.md](./phases/phase-8-dynamic-D.md) |
 | 9   | Push events instead of polling    | `[ ]`  | [phase-9-push-events.md](./phases/phase-9-push-events.md) |
 | 10  | TUI tunnel editor (e/n/d)         | `[ ]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
 | 11  | Polish (logs, themes, CI, doctor) | `[ ]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
@@ -60,7 +60,10 @@ the listener re-established on every reconnect. Direction is shown in the TUI an
 `portato list` (`←` for remote), and a forbidden server-side bind surfaces a
 `GatewayPorts` hint.
 
-Next up: **Phase 8 — Dynamic (`-D`) SOCKS5** (post-MVP, outline).
+Next up: **Phase 8 — Dynamic (`-D`) SOCKS5** (post-MVP) — **in progress.** A
+`type: dynamic` tunnel runs a SOCKS5 proxy on `local` whose per-connection dial
+is routed through `ssh.Client.Dial`, reusing the Phase 2 listener/accept-loop
+scaffolding. Direction shows as `⇄ *` in the TUI and `portato list`.
 
 Phases 1–6 are the detailed MVP plan; 7–11 are outline (goal + DoD), refined as we approach them.
 
