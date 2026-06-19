@@ -89,8 +89,10 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("tunnel %q: duplicate name", t.Name)
 		}
 		seen[t.Name] = struct{}{}
-		if t.Type != "local" {
-			return fmt.Errorf("tunnel %q: type %q not supported yet, supported: local", t.Name, t.Type)
+		switch t.Type {
+		case "local", "remote":
+		default:
+			return fmt.Errorf("tunnel %q: type %q not supported (supported: local, remote)", t.Name, t.Type)
 		}
 		if strings.TrimSpace(t.Remote) == "" {
 			return fmt.Errorf("tunnel %q: remote is empty", t.Name)
@@ -168,7 +170,20 @@ func (c *Config) prepare() {
 }
 
 func (t Tunnel) ListenAddr() string {
-	s := strings.TrimSpace(t.Local)
+	return normalizeAddrPort(t.Local, defaultHost)
+}
+
+// RemoteListenAddr is the address a type=remote tunnel listens on, on the SSH
+// server side. A bare port binds loopback (the OpenSSH -R default); a non-
+// loopback host requires GatewayPorts yes in sshd_config.
+func (t Tunnel) RemoteListenAddr() string {
+	return normalizeAddrPort(t.Remote, defaultHost)
+}
+
+// normalizeAddrPort expands a bare port (or host:port) into a dial/listen
+// address, defaulting an empty host to defaultHost.
+func normalizeAddrPort(s, defaultH string) string {
+	s = strings.TrimSpace(s)
 	if s == "" {
 		return ""
 	}
@@ -178,11 +193,11 @@ func (t Tunnel) ListenAddr() string {
 			return s
 		}
 		if host == "" {
-			host = defaultHost
+			host = defaultH
 		}
 		return net.JoinHostPort(host, port)
 	}
-	return net.JoinHostPort(defaultHost, s)
+	return net.JoinHostPort(defaultH, s)
 }
 
 func (t Tunnel) ResolvedIdentity(d Defaults) string {
