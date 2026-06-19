@@ -1,7 +1,7 @@
 ---
 phase: 7
 title: Remote (-R) tunnels
-status: in-progress
+status: done
 depends_on: [6]
 ---
 

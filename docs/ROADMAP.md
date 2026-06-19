@@ -22,7 +22,7 @@
 
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
-| 7   | Remote (-R) tunnels               | `[~]`  | [phase-7-remote-R.md](./phases/phase-7-remote-R.md)   |
+| 7   | Remote (-R) tunnels               | `[x]`  | [phase-7-remote-R.md](./phases/phase-7-remote-R.md)   |
 | 8   | Dynamic (-D) SOCKS5               | `[ ]`  | [phase-8-dynamic-D.md](./phases/phase-8-dynamic-D.md) |
 | 9   | Push events instead of polling    | `[ ]`  | [phase-9-push-events.md](./phases/phase-9-push-events.md) |
 | 10  | TUI tunnel editor (e/n/d)         | `[ ]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
@@ -53,8 +53,14 @@ exercised and are recorded as a deferred-verification deviation in
 [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) — recommended
 manual checks before relying on autostart in production.
 
-Next up: **Phase 7 — Remote (`-R`) tunnels** (post-MVP), the first outline phase
-to be refined when reached — **now in progress**.
+**Phase 7 — Remote (`-R`) tunnels — done.** `type: remote` tunnels now work: the
+port is listened on the SSH server via `ssh.Client.Listen` and forwarded back to
+a local address, with the shared dial/backoff/keepalive scaffolding reused and
+the listener re-established on every reconnect. Direction is shown in the TUI and
+`portato list` (`←` for remote), and a forbidden server-side bind surfaces a
+`GatewayPorts` hint.
+
+Next up: **Phase 8 — Dynamic (`-D`) SOCKS5** (post-MVP, outline).
 
 Phases 1–6 are the detailed MVP plan; 7–11 are outline (goal + DoD), refined as we approach them.
 
