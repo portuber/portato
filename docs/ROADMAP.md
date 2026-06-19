@@ -22,7 +22,7 @@
 
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
-| 7   | Remote (-R) tunnels               | `[ ]`  | [phase-7-remote-R.md](./phases/phase-7-remote-R.md)   |
+| 7   | Remote (-R) tunnels               | `[~]`  | [phase-7-remote-R.md](./phases/phase-7-remote-R.md)   |
 | 8   | Dynamic (-D) SOCKS5               | `[ ]`  | [phase-8-dynamic-D.md](./phases/phase-8-dynamic-D.md) |
 | 9   | Push events instead of polling    | `[ ]`  | [phase-9-push-events.md](./phases/phase-9-push-events.md) |
 | 10  | TUI tunnel editor (e/n/d)         | `[ ]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
@@ -54,7 +54,7 @@ exercised and are recorded as a deferred-verification deviation in
 manual checks before relying on autostart in production.
 
 Next up: **Phase 7 — Remote (`-R`) tunnels** (post-MVP), the first outline phase
-to be refined when reached.
+to be refined when reached — **now in progress**.
 
 Phases 1–6 are the detailed MVP plan; 7–11 are outline (goal + DoD), refined as we approach them.
 
