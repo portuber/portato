@@ -45,16 +45,24 @@ func TestStatusEndpointDirection(t *testing.T) {
 	}{
 		{"local", "5432 → db:5432"},
 		{"remote", "5432 ← db:5432"},
+		{"dynamic", "1080 ⇄ *"},
 		{"", "5432 → db:5432"}, // unknown/empty defaults to local direction
 	}
 	for _, tc := range cases {
 		t.Run(tc.typ, func(t *testing.T) {
-			s := Status{Type: tc.typ, Local: "5432", Remote: "db:5432"}
+			s := Status{Type: tc.typ, Local: localFor(tc.typ), Remote: "db:5432"}
 			if got := s.Endpoint(); got != tc.want {
 				t.Errorf("Endpoint(type=%q) = %q, want %q", tc.typ, got, tc.want)
 			}
 		})
 	}
+}
+
+func localFor(typ string) string {
+	if typ == "dynamic" {
+		return "1080"
+	}
+	return "5432"
 }
 
 func TestStatusJSONShape(t *testing.T) {

@@ -81,8 +81,12 @@ func (s Status) Uptime() time.Duration {
 // remote" for a local tunnel, "local ← remote" for a remote tunnel (traffic
 // flows from the server to here). The arrow encodes the direction.
 func (s Status) Endpoint() string {
-	if s.Type == "remote" {
+	switch s.Type {
+	case "remote":
 		return s.Local + " ← " + s.Remote
+	case "dynamic":
+		return s.Local + " ⇄ *"
+	default:
+		return s.Local + " → " + s.Remote
 	}
-	return s.Local + " → " + s.Remote
 }

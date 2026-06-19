@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/armon/go-socks5"
 	"github.com/kipkaev55/portato/internal/config"
 	"golang.org/x/crypto/ssh"
 )
@@ -227,7 +228,11 @@ func (t *Tunnel) acceptLoop(ctx context.Context, ln net.Listener) {
 			_ = conn.Close()
 			continue
 		}
-		go t.handleConn(client, conn)
+		if t.cfg.Type == "dynamic" {
+			go t.handleDynamicConn(client, conn)
+		} else {
+			go t.handleConn(client, conn)
+		}
 	}
 }
 
@@ -239,6 +244,25 @@ func (t *Tunnel) handleConn(client *ssh.Client, conn net.Conn) {
 		return
 	}
 	pipe(conn, remote)
+}
+
+// handleDynamicConn serves a type=dynamic (-D) connection: the inbound conn is a
+// SOCKS5 client, and each requested destination is dialed through the SSH client
+// on the server side. No auth (loopback bind only).
+func (t *Tunnel) handleDynamicConn(client *ssh.Client, conn net.Conn) {
+	srv, err := socks5.New(&socks5.Config{
+		Dial: func(_ context.Context, network, addr string) (net.Conn, error) {
+			return client.Dial(network, addr)
+		},
+	})
+	if err != nil {
+		t.log.Warn("socks5 server init failed", "err", err)
+		_ = conn.Close()
+		return
+	}
+	if err := srv.ServeConn(conn); err != nil {
+		t.log.Debug("socks5 connection ended", "err", err)
+	}
 }
 
 // runRemote is the reconnect loop for a type=remote (-R) tunnel. The listener

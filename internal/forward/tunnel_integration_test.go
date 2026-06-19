@@ -778,3 +778,170 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 		t.Error("server-side port still reachable after Stop")
 	}
 }
+
+// socks5Dial performs a minimal SOCKS5 no-auth CONNECT handshake against proxy
+// and returns the established connection tunneled to dst (IPv4 host:port). It
+// avoids pulling in a SOCKS5 client dependency just for this test.
+func socks5Dial(t *testing.T, proxy, dst string) net.Conn {
+	t.Helper()
+	conn, err := net.Dial("tcp", proxy)
+	if err != nil {
+		t.Fatalf("socks5: dial proxy %s: %v", proxy, err)
+	}
+	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+
+	// Greeting: ver=5, 1 method offered, no-auth (0x00).
+	if _, err := conn.Write([]byte{0x05, 0x01, 0x00}); err != nil {
+		t.Fatalf("socks5: write greeting: %v", err)
+	}
+	gr := make([]byte, 2)
+	if _, err := io.ReadFull(conn, gr); err != nil {
+		t.Fatalf("socks5: read greeting resp: %v", err)
+	}
+	if gr[0] != 0x05 || gr[1] != 0x00 {
+		t.Fatalf("socks5: greeting resp = %x, want method 00 (no-auth)", gr)
+	}
+
+	host, portStr, err := net.SplitHostPort(dst)
+	if err != nil {
+		t.Fatalf("socks5: bad dst %q: %v", dst, err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("socks5: bad port in %q: %v", dst, err)
+	}
+	ip := net.ParseIP(host).To4()
+	if ip == nil {
+		t.Fatalf("socks5: dst %q is not IPv4", dst)
+	}
+	// CONNECT: ver=5, cmd=1, rsv=0, atyp=1(ipv4), addr(4), port(2).
+	req := []byte{0x05, 0x01, 0x00, 0x01, ip[0], ip[1], ip[2], ip[3], byte(port >> 8), byte(port)}
+	if _, err := conn.Write(req); err != nil {
+		t.Fatalf("socks5: write connect: %v", err)
+	}
+	hdr := make([]byte, 4)
+	if _, err := io.ReadFull(conn, hdr); err != nil {
+		t.Fatalf("socks5: read reply hdr: %v", err)
+	}
+	if hdr[0] != 0x05 || hdr[1] != 0x00 {
+		t.Fatalf("socks5: connect reply = %x%x..., want rep=00 (succeeded)", hdr[:2], "")
+	}
+	// Consume the bound addr+port according to atyp.
+	switch hdr[3] {
+	case 0x01:
+		_, _ = io.ReadFull(conn, make([]byte, 4+2))
+	case 0x04:
+		_, _ = io.ReadFull(conn, make([]byte, 16+2))
+	case 0x03:
+		l := make([]byte, 1)
+		if _, err := io.ReadFull(conn, l); err != nil {
+			t.Fatalf("socks5: read bnd domain len: %v", err)
+		}
+		_, _ = io.ReadFull(conn, make([]byte, int(l[0])+2))
+	}
+	_ = conn.SetDeadline(time.Time{})
+	return conn
+}
+
+// TestTunnelDynamicTrafficAndReconnect exercises a type=dynamic (-D) tunnel end
+// to end: a SOCKS5 proxy on local whose per-connection dial is routed through
+// the SSH client. A hand-rolled SOCKS5 client CONNECTs to an echo server via
+// the proxy; the connection is re-established after an sshd drop/restart.
+func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen client key: %v", err)
+	}
+	authorizedKey, _ := ssh.NewPublicKey(pub)
+	block, err := ssh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		t.Fatalf("marshal client priv: %v", err)
+	}
+	dir := t.TempDir()
+	idPath := filepath.Join(dir, "id_ed25519")
+	if err := os.WriteFile(idPath, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write identity: %v", err)
+	}
+	knownHosts := filepath.Join(dir, "known_hosts")
+
+	srv := newSSHD(t, authorizedKey)
+	srv.start()
+	defer srv.stop()
+
+	localPort := freePort(t)
+	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
+
+	cfg := config.Tunnel{
+		Name:     "d-test",
+		Type:     "dynamic",
+		Local:    strconv.Itoa(localPort),
+		SSH:      "u@" + srv.addr(),
+		Identity: idPath,
+		User:     "u",
+		Host:     "127.0.0.1",
+		Port:     srv.port,
+		// no Remote: each SOCKS request carries its own destination.
+	}
+	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	if !waitForState(tun, Connected, 5*time.Second) {
+		s := tun.Status()
+		t.Fatalf("did not reach Connected: state=%s err=%q", s.State, s.Error)
+	}
+
+	ping := func(label string) {
+		t.Helper()
+		conn := socks5Dial(t, localAddr, echoAddr)
+		defer conn.Close()
+		msg := []byte("hello-" + label)
+		if _, err := conn.Write(msg); err != nil {
+			t.Fatalf("%s: write: %v", label, err)
+		}
+		buf := make([]byte, len(msg))
+		_ = conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+		if _, err := io.ReadFull(conn, buf); err != nil {
+			t.Fatalf("%s: read: %v", label, err)
+		}
+		if !bytes.Equal(buf, msg) {
+			t.Errorf("%s: echo %q, want %q", label, buf, msg)
+		}
+	}
+
+	ping("first")
+
+	// Kill the SSH server and confirm the SOCKS proxy self-heals.
+	srv.stop()
+	if !waitForNotState(tun, Connected, 5*time.Second) {
+		t.Fatal("tunnel stayed Connected after server kill")
+	}
+	srv.restart()
+	if !waitForState(tun, Connected, 15*time.Second) {
+		s := tun.Status()
+		t.Fatalf("did not reconnect after server restart: state=%s err=%q", s.State, s.Error)
+	}
+
+	ping("after-reconnect")
+
+	// Stop must close the local SOCKS port.
+	if err := tun.Stop(); err != nil {
+		t.Fatalf("Stop: %v", err)
+	}
+	c, err := net.Dial("tcp", localAddr)
+	if err == nil {
+		c.Close()
+		t.Error("local port still open after Stop")
+	}
+}
