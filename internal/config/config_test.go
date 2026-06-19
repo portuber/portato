@@ -167,7 +167,7 @@ func TestValidateErrors(t *testing.T) {
 		},
 		{
 			name:    "unsupported type",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "dynamic", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "foo", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "not supported",
 		},
 		{
@@ -276,21 +276,27 @@ func TestRemoteListenAddr(t *testing.T) {
 	}
 }
 
-func TestValidateAcceptsRemoteType(t *testing.T) {
+func TestValidateAcceptsTypes(t *testing.T) {
 	cases := []struct {
-		name string
-		typ  string
-		ok   bool
+		name   string
+		typ    string
+		local  string
+		remote string
+		ok     bool
 	}{
-		{"local is valid", "local", true},
-		{"remote is valid", "remote", true},
-		{"empty defaults to local", "", true},
-		{"dynamic not yet", "dynamic", false},
-		{"bogus type", "foo", false},
+		{"local is valid", "local", "5432", "127.0.0.1:5432", true},
+		{"remote is valid", "remote", "5432", "127.0.0.1:5432", true},
+		{"empty defaults to local", "", "5432", "127.0.0.1:5432", true},
+		{"dynamic is valid", "dynamic", "1080", "127.0.0.1:5432", true},
+		{"dynamic without remote is valid", "dynamic", "1080", "", true},
+		{"dynamic without local is rejected", "dynamic", "", "127.0.0.1:5432", false},
+		{"local without remote is rejected", "local", "5432", "", false},
+		{"remote without remote is rejected", "remote", "5432", "", false},
+		{"bogus type", "foo", "5432", "127.0.0.1:5432", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := &Config{Tunnels: []Tunnel{{Name: "a", Type: tc.typ, Local: "5432", Remote: "127.0.0.1:5432", SSH: "u@h:22"}}}
+			cfg := &Config{Tunnels: []Tunnel{{Name: "a", Type: tc.typ, Local: tc.local, Remote: tc.remote, SSH: "u@h:22"}}}
 			cfg.prepare()
 			err := cfg.Validate()
 			if tc.ok && err != nil {

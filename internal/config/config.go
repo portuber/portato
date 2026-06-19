@@ -90,12 +90,15 @@ func (c *Config) Validate() error {
 		}
 		seen[t.Name] = struct{}{}
 		switch t.Type {
-		case "local", "remote":
+		case "local", "remote", "dynamic":
 		default:
-			return fmt.Errorf("tunnel %q: type %q not supported (supported: local, remote)", t.Name, t.Type)
+			return fmt.Errorf("tunnel %q: type %q not supported (supported: local, remote, dynamic)", t.Name, t.Type)
 		}
-		if strings.TrimSpace(t.Remote) == "" {
+		if t.Type != "dynamic" && strings.TrimSpace(t.Remote) == "" {
 			return fmt.Errorf("tunnel %q: remote is empty", t.Name)
+		}
+		if t.Type == "dynamic" && strings.TrimSpace(t.Local) == "" {
+			return fmt.Errorf("tunnel %q: local is empty", t.Name)
 		}
 		if strings.TrimSpace(t.Host) == "" {
 			return fmt.Errorf("tunnel %q: ssh host is empty", t.Name)
