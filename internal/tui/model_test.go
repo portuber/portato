@@ -198,12 +198,13 @@ func TestModel_RenderContainsTunnels(t *testing.T) {
 	f := newFake(
 		controller.Status{Name: "alpha", Type: "local", Local: "5432", Remote: "db:5432", State: controller.Connected},
 		controller.Status{Name: "beta", Type: "local", Local: "8080", Remote: "web:80", State: controller.Off, Error: "boom"},
+		controller.Status{Name: "gamma", Type: "remote", Local: "5432", Remote: "db:5432", State: controller.Connected},
 	)
 	m := New(f, Options{Mode: "standalone"})
 	m.width = 100
 
 	out := m.render()
-	for _, want := range []string{"Portato", "mode: standalone", "alpha", "beta", "5432 → db:5432"} {
+	for _, want := range []string{"Portato", "mode: standalone", "alpha", "beta", "gamma", "5432 → db:5432", "5432 ← db:5432", "remote", "ENDPOINT"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("render missing %q", want)
 		}

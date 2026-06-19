@@ -79,7 +79,7 @@ func columnHeader() string {
 		"  " +
 			pad("NAME", colName) +
 			pad("TYPE", colType) +
-			pad("LOCAL → REMOTE", colEndpoint) +
+			pad("ENDPOINT", colEndpoint) +
 			pad("STATUS", colStatus) +
 			"UPTIME",
 	)
@@ -91,7 +91,7 @@ func (m Model) row(i int, s controller.Status) string {
 	if s.State != controller.Off {
 		indicator = "●"
 	}
-	endpoint := s.Local + " → " + s.Remote
+	endpoint := s.Endpoint()
 	status := stateLabel(s.State)
 	if s.Error != "" {
 		status += " " + dimStyle.Render(truncate(s.Error, 18))

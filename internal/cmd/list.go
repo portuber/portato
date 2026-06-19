@@ -35,13 +35,13 @@ func listRunE(cmd *cobra.Command, _ []string) error {
 
 func printTable(out io.Writer, statuses []forward.Status) {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "  NAME\tTYPE\tLOCAL → REMOTE\tSTATUS\tUPTIME")
+	fmt.Fprintln(w, "  NAME\tTYPE\tENDPOINT\tSTATUS\tUPTIME")
 	for _, s := range statuses {
 		indicator := "○"
 		if s.State != forward.Off {
 			indicator = "●"
 		}
-		endpoint := s.Local + " → " + s.Remote
+		endpoint := s.Endpoint()
 		status := s.State.String()
 		if s.Error != "" {
 			status += " " + s.Error

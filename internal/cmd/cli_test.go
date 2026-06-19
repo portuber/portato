@@ -144,6 +144,7 @@ func sampleStatuses() []forward.Status {
 	return []forward.Status{
 		{Name: "db-stage", Type: "local", Local: "5432", Remote: "bastion:5432", State: forward.Connected},
 		{Name: "admin", Type: "local", Local: "8080", Remote: "web:80", State: forward.Off},
+		{Name: "pull-db", Type: "remote", Local: "5432", Remote: "bastion:5432", State: forward.Connected},
 	}
 }
 
@@ -158,7 +159,7 @@ func TestList_PrintsTable(t *testing.T) {
 	if errOut.String() != "" {
 		t.Errorf("unexpected stderr: %q", errOut.String())
 	}
-	for _, want := range []string{"NAME", "db-stage", "5432 → bastion:5432", "connected", "admin", "off"} {
+	for _, want := range []string{"NAME", "ENDPOINT", "db-stage", "5432 → bastion:5432", "pull-db", "5432 ← bastion:5432", "remote", "connected", "admin", "off"} {
 		if !strings.Contains(out.String(), want) {
 			t.Errorf("list output missing %q\ngot:\n%s", want, out.String())
 		}
