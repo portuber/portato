@@ -47,6 +47,7 @@ Each tunnel has a `type`:
 |-----------|----------|----------------------------------------------------------------|
 | `local`   | `-L`     | listen **here**, forward to `remote` on the host (`→` in UI).  |
 | `remote`  | `-R`     | listen **on the host**, forward back here (`←` in UI).         |
+| `dynamic` | `-D`     | a SOCKS5 proxy on `local`, all traffic via the host (`⇄ *`).  |
 
 For a `remote` tunnel, `remote` is the address listened on the SSH server (a
 bare port binds loopback, the OpenSSH default), and `local` is the address
@@ -64,6 +65,33 @@ tunnels:
 **Binding a non-loopback address on the host** (e.g. `remote: 0.0.0.0:16379`)
 requires `GatewayPorts yes` in the server's `sshd_config`. Otherwise the server
 refuses the bind and the tunnel reports a `GatewayPorts` error.
+
+### Dynamic (SOCKS5) tunnels
+
+A `dynamic` tunnel runs a SOCKS5 proxy on `local`. There is no fixed `remote` —
+each connection's destination is read from the SOCKS request and dialed on the
+host side, so you can reach any internal address through the bastion without a
+forward per port:
+
+```yaml
+tunnels:
+  - name: socks
+    type: dynamic
+    local: 1080          # SOCKS5 proxy -> 127.0.0.1:1080
+    ssh: user@bastion.example.com
+```
+
+Use it like any SOCKS5 proxy (no auth, loopback bind):
+
+```sh
+curl --socks5 127.0.0.1:1080 http://internal-host.example.com
+# or HTTP-through-SOCKS:
+ALL_PROXY=socks5://127.0.0.1:1080 curl http://internal-host.example.com
+```
+
+For a browser, set the SOCKS5 host to `127.0.0.1` and port `1080` (enable "Proxy
+DNS when using SOCKS v5" so names resolve on the bastion too). The proxy
+reconnects automatically if the SSH session drops.
 
 ## Autostart
 

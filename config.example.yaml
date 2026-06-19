@@ -11,7 +11,7 @@ defaults:
 
 tunnels:
   - name: db-stage                # unique, required
-    type: local                   # "local" (-L) or "remote" (-R); "dynamic" (-D) is post-MVP
+    type: local                   # "local" (-L), "remote" (-R), or "dynamic" (-D)
     local: 5432                   # port or host:port (defaults to 127.0.0.1)
     remote: 10.0.0.5:5432         # destination address, relative to the ssh server
     ssh: user@bastion.example.com:22   # required; user and port optional
@@ -26,5 +26,15 @@ tunnels:
     type: remote
     remote: 16379                # listened on the server -> 127.0.0.1:16379
     local: 6379                  # forwarded to the local redis
+    ssh: user@bastion.example.com:22
+    enabled: false
+
+  # Dynamic (-D): a SOCKS5 proxy on `local`. Each connection's destination is
+  # taken from the SOCKS request and dialed on the ssh server side, so there is
+  # no `remote`. Point a browser or `curl --socks5 127.0.0.1:1080` at it to
+  # reach internal hosts through the bastion.
+  - name: socks
+    type: dynamic
+    local: 1080                 # SOCKS5 listen address -> 127.0.0.1:1080
     ssh: user@bastion.example.com:22
     enabled: false
