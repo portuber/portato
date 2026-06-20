@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"log/slog"
 	"net"
 	"sync"
@@ -20,6 +21,12 @@ const (
 	keepaliveTimeout    = 5 * time.Second
 	stableResetInterval = 30 * time.Second
 )
+
+// socks5SilencedLogger discards the armon/go-socks5 library's own log output.
+// By default it writes [ERR] socks: ... to os.Stdout, which corrupts the TUI
+// (and desyncs the bubbletea renderer). Per-connection failures are still
+// surfaced via the ServeConn return value through slog (see handleDynamicConn).
+var socks5SilencedLogger = log.New(io.Discard, "", 0)
 
 // Tunnel manages one local (-L) SSH port forward: it owns the local listener,
 // the SSH client (with reconnect), and the per-connection copy loops.
@@ -251,6 +258,7 @@ func (t *Tunnel) handleConn(client *ssh.Client, conn net.Conn) {
 // on the server side. No auth (loopback bind only).
 func (t *Tunnel) handleDynamicConn(client *ssh.Client, conn net.Conn) {
 	srv, err := socks5.New(&socks5.Config{
+		Logger: socks5SilencedLogger,
 		Dial: func(_ context.Context, network, addr string) (net.Conn, error) {
 			return client.Dial(network, addr)
 		},
