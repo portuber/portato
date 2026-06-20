@@ -14,8 +14,9 @@ import (
 const (
 	colName     = 20
 	colType     = 7
-	colEndpoint = 32
+	colEndpoint = 48
 	colStatus   = 14
+	gutter      = "  "
 )
 
 func (m Model) View() tea.View {
@@ -77,10 +78,10 @@ func (m Model) table() string {
 func columnHeader() string {
 	return headerStyle.Render(
 		"  " +
-			pad("NAME", colName) +
-			pad("TYPE", colType) +
-			pad("ENDPOINT", colEndpoint) +
-			pad("STATUS", colStatus) +
+			pad("NAME", colName) + gutter +
+			pad("TYPE", colType) + gutter +
+			pad("ENDPOINT", colEndpoint) + gutter +
+			pad("STATUS", colStatus) + gutter +
 			"UPTIME",
 	)
 }
@@ -97,10 +98,10 @@ func (m Model) row(i int, s controller.Status) string {
 		status += " " + dimStyle.Render(truncate(s.Error, 18))
 	}
 	cells := indicator + " " +
-		pad(s.Name, colName) +
-		pad(s.Type, colType) +
-		pad(endpoint, colEndpoint) +
-		pad(status, colStatus) +
+		pad(s.Name, colName) + gutter +
+		pad(s.Type, colType) + gutter +
+		pad(endpoint, colEndpoint) + gutter +
+		pad(status, colStatus) + gutter +
 		uptime(s)
 	if selected {
 		return selectedStyle.Render(cells)
