@@ -24,7 +24,7 @@
 |-----|-----------------------------------|--------|-------------------------------------------------------|
 | 7   | Remote (-R) tunnels               | `[x]`  | [phase-7-remote-R.md](./phases/phase-7-remote-R.md)   |
 | 8   | Dynamic (-D) SOCKS5               | `[x]`  | [phase-8-dynamic-D.md](./phases/phase-8-dynamic-D.md) |
-| 9   | Push events instead of polling    | `[~]`  | [phase-9-push-events.md](./phases/phase-9-push-events.md) |
+| 9   | Push events instead of polling    | `[x]`  | [phase-9-push-events.md](./phases/phase-9-push-events.md) |
 | 10  | TUI tunnel editor (e/n/d)         | `[ ]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
 | 11  | Polish (logs, themes, CI, doctor) | `[ ]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
 | 12  | Robust IPC socket discovery       | `[ ]`  | [phase-12-ipc-discovery.md](./phases/phase-12-ipc-discovery.md) |
@@ -69,8 +69,21 @@ divergence is the per-connection handler (a `armon/go-socks5` server).
 Direction shows as `⇄ *` in the TUI and `portato list`; reconnect is covered by
 an integration test (drop/restart sshd → proxy works again).
 
-Next up: **Phase 9 — Push events** (post-MVP, outline) — SSE/chunked events
-instead of the 1s polling.
+**Phase 9 — Push events — done.** The 1s polling on both `localController`
+and `remoteController` is gone. The Engine now fans every tunnel state change
+to subscribers via a drop-old broker; `localController.Changes()` forwards it,
+and the daemon's new `GET /events` SSE stream forwards it to attached clients
+(`remoteController` reads the stream and reconnects with exponential backoff).
+The Controller interface is unchanged, so the TUI redraws instantly on
+`space`, on reconnect, and across two concurrent `attach` sessions — with zero
+idle load. Also landed two follow-ups during the phase: `fix(daemon)` made the
+macOS socket path deterministic (a build-tagged `~/Library/Application
+Support/portato/` location, no longer depending on `XDG_RUNTIME_DIR`), and
+`fix(tui)` gave errored tunnels a distinct `✗` indicator.
+
+Next up: **Phase 10 — TUI tunnel editor** (`e`/`n`/`d`). **Phase 12 — Robust
+IPC socket discovery** is planned to replace the phase-9 `fix(daemon)` patch
+with a discovery-file + runtime-socket design.
 
 Phases 1–6 are the detailed MVP plan; 7–12 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design.
 

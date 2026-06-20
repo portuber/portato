@@ -1,7 +1,7 @@
 ---
 phase: 9
 title: Push events instead of polling
-status: in-progress
+status: done
 depends_on: [6]
 ---
 
