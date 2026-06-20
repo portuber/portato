@@ -27,6 +27,54 @@ type Engine struct {
 	tunnels  map[string]tunneler
 	configs  map[string]config.Tunnel
 	factory  func(config.Tunnel, config.Defaults, *slog.Logger) tunneler
+
+	// Event broker (Phase 9): every tunnel state change fans out to
+	// subscribers as a non-blocking "something changed" signal. The local
+	// controller subscribes directly; the daemon's /events stream forwards
+	// the same signal over SSE.
+	subMu sync.RWMutex
+	subs  map[chan struct{}]struct{}
+}
+
+// subscriberBuffer caps each subscriber's signal queue. Sends are non-blocking
+// (drop-old): a slow consumer loses intermediate signals but always sees the
+// latest state on the next List() — the right trade-off for a UI redraw tick.
+const subscriberBuffer = 16
+
+// Subscribe returns a channel that receives struct{}{} on every tunnel state
+// change, plus an unsubscribe func that must be called to stop delivery. Safe
+// for concurrent use; notify never blocks (drop-old on a full buffer).
+func (e *Engine) Subscribe() (<-chan struct{}, func()) {
+	ch := make(chan struct{}, subscriberBuffer)
+	e.subMu.Lock()
+	if e.subs == nil {
+		e.subs = make(map[chan struct{}]struct{})
+	}
+	e.subs[ch] = struct{}{}
+	e.subMu.Unlock()
+	var once sync.Once
+	unsub := func() {
+		once.Do(func() {
+			e.subMu.Lock()
+			delete(e.subs, ch)
+			e.subMu.Unlock()
+		})
+	}
+	return ch, unsub
+}
+
+// notify fans a change signal to every subscriber. Called by tunnels (via the
+// onChange callback wired in the factory) and internally after engine-level
+// mutations. Non-blocking: a full subscriber buffer drops the oldest signal.
+func (e *Engine) notify() {
+	e.subMu.RLock()
+	for ch := range e.subs {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+	e.subMu.RUnlock()
 }
 
 // NewEngine builds an Engine with all tunnels constructed but not started.
@@ -44,9 +92,11 @@ func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger) *Engin
 		defaults: cfg.Defaults,
 		tunnels:  make(map[string]tunneler),
 		configs:  make(map[string]config.Tunnel),
-		factory: func(t config.Tunnel, d config.Defaults, l *slog.Logger) tunneler {
-			return NewTunnel(ctx, t, d, l)
-		},
+	}
+	e.factory = func(t config.Tunnel, d config.Defaults, l *slog.Logger) tunneler {
+		tn := NewTunnel(ctx, t, d, l)
+		tn.onChange = e.notify
+		return tn
 	}
 	e.buildAll()
 	return e
@@ -174,6 +224,9 @@ func (e *Engine) Reload(cfg *config.Config) {
 		}
 	}
 	e.configs = newConfigs
+	// Reload reshapes the tunnel set; ensure subscribers refresh even when
+	// the change is only an added/removed Off tunnel (no per-tunnel notify).
+	e.notify()
 }
 
 func (e *Engine) lookup(name string) (tunneler, bool) {

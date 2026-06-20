@@ -45,6 +45,19 @@ type Tunnel struct {
 	client      *ssh.Client
 	cancel      context.CancelFunc
 	done        chan struct{}
+
+	// onChange is wired by the Engine (Phase 9) so every state transition
+	// fans out to event subscribers. Nil-safe: standalone tests / fakes
+	// leave it unset. Fires after the state mutex is released.
+	onChange func()
+}
+
+// notifyChange propagates a state transition to the Engine broker. Called
+// only by the goroutine that just changed t.state, after releasing t.mu.
+func (t *Tunnel) notifyChange() {
+	if t.onChange != nil {
+		t.onChange()
+	}
 }
 
 // NewTunnel constructs a tunnel. baseCtx is reused for manual Restart.
@@ -88,6 +101,7 @@ func (t *Tunnel) Start(ctx context.Context) error {
 		t.state = Connecting
 		t.errMsg = ""
 		t.mu.Unlock()
+		t.notifyChange()
 		go t.runRemote(cctx, done)
 		return nil
 	}
@@ -98,6 +112,7 @@ func (t *Tunnel) Start(ctx context.Context) error {
 		t.state = Error
 		t.errMsg = fmt.Sprintf("listen %s: %v", addr, err)
 		t.mu.Unlock()
+		t.notifyChange()
 		return fmt.Errorf("listen %s: %w", addr, err)
 	}
 	cctx, cancel := context.WithCancel(ctx)
@@ -109,6 +124,7 @@ func (t *Tunnel) Start(ctx context.Context) error {
 	t.state = Connecting
 	t.errMsg = ""
 	t.mu.Unlock()
+	t.notifyChange()
 
 	go t.run(cctx, ln, done)
 	return nil
@@ -134,6 +150,7 @@ func (t *Tunnel) Stop() error {
 	t.cancel = nil
 	t.done = nil
 	t.mu.Unlock()
+	t.notifyChange()
 
 	if cancel != nil {
 		cancel()
@@ -199,6 +216,7 @@ func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{})
 		t.connectedAt = time.Now()
 		t.state = Connected
 		t.mu.Unlock()
+		t.notifyChange()
 		t.log.Info("tunnel connected")
 
 		t.serveConnected(ctx, client)
@@ -315,6 +333,7 @@ func (t *Tunnel) runRemote(ctx context.Context, done chan<- struct{}) {
 		t.connectedAt = time.Now()
 		t.state = Connected
 		t.mu.Unlock()
+		t.notifyChange()
 		t.log.Info("remote tunnel connected", "bind", bindAddr)
 
 		t.serveRemoteConnected(ctx, client, ln)
@@ -467,6 +486,7 @@ func (t *Tunnel) setState(s State) {
 	t.mu.Lock()
 	t.state = s
 	t.mu.Unlock()
+	t.notifyChange()
 }
 
 func (t *Tunnel) setStateErr(s State, msg string) {
@@ -474,6 +494,7 @@ func (t *Tunnel) setStateErr(s State, msg string) {
 	t.state = s
 	t.errMsg = msg
 	t.mu.Unlock()
+	t.notifyChange()
 }
 
 func (t *Tunnel) sleep(ctx context.Context, d time.Duration) bool {
