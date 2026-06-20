@@ -18,7 +18,7 @@
 | 5   | CLI commands + smart launcher + hand-off | `[x]`  | [phase-5-cli-smart-launcher.md](./phases/phase-5-cli-smart-launcher.md) |
 | 6   | Autostart (launchd/systemd) + E2E     | `[x]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
 
-### Post-MVP (phases 7–11, outline — detailed when reached)
+### Post-MVP (phases 7–12, outline — detailed when reached)
 
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
@@ -27,6 +27,7 @@
 | 9   | Push events instead of polling    | `[~]`  | [phase-9-push-events.md](./phases/phase-9-push-events.md) |
 | 10  | TUI tunnel editor (e/n/d)         | `[ ]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
 | 11  | Polish (logs, themes, CI, doctor) | `[ ]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
+| 12  | Robust IPC socket discovery       | `[ ]`  | [phase-12-ipc-discovery.md](./phases/phase-12-ipc-discovery.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -71,7 +72,7 @@ an integration test (drop/restart sshd → proxy works again).
 Next up: **Phase 9 — Push events** (post-MVP, outline) — SSE/chunked events
 instead of the 1s polling.
 
-Phases 1–6 are the detailed MVP plan; 7–11 are outline (goal + DoD), refined as we approach them.
+Phases 1–6 are the detailed MVP plan; 7–12 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design.
 
 ## Phase summary
 
@@ -87,6 +88,7 @@ Phases 1–6 are the detailed MVP plan; 7–11 are outline (goal + DoD), refined
 - **Phase 9** — push events (`GET /events` SSE/chunked) instead of 1s polling.
 - **Phase 10** — a tunnel editor in the TUI (`e`/`n`/`d`).
 - **Phase 11** — logs in the TUI (`l`), themes, `portato doctor`, tests, CI.
+- **Phase 12** — robust IPC socket discovery: the daemon advertises its socket path via a stable discovery file; clients read it (socket lives in `$TMPDIR` / `$XDG_RUNTIME_DIR`).
 
 ## Final MVP E2E (on completing Phase 6)
 
