@@ -136,8 +136,8 @@ type Status struct {
 ```
 
 Implementations:
-- **`localController`** (`controller/local.go`): wraps `forward.Engine`. `Changes()` is a channel fed by a `time.Ticker` at 1s in the MVP (the controller does not depend on bubbletea); replaced by a push from the Engine in post-MVP.
-- **`remoteController`** (`controller/remote.go`): HTTP client to the daemon. `Changes()` is a `GET /tunnels` poll once per second in the MVP; replaced by SSE/stream in post-MVP (Phase 9).
+- **`localController`** (`controller/local.go`): wraps `forward.Engine`. `Changes()` forwards the Engine's event broker — every tunnel state transition pushes a signal through an owned, drop-old channel (Phase 9).
+- **`remoteController`** (`controller/remote.go`): HTTP client to the daemon. `Changes()` reads the daemon's `GET /events` SSE stream and reconnects with exponential backoff on a stream break (Phase 9).
 
 ## 6. IPC (daemon <-> clients)
 
@@ -157,9 +157,15 @@ Implementations:
 | `POST`  | `/tunnels/{name}/disable`         | disable + persist `enabled=false` |
 | `POST`  | `/tunnels/{name}/restart`         | down + up                         |
 | `POST`  | `/reload`                         | re-read the config from disk      |
+| `GET`   | `/events`                         | SSE stream of state-change signals (Phase 9) |
 | `GET`   | `/healthz`                        | liveness probe (smart-launcher)   |
 
-Post-MVP (Phase 9): add `GET /events` (SSE/chunked) for push updates.
+`GET /events` (Phase 9) is a `text/event-stream`: the daemon subscribes a
+client to the Engine's event broker and writes a signal-only `data: {}` frame
+on every tunnel state change (plus one initial frame on connect and a 15s
+heartbeat comment). The client reacts by re-fetching `GET /tunnels`. This
+replaces the former 1s polling — an idle attached client issues no periodic
+requests.
 
 **Key invariant:** every `enable/disable` writes `enabled` back to the YAML config. This is the foundation of the "leave in the background" hand-off: a fresh daemon reads the same config and brings up the same set of tunnels.
 
