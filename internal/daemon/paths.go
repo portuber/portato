@@ -1,31 +1,16 @@
 package daemon
 
-import (
-	"os"
-	"path/filepath"
-
-	"github.com/adrg/xdg"
-)
+import "path/filepath"
 
 const (
 	socketFile = "portato.sock"
 	pidFile    = "portato.pid"
 )
 
-// socketDir returns the directory shared by the unix socket and PID file.
-// Preferred location is xdg.RuntimeDir; if it is empty (common on macOS
-// outside of systemd/launchd sessions), the config-style fallback
-// $HOME/.config/portato is used. See SPEC §6.
-func socketDir() (string, error) {
-	if dir := xdg.RuntimeDir; dir != "" {
-		return dir, nil
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, ".config", "portato"), nil
-}
+// socketDir returns the directory shared by the unix socket and PID file. It
+// is implemented per-OS (build-tagged paths_darwin.go / paths_unix.go) because
+// the right answer differs: Linux has a reliable per-user runtime dir, macOS
+// does not. See SPEC §6.
 
 // SocketPath returns the absolute path of the IPC unix socket.
 func SocketPath() (string, error) {

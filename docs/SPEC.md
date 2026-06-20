@@ -142,9 +142,9 @@ Implementations:
 ## 6. IPC (daemon <-> clients)
 
 - **Transport:** a unix domain socket (a file). No TCP ports exposed to the network.
-- **Socket path:**
-  - Linux: `$XDG_RUNTIME_DIR/portato.sock` (fallback `/run/user/<uid>/portato.sock`).
-  - macOS: `$(xdg.RuntimeDir)/portato.sock` (usually `/var/folders/.../T/portato.sock`); if `xdg.RuntimeDir` is empty — `$HOME/.config/portato/portato.sock`.
+- **Socket path:** resolved per OS so the daemon and every client always agree, regardless of which shell launched them.
+  - Linux: `$XDG_RUNTIME_DIR/portato.sock` (reliable — set by systemd/logind as a per-user tmpfs; fallback `$HOME/.config/portato/portato.sock` when unset).
+  - macOS: `$HOME/Library/Application Support/portato/portato.sock` — a fixed subdirectory. macOS has no reliable per-user runtime dir (`XDG_RUNTIME_DIR` is not set by the OS and varies across terminal/tmux sessions; relying on it made the daemon and clients disagree on the path), so a deterministic Application Support location is used.
 - **PID file:** next to the socket, `portato.pid`. On daemon startup, verify the process is alive via the PID — protection against double launches.
 - **Protocol:** HTTP over the unix socket (`net.Listen("unix", path)` + `http.Serve`). JSON in request/response bodies.
 - **Permissions:** the socket is created with mode `0600`, accessible only to the owner.
