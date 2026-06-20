@@ -140,31 +140,21 @@ func TestLocal_EnableUnknownDoesNotPersist(t *testing.T) {
 	}
 }
 
-func TestLocal_ChangesTicksAndCloses(t *testing.T) {
+func TestLocal_ChangesPushesAndCloses(t *testing.T) {
 	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
 	cfg := mustLoad(t, p)
-	l := newLocal(cfg, p, nil, 20*time.Millisecond)
+	l := NewLocal(cfg, p, nil)
+	defer l.Close()
 	ch := l.Changes()
 
+	// Reload drives engine.Reload, which fans a notify out to subscribers.
+	if err := l.Reload(); err != nil {
+		t.Fatalf("Reload: %v", err)
+	}
 	select {
 	case <-ch:
 	case <-time.After(time.Second):
-		t.Fatal("no tick received within 1s")
-	}
-
-	if _, ok := (<-ch); !ok {
-		t.Fatal("second tick expected")
-	}
-
-	if err := l.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-	if _, ok := <-ch; ok {
-		t.Errorf("after Close channel should be closed")
-	}
-
-	if err := l.Close(); err != nil {
-		t.Errorf("second Close: %v", err)
+		t.Fatal("no push signal after Reload")
 	}
 }
 

@@ -1,6 +1,10 @@
 package controller
 
 import (
+	"bufio"
+	"context"
+	"io"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,29 +20,33 @@ type daemonClient interface {
 	Disable(name string) error
 	Restart(name string) error
 	Reload() error
+	Events(ctx context.Context) (io.ReadCloser, error)
 }
 
 // Remote is a Controller backed by the daemon via an HTTP client over a unix
 // socket. It is the attach/CLI counterpart of Local. Changes() drives the TUI
-// via 1s polling (Phase 9 will replace this with push events).
+// from the daemon's SSE event stream (Phase 9): a state change on the daemon
+// reaches attached clients instantly, with no 1s polling.
 type Remote struct {
-	client   daemonClient
-	interval time.Duration
+	client daemonClient
 
 	initOnce  sync.Once
 	closeOnce sync.Once
 	changes   chan struct{}
-	stop      chan struct{}
+	ctx       context.Context
+	cancel    context.CancelFunc
 	done      chan struct{}
 }
 
 // NewRemote wraps a daemon client as a Controller.
 func NewRemote(c *client.Client) *Remote {
-	return &Remote{client: c, interval: time.Second}
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Remote{client: c, ctx: ctx, cancel: cancel}
 }
 
-func newRemote(c daemonClient, interval time.Duration) *Remote {
-	return &Remote{client: c, interval: interval}
+func newRemote(c daemonClient) *Remote {
+	ctx, cancel := context.WithCancel(context.Background())
+	return &Remote{client: c, ctx: ctx, cancel: cancel}
 }
 
 func (r *Remote) List() []Status {
@@ -57,38 +65,86 @@ func (r *Remote) Disable(name string) error { return r.client.Disable(name) }
 func (r *Remote) Restart(name string) error { return r.client.Restart(name) }
 func (r *Remote) Reload() error             { return r.client.Reload() }
 
+// Changes returns the push channel fed by the daemon's /events SSE stream.
+// A goroutine reads frames, reconnects on break with exponential backoff,
+// and coalesces bursts via a buffered drop-old channel. The stream closes
+// with the channel when Close() is called.
 func (r *Remote) Changes() <-chan struct{} {
 	r.initOnce.Do(func() {
 		r.changes = make(chan struct{}, 1)
-		r.stop = make(chan struct{})
 		r.done = make(chan struct{})
-		go r.tickLoop()
+		go r.streamLoop()
 	})
 	return r.changes
 }
 
-func (r *Remote) tickLoop() {
+// streamLoop maintains a live SSE subscription to the daemon. On connect it
+// reads data frames and forwards them as change signals; on any break it
+// reconnects after exponential backoff. Returns when ctx is cancelled.
+func (r *Remote) streamLoop() {
 	defer close(r.done)
-	ticker := time.NewTicker(r.interval)
-	defer ticker.Stop()
+	backoff := streamReconnectBackoff
 	for {
-		select {
-		case <-r.stop:
+		if r.ctx.Err() != nil {
 			return
-		case <-ticker.C:
+		}
+		rc, err := r.client.Events(r.ctx)
+		if err != nil {
+			if !r.sleep(backoff) {
+				return
+			}
+			backoff = nextStreamBackoff(backoff)
+			continue
+		}
+		backoff = streamReconnectBackoff
+		live := r.scanStream(rc)
+		_ = rc.Close()
+		if !live {
+			return // ctx cancelled
+		}
+		// Stream broke mid-flight: pause briefly, then re-establish.
+		if !r.sleep(backoff) {
+			return
+		}
+		backoff = nextStreamBackoff(backoff)
+	}
+}
+
+// scanStream reads SSE frames until the stream ends or ctx is cancelled. Each
+// data frame forwards a non-blocking signal into changes. Heartbeat comment
+// lines and blank separators are ignored. Reports whether the loop ended due
+// to a stream break (true) vs. ctx cancellation (false).
+func (r *Remote) scanStream(rc io.ReadCloser) bool {
+	scanner := bufio.NewScanner(rc)
+	for scanner.Scan() {
+		if r.ctx.Err() != nil {
+			return false
+		}
+		if strings.HasPrefix(scanner.Text(), "data:") {
 			select {
 			case r.changes <- struct{}{}:
 			default:
 			}
 		}
 	}
+	// Scanner stops on EOF/read error; a cancelled ctx means we intended to stop.
+	return r.ctx.Err() == nil
+}
+
+func (r *Remote) sleep(d time.Duration) bool {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-r.ctx.Done():
+		return false
+	case <-timer.C:
+		return true
+	}
 }
 
 func (r *Remote) Close() error {
 	r.closeOnce.Do(func() {
-		if r.stop != nil {
-			close(r.stop)
-		}
+		r.cancel()
 		if r.done != nil {
 			select {
 			case <-r.done:
@@ -100,4 +156,17 @@ func (r *Remote) Close() error {
 		}
 	})
 	return nil
+}
+
+const (
+	streamReconnectBackoff = 100 * time.Millisecond
+	maxStreamBackoff       = 5 * time.Second
+)
+
+func nextStreamBackoff(d time.Duration) time.Duration {
+	d *= 2
+	if d > maxStreamBackoff {
+		d = maxStreamBackoff
+	}
+	return d
 }
