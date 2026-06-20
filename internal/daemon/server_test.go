@@ -1,12 +1,14 @@
 package daemon
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -22,6 +24,7 @@ type fakeEngine struct {
 	mu     sync.Mutex
 	states map[string]forward.State
 	cfg    *config.Config
+	subs   map[chan struct{}]struct{}
 }
 
 func newFakeEngine(cfg *config.Config) *fakeEngine {
@@ -77,6 +80,34 @@ func (f *fakeEngine) Reload(cfg *config.Config) {
 
 func (f *fakeEngine) StartEnabled() {}
 func (f *fakeEngine) StopAll()      {}
+
+// Subscribe mimics the real Engine broker for SSE tests. broadcast() fans a
+// signal out to every active subscriber (drop-old).
+func (f *fakeEngine) Subscribe() (<-chan struct{}, func()) {
+	ch := make(chan struct{}, 16)
+	f.mu.Lock()
+	if f.subs == nil {
+		f.subs = make(map[chan struct{}]struct{})
+	}
+	f.subs[ch] = struct{}{}
+	f.mu.Unlock()
+	return ch, func() {
+		f.mu.Lock()
+		delete(f.subs, ch)
+		f.mu.Unlock()
+	}
+}
+
+func (f *fakeEngine) broadcast() {
+	f.mu.Lock()
+	for ch := range f.subs {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+	}
+	f.mu.Unlock()
+}
 
 func testConfig() *config.Config {
 	return &config.Config{
@@ -293,4 +324,120 @@ func TestEnsureNotRunning(t *testing.T) {
 	if err := ensureNotRunning(pid, sock); err == nil {
 		t.Fatalf("expected already-running error for live pid")
 	}
+}
+
+// readSSEFrame reads one SSE frame from br: a sequence of lines terminated by
+// a blank line. Returns the concatenated lines (without the terminator).
+func readSSEFrame(t *testing.T, br *bufio.Reader) string {
+	t.Helper()
+	var sb strings.Builder
+	for {
+		line, err := br.ReadString('\n')
+		if err != nil {
+			t.Fatalf("read SSE frame: %v", err)
+		}
+		if line == "\n" {
+			return strings.TrimRight(sb.String(), "\n")
+		}
+		sb.WriteString(line)
+	}
+}
+
+func newEventServer(t *testing.T) (*Server, *fakeEngine, *client.Client, context.CancelFunc) {
+	t.Helper()
+	dir := shortDir(t)
+	cfgPath := filepath.Join(dir, "config.yaml")
+	cfg := testConfig()
+	if err := cfg.Save(cfgPath); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+	sock := filepath.Join(dir, "portato.sock")
+	fe := newFakeEngine(cfg)
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go s.Start(ctx)
+	if err := waitForFile(sock, 2*time.Second); err != nil {
+		cancel()
+		t.Fatalf("socket not created: %v", err)
+	}
+	t.Cleanup(func() {
+		cancel()
+	})
+	return s, fe, client.New(sock), cancel
+}
+
+func TestServer_EventsStreamMultipleClients(t *testing.T) {
+	_, fe, c, _ := newEventServer(t)
+
+	rc1, err := c.Events(context.Background())
+	if err != nil {
+		t.Fatalf("events1: %v", err)
+	}
+	defer rc1.Close()
+	rc2, err := c.Events(context.Background())
+	if err != nil {
+		t.Fatalf("events2: %v", err)
+	}
+	defer rc2.Close()
+
+	br1 := bufio.NewReader(rc1)
+	br2 := bufio.NewReader(rc2)
+
+	// Both clients must receive the initial frame immediately on connect.
+	for i, br := range []*bufio.Reader{br1, br2} {
+		if frame := readSSEFrame(t, br); !strings.HasPrefix(frame, "data:") {
+			t.Fatalf("client %d initial frame = %q, want a data frame", i, frame)
+		}
+	}
+
+	// A daemon-side state change fans out to both clients simultaneously.
+	fe.broadcast()
+	for i, br := range []*bufio.Reader{br1, br2} {
+		if frame := readSSEFrame(t, br); !strings.HasPrefix(frame, "data:") {
+			t.Fatalf("client %d post-broadcast frame = %q, want data", i, frame)
+		}
+	}
+}
+
+func TestServer_EventsClientDisconnectUnsubscribes(t *testing.T) {
+	_, fe, c, _ := newEventServer(t)
+
+	rc, err := c.Events(context.Background())
+	if err != nil {
+		t.Fatalf("events: %v", err)
+	}
+	br := bufio.NewReader(rc)
+	readSSEFrame(t, br) // consume the initial frame
+
+	// There must be exactly one subscriber while connected.
+	fe.mu.Lock()
+	if n := len(fe.subs); n != 1 {
+		t.Fatalf("subs while connected = %d, want 1", n)
+	}
+	fe.mu.Unlock()
+
+	// Closing the client stream must drop the subscriber on the server side.
+	if err := rc.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if !waitFor(func() bool {
+		fe.mu.Lock()
+		defer fe.mu.Unlock()
+		return len(fe.subs) == 0
+	}, time.Second) {
+		t.Fatalf("subscriber not removed after client disconnect")
+	}
+}
+
+// waitFor polls cond until it returns true or the timeout elapses.
+func waitFor(cond func() bool, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		if cond() {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	return cond()
 }

@@ -33,6 +33,9 @@ type tunneler interface {
 	Reload(*config.Config)
 	StartEnabled()
 	StopAll()
+	// Subscribe returns a channel that fires on every tunnel state change
+	// plus an unsubscribe func. Drives the GET /events SSE stream (Phase 9).
+	Subscribe() (<-chan struct{}, func())
 }
 
 // Server is the background daemon: it owns the tunnel Engine and exposes it
@@ -164,6 +167,7 @@ func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /tunnels", s.handleList)
+	mux.HandleFunc("GET /events", s.handleEvents)
 	mux.HandleFunc("POST /tunnels/{name}/enable", s.handleEnable)
 	mux.HandleFunc("POST /tunnels/{name}/disable", s.handleDisable)
 	mux.HandleFunc("POST /tunnels/{name}/restart", s.handleRestart)
@@ -177,6 +181,63 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleList(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.engine.List())
+}
+
+// eventHeartbeat is how often the SSE stream emits a comment line to keep the
+// connection alive through proxies/timeouts. Over a unix socket this is mostly
+// hygiene, but it lets a stalled client detect a dead stream promptly.
+const eventHeartbeat = 15 * time.Second
+
+// handleEvents streams tunnel state-change signals to the client as SSE
+// (Server-Sent Events). Each signal is a signal-only `data: {}` frame: the
+// client reacts by re-fetching GET /tunnels. The stream stays open until the
+// client disconnects (context done) or serving ends. SPEC §6 (Phase 9).
+func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "text/event-stream")
+	h.Set("Cache-Control", "no-cache")
+	h.Set("Connection", "keep-alive")
+	h.Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	// Flush one frame immediately so a freshly attached client knows the
+	// stream is live and can do an initial List() + redraw without waiting.
+	writeEvent := func(frame string) bool {
+		if _, err := fmt.Fprintf(w, "%s\n\n", frame); err != nil {
+			return false
+		}
+		flusher.Flush()
+		return true
+	}
+	if !writeEvent("data: {}") {
+		return
+	}
+
+	ch, unsub := s.engine.Subscribe()
+	defer unsub()
+
+	heartbeat := time.NewTicker(eventHeartbeat)
+	defer heartbeat.Stop()
+
+	for {
+		select {
+		case <-r.Context().Done():
+			return
+		case <-ch:
+			if !writeEvent("data: {}") {
+				return
+			}
+		case <-heartbeat.C:
+			if !writeEvent(": heartbeat") {
+				return
+			}
+		}
+	}
 }
 
 func (s *Server) handleEnable(w http.ResponseWriter, r *http.Request) {

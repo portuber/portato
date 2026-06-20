@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"time"
@@ -18,6 +19,7 @@ const defaultTimeout = 5 * time.Second
 // stateless and safe for concurrent use; the underlying http.Client is reused.
 type Client struct {
 	http       *http.Client
+	stream     *http.Client
 	socketPath string
 }
 
@@ -31,6 +33,7 @@ func New(socketPath string) *Client {
 	}
 	return &Client{
 		http:       &http.Client{Transport: transport, Timeout: defaultTimeout},
+		stream:     &http.Client{Transport: transport}, // no overall timeout: SSE is long-lived
 		socketPath: socketPath,
 	}
 }
@@ -95,6 +98,29 @@ func (c *Client) Restart(name string) error {
 func (c *Client) Reload() error {
 	_, err := c.post("/reload")
 	return err
+}
+
+// Events opens the daemon's SSE stream (GET /events) and returns the response
+// body for line-by-line reading. The caller owns the ReadCloser and must close
+// it to end the subscription. A context cancellation propagates to the stream.
+// Uses a dedicated http.Client with no overall timeout: the stream is long-
+// lived (Phase 9 push events).
+func (c *Client) Events(ctx context.Context) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url("/events"), nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "text/event-stream")
+	req.Header.Set("Cache-Control", "no-cache")
+	resp, err := c.stream.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode >= 400 {
+		defer resp.Body.Close()
+		return nil, decodeError(resp)
+	}
+	return resp.Body, nil
 }
 
 func (c *Client) get(path string, out any) error {
