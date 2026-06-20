@@ -91,7 +91,7 @@ func (m Model) row(i int, s controller.Status) string {
 	if s.State != controller.Off {
 		indicator = "●"
 	}
-	endpoint := s.Endpoint()
+	endpoint := fitEndpoint(s.Endpoint(), colEndpoint)
 	status := stateLabel(s.State)
 	if s.Error != "" {
 		status += " " + dimStyle.Render(truncate(s.Error, 18))
@@ -206,4 +206,59 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n-1] + "…"
+}
+
+// fitEndpoint shrinks an endpoint to at most max display cells, keeping the
+// local address, the direction arrow and the remote :port, and middle-
+// truncating only the remote host. Endpoints without a remote host (the
+// dynamic "⇄ *") and anything that still does not fit fall back to a simple
+// ellipsis truncate. This keeps the ENDPOINT column a fixed width so STATUS /
+// UPTIME line up across rows regardless of host length.
+func fitEndpoint(s string, max int) string {
+	if lipgloss.Width(s) <= max {
+		return s
+	}
+	for _, sep := range []string{" → ", " ← "} {
+		if i := strings.Index(s, sep); i >= 0 {
+			left, right := s[:i+len(sep)], s[i+len(sep):]
+			if budget := max - lipgloss.Width(left); budget >= 4 {
+				return left + fitHostPort(right, budget)
+			}
+		}
+	}
+	return truncate(s, max)
+}
+
+// fitHostPort fits a "host:port" (or bare host) into budget cells, preserving
+// the :port (splitting on the last colon, so "[::1]:3306" keeps its brackets)
+// and middle-truncating the host. When there is no room for host+port, the port
+// tail is kept with a leading ellipsis.
+func fitHostPort(hp string, budget int) string {
+	if lipgloss.Width(hp) <= budget {
+		return hp
+	}
+	host, port := hp, ""
+	if i := strings.LastIndex(hp, ":"); i >= 0 {
+		host, port = hp[:i], hp[i:] // port keeps the ":"
+	}
+	avail := budget - lipgloss.Width(port)
+	if avail <= 1 {
+		return truncate("…"+port, budget)
+	}
+	return middleTruncate(host, avail) + port
+}
+
+// middleTruncate shrinks s to at most width cells by inserting a single "…"
+// between the kept head and tail of the string.
+func middleTruncate(s string, width int) string {
+	if lipgloss.Width(s) <= width {
+		return s
+	}
+	if width <= 1 {
+		return "…"
+	}
+	rs := []rune(s)
+	keep := width - 1 // one cell reserved for "…"
+	left := keep / 2
+	return string(rs[:left]) + "…" + string(rs[len(rs)-(keep-left):])
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/kipkaev55/portato/internal/controller"
 )
 
@@ -251,6 +252,72 @@ func TestFormatUptime(t *testing.T) {
 		if got := formatUptime(c.d); got != c.out {
 			t.Errorf("formatUptime(%v) = %q, want %q", c.d, got, c.out)
 		}
+	}
+}
+
+func TestFitEndpoint(t *testing.T) {
+	const max = colEndpoint // 32
+	cases := []struct {
+		name string
+		in   string
+		// checks applied to the result
+		contains  []string
+		hasPrefix string
+		hasSuffix string
+		unchanged bool // expect the input back verbatim
+	}{
+		{
+			name:      "short local endpoint unchanged",
+			in:        "127.0.0.1:5432 → db:5432",
+			unchanged: true,
+		},
+		{
+			name:      "dynamic endpoint unchanged",
+			in:        "127.0.0.1:1080 ⇄ *",
+			unchanged: true,
+		},
+		{
+			name:      "long host keeps local, arrow and port",
+			in:        "127.0.0.1:33061 → c-c9qmgaf6i8b4nlavcqnr.rw.mdb.yandexcloud.net:3306",
+			hasPrefix: "127.0.0.1:33061 → ",
+			hasSuffix: ":3306",
+			contains:  []string{"…"},
+		},
+		{
+			name:     "long remote direction keeps port",
+			in:       "5432 ← c-c9qmgaf6i8b4nlavcqnr.rw.mdb.yandexcloud.net:3306",
+			contains: []string{" ← ", ":3306", "…"},
+		},
+		{
+			name:     "bare host without port truncated with ellipsis",
+			in:       "127.0.0.1:33061 → thisisaveryverylonghostnamewithnoport",
+			contains: []string{"…"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := fitEndpoint(tc.in, max)
+			if tc.unchanged {
+				if got != tc.in {
+					t.Errorf("expected unchanged %q, got %q", tc.in, got)
+				}
+				return
+			}
+			if w := lipgloss.Width(got); w > max {
+				t.Errorf("result width %d > max %d: %q", w, max, got)
+			}
+			if tc.hasPrefix != "" && !strings.HasPrefix(got, tc.hasPrefix) {
+				t.Errorf("result %q must have prefix %q", got, tc.hasPrefix)
+			}
+			if tc.hasSuffix != "" && !strings.HasSuffix(got, tc.hasSuffix) {
+				t.Errorf("result %q must have suffix %q", got, tc.hasSuffix)
+			}
+			for _, s := range tc.contains {
+				if !strings.Contains(got, s) {
+					t.Errorf("result %q must contain %q", got, s)
+				}
+			}
+		})
 	}
 }
 
