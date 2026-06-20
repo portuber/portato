@@ -166,6 +166,24 @@ func TestList_PrintsTable(t *testing.T) {
 	}
 }
 
+func TestList_ErrorIndicator(t *testing.T) {
+	s := newStubServer(t, []forward.Status{
+		{Name: "db", Type: "local", Local: "5432", Remote: "bastion:5432", State: forward.Error, Error: "listen fail"},
+	})
+	useStub(t, s)
+
+	c, out, errOut := captureCmd()
+	if err := listRunE(c, nil); err != nil {
+		t.Fatalf("listRunE: %v", err)
+	}
+	if errOut.String() != "" {
+		t.Errorf("unexpected stderr: %q", errOut.String())
+	}
+	if !strings.Contains(out.String(), "✗") {
+		t.Errorf("error tunnel should render ✗ indicator (not ●)\ngot:\n%s", out.String())
+	}
+}
+
 func TestEnableDisableRestart_ConfirmAndRPC(t *testing.T) {
 	s := newStubServer(t, sampleStatuses())
 	useStub(t, s)

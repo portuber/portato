@@ -88,16 +88,12 @@ func columnHeader() string {
 
 func (m Model) row(i int, s controller.Status) string {
 	selected := i == m.cursor
-	indicator := "○"
-	if s.State != controller.Off {
-		indicator = "●"
-	}
 	endpoint := fitEndpoint(s.Endpoint(), colEndpoint)
 	status := stateLabel(s.State)
 	if s.Error != "" {
 		status += " " + dimStyle.Render(truncate(s.Error, 18))
 	}
-	cells := indicator + " " +
+	cells := indicator(s) + " " +
 		pad(s.Name, colName) + gutter +
 		pad(s.Type, colType) + gutter +
 		pad(endpoint, colEndpoint) + gutter +
@@ -107,6 +103,22 @@ func (m Model) row(i int, s controller.Status) string {
 		return selectedStyle.Render(cells)
 	}
 	return cells
+}
+
+// indicator returns the leading status glyph, coloured by state. Error uses a
+// distinct ✗ so a failed tunnel cannot be mistaken for a connected one — the
+// old "● for everything not Off" made an errored tunnel look live. In a
+// selected (inverse-video) row the colour may wash out, but the ✗ shape still
+// distinguishes error from ●/○.
+func indicator(s controller.Status) string {
+	switch s.State {
+	case controller.Off:
+		return stateStyle[controller.Off].Render("○")
+	case controller.Error:
+		return stateStyle[controller.Error].Render("✗")
+	default:
+		return stateStyle[s.State].Render("●")
+	}
 }
 
 func stateLabel(s controller.State) string {

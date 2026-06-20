@@ -419,6 +419,41 @@ func TestModel_ConfirmKeys(t *testing.T) {
 	}
 }
 
+func TestIndicatorShapePerState(t *testing.T) {
+	cases := []struct {
+		state controller.State
+		glyph string
+	}{
+		{controller.Off, "○"},
+		{controller.Error, "✗"},
+		{controller.Connected, "●"},
+		{controller.Connecting, "●"},
+		{controller.Reconnecting, "●"},
+	}
+	for _, c := range cases {
+		got := indicator(controller.Status{State: c.state})
+		if !strings.Contains(got, c.glyph) {
+			t.Errorf("state %v: indicator %q does not contain %q", c.state, got, c.glyph)
+		}
+	}
+}
+
+// TestRenderErrorIndicatorDistinct guards the regression where an errored
+// tunnel showed ● (indistinguishable from connected). The error row must use
+// ✗ and must not contain a ● glyph that reads as "live".
+func TestRenderErrorIndicatorDistinct(t *testing.T) {
+	f := newFake(controller.Status{Name: "x", Type: "local", Local: "1", Remote: "r", State: controller.Error, Error: "listen fail"})
+	m := New(f, Options{Mode: "standalone"})
+	m.width = 100
+	out := m.render()
+	if !strings.Contains(out, "✗") {
+		t.Errorf("error tunnel should render ✗ indicator\ngot:\n%s", out)
+	}
+	if strings.Contains(out, "●") {
+		t.Errorf("error render must not contain ● (would look connected)\ngot:\n%s", out)
+	}
+}
+
 func TestModel_TickIgnoredDuringHandoff(t *testing.T) {
 	f := newFake(controller.Status{Name: "a", State: controller.Connected})
 	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})

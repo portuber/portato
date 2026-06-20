@@ -37,9 +37,12 @@ func printTable(out io.Writer, statuses []forward.Status) {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(w, "  NAME\tTYPE\tENDPOINT\tSTATUS\tUPTIME")
 	for _, s := range statuses {
-		indicator := "○"
-		if s.State != forward.Off {
-			indicator = "●"
+		indicator := "●"
+		switch s.State {
+		case forward.Off:
+			indicator = "○"
+		case forward.Error:
+			indicator = "✗"
 		}
 		endpoint := s.Endpoint()
 		status := s.State.String()
