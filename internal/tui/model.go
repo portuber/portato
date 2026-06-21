@@ -2,6 +2,7 @@ package tui
 
 import (
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -58,6 +59,20 @@ func waitForChange(ch <-chan struct{}) tea.Cmd {
 	}
 }
 
+// redrawTickMsg drives a purely local re-render every second. It does NOT fetch
+// from the controller — its only purpose is to refresh time-based display
+// fields (uptime) while a tunnel sits in a steady state (Connected/Off) and
+// produces no state-change events. This keeps the Phase 9 "no idle daemon
+// load" guarantee intact: there is no per-second /tunnels request, just a
+// cheap local redraw.
+type redrawTickMsg struct{}
+
+const redrawInterval = time.Second
+
+func redrawTick() tea.Cmd {
+	return tea.Tick(redrawInterval, func(time.Time) tea.Msg { return redrawTickMsg{} })
+}
+
 func (m Model) Init() tea.Cmd {
-	return waitForChange(m.ctrl.Changes())
+	return tea.Batch(waitForChange(m.ctrl.Changes()), redrawTick())
 }

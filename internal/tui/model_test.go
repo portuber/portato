@@ -19,6 +19,7 @@ type fakeCtrl struct {
 	disabled  []string
 	restarted []string
 	reloads   int
+	lists     int
 	adds      []config.Tunnel
 	updates   []config.Tunnel
 	deletes   []string
@@ -30,6 +31,7 @@ type fakeCtrl struct {
 func (f *fakeCtrl) List() []controller.Status {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.lists++
 	out := make([]controller.Status, len(f.statuses))
 	copy(out, f.statuses)
 	return out
@@ -544,6 +546,25 @@ func TestModel_TickIgnoredDuringHandoff(t *testing.T) {
 	}
 	if mm.handoffing != true {
 		t.Error("handoffing flag should be preserved")
+	}
+}
+
+// TestModel_RedrawTickDoesNotFetch guards the Phase 9 guarantee: the per-second
+// redraw tick (which refreshes uptime) must NOT fetch from the controller — it
+// is a purely local re-render. Otherwise idle clients would poll the daemon.
+func TestModel_RedrawTickDoesNotFetch(t *testing.T) {
+	f := newFake(controller.Status{Name: "a", State: controller.Connected})
+	m := New(f, Options{Mode: "standalone"})
+	before := f.lists
+
+	next, cmd := m.Update(redrawTickMsg{})
+	_ = next.(Model)
+
+	if cmd == nil {
+		t.Error("redrawTickMsg should re-arm the redraw tick (non-nil cmd)")
+	}
+	if f.lists != before {
+		t.Errorf("redrawTickMsg triggered %d List() call(s), want 0 (no idle fetch)", f.lists-before)
 	}
 }
 

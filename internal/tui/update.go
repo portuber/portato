@@ -22,6 +22,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.list = m.ctrl.List()
 		m.clampCursor()
 		return m, waitForChange(m.ctrl.Changes())
+	case redrawTickMsg:
+		// Local re-render tick: refreshes time-based display fields (uptime)
+		// without fetching from the controller. Re-arm; the change-waiter is
+		// an independent pending command. See redrawTickMsg in model.go.
+		return m, redrawTick()
 	case handoffDoneMsg:
 		m.handoffing = false
 		m.quit = true
