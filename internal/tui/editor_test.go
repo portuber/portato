@@ -51,6 +51,9 @@ func TestEditor_Validate_RequiredFields(t *testing.T) {
 	if _, ok := errs["ssh"]; !ok {
 		t.Error("empty ssh should be flagged")
 	}
+	if _, ok := errs["local"]; !ok {
+		t.Error("empty local should be flagged (required for all types)")
+	}
 }
 
 func TestEditor_Validate_BadName(t *testing.T) {
@@ -103,9 +106,29 @@ func TestEditor_Validate_NonDynamicRequiresRemote(t *testing.T) {
 	e := editorForNew(f)
 	e.name.SetValue("loc")
 	e.ssh.SetValue("u@h:22")
+	e.local.SetValue("8080")
 	e.remote.SetValue("")
 	if errs := e.validate(); errs["remote"] == "" {
 		t.Error("local type with empty remote should be flagged")
+	}
+}
+
+func TestEditor_Validate_LocalRequiredForAllTypes(t *testing.T) {
+	f := newEditorFake()
+	for _, ty := range tunnelTypes {
+		e := editorForNew(f)
+		e.name.SetValue("x")
+		e.ssh.SetValue("u@h:22")
+		e.typeIdx = indexOf(tunnelTypes, ty)
+		e.local.SetValue("")
+		e.remote.SetValue("r:1") // valid for non-dynamic; unused for dynamic
+		if errs := e.validate(); errs["local"] == "" {
+			t.Errorf("type %s: empty local should be flagged", ty)
+		}
+		e.local.SetValue("1080")
+		if errs := e.validate(); errs["local"] != "" {
+			t.Errorf("type %s: local set should clear the error (got %q)", ty, errs["local"])
+		}
 	}
 }
 

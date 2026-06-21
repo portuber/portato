@@ -251,14 +251,14 @@ func (e *tunnelEditor) validate() map[string]string {
 		}
 	}
 
+	if strings.TrimSpace(t.Local) == "" {
+		errs["local"] = "required"
+	}
 	if strings.TrimSpace(t.SSH) == "" {
 		errs["ssh"] = "required"
 	}
 	if t.Type != "dynamic" && strings.TrimSpace(t.Remote) == "" {
 		errs["remote"] = "required for " + t.Type
-	}
-	if t.Type == "dynamic" && strings.TrimSpace(t.Local) == "" {
-		errs["local"] = "required for dynamic"
 	}
 	return errs
 }

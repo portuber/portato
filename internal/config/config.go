@@ -96,11 +96,16 @@ func (c *Config) Validate() error {
 		default:
 			return fmt.Errorf("tunnel %q: type %q not supported (supported: local, remote, dynamic)", t.Name, t.Type)
 		}
+		// local is required for every type: for local/dynamic it is the listen
+		// address (a bare port expands to 127.0.0.1:port); for remote it is the
+		// address server-side connections are forwarded to here.
+		if strings.TrimSpace(t.Local) == "" {
+			return fmt.Errorf("tunnel %q: local is empty", t.Name)
+		}
+		// remote is the destination dialed on the host (local) or the address
+		// listened on the host (remote). A dynamic (-D) tunnel has no remote.
 		if t.Type != "dynamic" && strings.TrimSpace(t.Remote) == "" {
 			return fmt.Errorf("tunnel %q: remote is empty", t.Name)
-		}
-		if t.Type == "dynamic" && strings.TrimSpace(t.Local) == "" {
-			return fmt.Errorf("tunnel %q: local is empty", t.Name)
 		}
 		if strings.TrimSpace(t.Host) == "" {
 			return fmt.Errorf("tunnel %q: ssh host is empty", t.Name)

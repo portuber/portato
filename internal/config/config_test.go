@@ -152,37 +152,42 @@ func TestValidateErrors(t *testing.T) {
 	}{
 		{
 			name:    "duplicate name",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Remote: "r:1", SSH: "h:22"}, {Name: "a", Type: "local", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}, {Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "duplicate name",
 		},
 		{
 			name:    "empty name",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "", Type: "local", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "name is empty",
 		},
 		{
 			name:    "bad name chars",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "bad name!", Type: "local", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "bad name!", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "name must be",
 		},
 		{
 			name:    "unsupported type",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "foo", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "foo", Local: "1", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "not supported",
 		},
 		{
+			name:    "empty local",
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "  ", Remote: "r:1", SSH: "h:22"}}},
+			wantSub: "local is empty",
+		},
+		{
 			name:    "empty remote",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Remote: "  ", SSH: "h:22"}}},
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "1", Remote: "  ", SSH: "h:22"}}},
 			wantSub: "remote is empty",
 		},
 		{
 			name:    "empty ssh host",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Remote: "r:1", SSH: "  "}}},
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "  "}}},
 			wantSub: "ssh host is empty",
 		},
 		{
 			name:    "port out of range",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Remote: "r:1", SSH: "h:0"}}},
+			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:0"}}},
 			wantSub: "out of range",
 		},
 	}
@@ -290,6 +295,8 @@ func TestValidateAcceptsTypes(t *testing.T) {
 		{"dynamic is valid", "dynamic", "1080", "127.0.0.1:5432", true},
 		{"dynamic without remote is valid", "dynamic", "1080", "", true},
 		{"dynamic without local is rejected", "dynamic", "", "127.0.0.1:5432", false},
+		{"local without local is rejected", "local", "", "127.0.0.1:5432", false},
+		{"remote without local is rejected", "remote", "", "127.0.0.1:5432", false},
 		{"local without remote is rejected", "local", "5432", "", false},
 		{"remote without remote is rejected", "remote", "5432", "", false},
 		{"bogus type", "foo", "5432", "127.0.0.1:5432", false},

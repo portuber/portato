@@ -21,6 +21,7 @@ tunnels:
     enabled: false
   - name: edit-me
     type: remote
+    local: 127.0.0.1:9090
     remote: 9090
     ssh: deploy@bastion:22
     enabled: false
