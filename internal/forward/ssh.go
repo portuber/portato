@@ -151,7 +151,7 @@ type unknownHostError struct {
 }
 
 func (e *unknownHostError) Error() string {
-	return fmt.Sprintf("unknown host %s (%s); add to known_hosts or set accept_new_hosts: true", e.host, e.fingerprint)
+	return fmt.Sprintf("%s: host key not in known_hosts (%s); add it to known_hosts or set accept_new_hosts: true", e.host, e.fingerprint)
 }
 
 func wrapHostKey(hostsFile string, base ssh.HostKeyCallback, acceptNew bool, log *slog.Logger) ssh.HostKeyCallback {

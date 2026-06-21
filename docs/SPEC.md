@@ -255,7 +255,7 @@ server (`armon/go-socks5`) whose `Dial` is routed through the current
   - **Auth:** try `ssh.PublicKeysCallback` from the agent, then `ssh.PublicKeys` from the `identity`.
   - **HostKeyCallback:** `knownhosts.New(hostsFile)`; with `accept_new_hosts: true` — a wrapper that appends a new key (TOFU).
   - **Timeout:** an explicit connect timeout (5s).
-- Readable errors: `unknown host` / `auth failed` / `connect refused`.
+- Readable errors: `host key not in known_hosts` / `auth failed` / `connect refused` / `connect timeout`.
 
 ## 10. Reconnect and keepalive
 

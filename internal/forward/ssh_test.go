@@ -3,6 +3,7 @@ package forward
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/crypto/ssh"
@@ -133,4 +134,20 @@ func equalStringSlices(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// TestUnknownHostErrorMessage guards the wording: the error must read as a
+// host-key / known_hosts trust issue, not as a DNS lookup failure (the earlier
+// "unknown host <name>" text was routinely mistaken for a DNS error).
+func TestUnknownHostErrorMessage(t *testing.T) {
+	err := &unknownHostError{host: "tv.example.com", fingerprint: "SHA256:abc"}
+	msg := err.Error()
+	for _, want := range []string{"tv.example.com", "known_hosts", "accept_new_hosts"} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("error %q missing %q", msg, want)
+		}
+	}
+	if strings.HasPrefix(msg, "unknown host ") {
+		t.Errorf("error %q should not read like a DNS 'unknown host' error", msg)
+	}
 }
