@@ -297,6 +297,42 @@ func TestFormatUptime(t *testing.T) {
 	}
 }
 
+func TestPad(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		n    int
+		want string
+	}{
+		{"shorter pads to n", "local", 7, "local  "},
+		{"exactly n stays n (no extra space)", "dynamic", 7, "dynamic"},
+		{"one under n", "remote", 7, "remote "},
+		{"empty pads to n", "", 7, "       "},
+		{"overflow keeps value plus one space", "abcdef", 3, "abcdef "},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := pad(c.in, c.n)
+			if got != c.want {
+				t.Errorf("pad(%q,%d) = %q (len %d), want %q (len %d)",
+					c.in, c.n, got, len(got), c.want, len(c.want))
+			}
+		})
+	}
+}
+
+// TestPadAlignsColumns guards the regression: a value exactly as wide as its
+// column must not shift later columns. "dynamic" (7) in a width-7 TYPE column
+// must produce a cell of the same width as "local" (5) padded to 7.
+func TestPadAlignsColumns(t *testing.T) {
+	if w := lipgloss.Width(pad("dynamic", colType)); w != colType {
+		t.Errorf("pad(dynamic,%d) width = %d, want %d", colType, w, colType)
+	}
+	if w := lipgloss.Width(pad("local", colType)); w != colType {
+		t.Errorf("pad(local,%d) width = %d, want %d", colType, w, colType)
+	}
+}
+
 func TestFitEndpoint(t *testing.T) {
 	const max = colEndpoint // 32
 	cases := []struct {

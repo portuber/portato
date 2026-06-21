@@ -224,7 +224,7 @@ func joinRight(left, right string, width int) string {
 
 func pad(s string, n int) string {
 	w := lipgloss.Width(s)
-	if w >= n {
+	if w > n {
 		return s + " "
 	}
 	return s + strings.Repeat(" ", n-w)
