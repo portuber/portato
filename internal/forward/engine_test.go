@@ -44,6 +44,17 @@ func (f *fakeTunnel) Restart() error {
 	return nil
 }
 
+func (f *fakeTunnel) Reconfigure(cfg config.Tunnel, _ config.Defaults) error {
+	f.mu.Lock()
+	running := f.state != Off
+	f.cfg = cfg
+	f.mu.Unlock()
+	if running {
+		return f.Restart()
+	}
+	return nil
+}
+
 func (f *fakeTunnel) Status() Status {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -149,6 +160,9 @@ func TestEngineUpAllDownAllStartEnabled(t *testing.T) {
 func TestEngineReload(t *testing.T) {
 	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a"), tunnelCfg("b")}}
 	e, fakes := newTestEngine(cfg)
+	if err := e.Enable("a"); err != nil { // a is running -> a changed tunnel must restart
+		t.Fatalf("Enable a: %v", err)
+	}
 
 	changed := tunnelCfg("a")
 	changed.Remote = "changed:2"
@@ -164,7 +178,10 @@ func TestEngineReload(t *testing.T) {
 		t.Errorf("Reload: resulting set = %v, want {a,c}", names)
 	}
 	if fakes["a"].restarts.Load() != 1 {
-		t.Errorf("Reload: a.restarts = %d, want 1 (remote changed)", fakes["a"].restarts.Load())
+		t.Errorf("Reload: a.restarts = %d, want 1 (running + remote changed)", fakes["a"].restarts.Load())
+	}
+	if fakes["a"].cfg.Remote != "changed:2" {
+		t.Errorf("Reload: a.cfg.Remote = %q, want changed:2 (reconfigured)", fakes["a"].cfg.Remote)
 	}
 	if fakes["b"].stops.Load() != 1 {
 		t.Errorf("Reload: b.stops = %d, want 1 (removed)", fakes["b"].stops.Load())
@@ -174,9 +191,34 @@ func TestEngineReload(t *testing.T) {
 	}
 }
 
+// TestEngineReload_OffChangedUpdatesConfigNotStarted guards the fix: a tunnel
+// that is off must have its config updated on Reload but must NOT be started.
+func TestEngineReload_OffChangedUpdatesConfigNotStarted(t *testing.T) {
+	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}}
+	e, fakes := newTestEngine(cfg)
+	// a is off (never enabled).
+
+	changed := tunnelCfg("a")
+	changed.Remote = "new:9"
+	e.Reload(&config.Config{Tunnels: []config.Tunnel{changed}})
+
+	if fakes["a"].cfg.Remote != "new:9" {
+		t.Errorf("off tunnel cfg not updated: Remote = %q", fakes["a"].cfg.Remote)
+	}
+	if fakes["a"].starts.Load() != 0 {
+		t.Errorf("off tunnel was started: starts = %d, want 0", fakes["a"].starts.Load())
+	}
+	if fakes["a"].restarts.Load() != 0 {
+		t.Errorf("off tunnel was restarted: restarts = %d, want 0", fakes["a"].restarts.Load())
+	}
+}
+
 func TestEngineReloadDefaultsChangedRestarts(t *testing.T) {
 	cfg := &config.Config{Defaults: config.Defaults{Identity: "/tmp/a"}, Tunnels: []config.Tunnel{tunnelCfg("a")}}
 	e, fakes := newTestEngine(cfg)
+	if err := e.Enable("a"); err != nil { // defaults-change restarts only running tunnels now
+		t.Fatalf("Enable a: %v", err)
+	}
 
 	newCfg := &config.Config{
 		Defaults: config.Defaults{Identity: "/tmp/b"},
@@ -185,5 +227,29 @@ func TestEngineReloadDefaultsChangedRestarts(t *testing.T) {
 	e.Reload(newCfg)
 	if fakes["a"].restarts.Load() != 1 {
 		t.Errorf("Reload(defaults changed): a.restarts = %d, want 1", fakes["a"].restarts.Load())
+	}
+}
+
+// TestTunnelReconfigureUpdatesStatus is the direct regression for the reported
+// bug: after editing a tunnel, Status() must show the new Local/Remote (the cfg
+// is swapped in place), and an off tunnel must not be started.
+func TestTunnelReconfigureUpdatesStatus(t *testing.T) {
+	tn := NewTunnel(context.Background(), tunnelCfg("a"), config.Defaults{}, slog.Default())
+
+	newCfg := tunnelCfg("a")
+	newCfg.Remote = "changed:9"
+	newCfg.Local = "127.0.0.1:20000"
+	if err := tn.Reconfigure(newCfg, config.Defaults{}); err != nil {
+		t.Fatalf("Reconfigure: %v", err)
+	}
+	st := tn.Status()
+	if st.Remote != "changed:9" {
+		t.Errorf("Status.Remote = %q, want changed:9", st.Remote)
+	}
+	if st.Local != "127.0.0.1:20000" {
+		t.Errorf("Status.Local = %q, want 127.0.0.1:20000", st.Local)
+	}
+	if st.State != Off {
+		t.Errorf("State = %v, want Off (reconfigure must not start an off tunnel)", st.State)
 	}
 }

@@ -13,6 +13,9 @@ type tunneler interface {
 	Start(ctx context.Context) error
 	Stop() error
 	Restart() error
+	// Reconfigure updates a tunnel's config/defaults in place; it restarts the
+	// tunnel only if it is currently running. Used by Engine.Reload.
+	Reconfigure(cfg config.Tunnel, def config.Defaults) error
 	Status() Status
 }
 
@@ -220,7 +223,10 @@ func (e *Engine) Reload(cfg *config.Config) {
 			continue
 		}
 		if tunnelChanged(old, t) || oldDefaults != cfg.Defaults {
-			_ = e.tunnels[name].Restart()
+			// Reconfigure (not bare Restart): update the tunnel's cfg so Status()
+			// reflects the new Local/Remote, and restart only if it was running —
+			// editing an off tunnel must not start it.
+			_ = e.tunnels[name].Reconfigure(t, cfg.Defaults)
 		}
 	}
 	e.configs = newConfigs

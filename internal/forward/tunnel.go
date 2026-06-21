@@ -175,6 +175,23 @@ func (t *Tunnel) Restart() error {
 	return t.Start(t.baseCtx)
 }
 
+// Reconfigure swaps the tunnel's config and defaults in place. If the tunnel is
+// currently running, it is restarted so the new endpoints/auth take effect;
+// otherwise it stays stopped, but Status() already reflects the new fields.
+// Used by Engine.Reload so editing a tunnel updates its displayed Local/Remote
+// without starting a tunnel that was off (and without leaving a stale cfg).
+func (t *Tunnel) Reconfigure(cfg config.Tunnel, def config.Defaults) error {
+	t.mu.Lock()
+	running := t.running
+	t.cfg = cfg
+	t.defaults = def
+	t.mu.Unlock()
+	if running {
+		return t.Restart()
+	}
+	return nil
+}
+
 func (t *Tunnel) Status() Status {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
