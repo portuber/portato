@@ -25,6 +25,12 @@ type Model struct {
 	handoffing bool
 	handoffErr string
 
+	// editor is the Phase 10 tunnel editor sub-model (nil when inactive).
+	editor *tunnelEditor
+	// confirmDelete shows the "delete tunnel?" modal.
+	confirmDelete bool
+	deleteTarget  string
+
 	cfgPath   string
 	socketURI string
 

@@ -16,6 +16,9 @@ var (
 	helpTitle     = lipgloss.NewStyle().Bold(true).Underline(true)
 	helpPanel     = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 2)
 	modalStyle    = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(1, 3).Bold(true)
+
+	editorTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
+	editorLabelStyle = lipgloss.NewStyle().Bold(true)
 )
 
 var stateStyle = map[controller.State]lipgloss.Style{

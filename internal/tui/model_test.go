@@ -23,6 +23,7 @@ type fakeCtrl struct {
 	updates   []config.Tunnel
 	deletes   []string
 	cfg       *config.Config
+	tunErr    error // returned by Add/Update/Delete when set
 	changes   chan struct{}
 }
 
@@ -81,18 +82,27 @@ func (f *fakeCtrl) Config() (*config.Config, error) {
 func (f *fakeCtrl) AddTunnel(t config.Tunnel) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.tunErr != nil {
+		return f.tunErr
+	}
 	f.adds = append(f.adds, t)
 	return nil
 }
 func (f *fakeCtrl) UpdateTunnel(name string, t config.Tunnel) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.tunErr != nil {
+		return f.tunErr
+	}
 	f.updates = append(f.updates, t)
 	return nil
 }
 func (f *fakeCtrl) DeleteTunnel(name string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.tunErr != nil {
+		return f.tunErr
+	}
 	f.deletes = append(f.deletes, name)
 	return nil
 }
@@ -498,5 +508,96 @@ func TestModel_TickIgnoredDuringHandoff(t *testing.T) {
 	}
 	if mm.handoffing != true {
 		t.Error("handoffing flag should be preserved")
+	}
+}
+
+func TestModel_EditKeyOpensEditor(t *testing.T) {
+	f := newFake(controller.Status{Name: "db", Type: "local"})
+	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db", Type: "local", SSH: "u@h:22", Local: "5432"}}}
+	m := New(f, Options{Mode: "standalone"})
+
+	next, _ := m.handleKey(keyPress("e"))
+	mm := next.(Model)
+	if mm.editor == nil {
+		t.Fatal("e should open the editor")
+	}
+	if mm.editor.mode != modeEdit || mm.editor.original != "db" {
+		t.Errorf("editor mode/original = %v/%q", mm.editor.mode, mm.editor.original)
+	}
+	if mm.editor.name.Value() != "db" {
+		t.Errorf("editor should be prefilled, name=%q", mm.editor.name.Value())
+	}
+}
+
+func TestModel_EditKeyNoSelection(t *testing.T) {
+	f := newFake()
+	m := New(f, Options{Mode: "standalone"})
+	next, _ := m.handleKey(keyPress("e"))
+	mm := next.(Model)
+	if mm.editor != nil {
+		t.Error("e on empty list should not open the editor")
+	}
+}
+
+func TestModel_NewKeyOpensEditor(t *testing.T) {
+	f := newFake(controller.Status{Name: "db"})
+	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db"}}}
+	m := New(f, Options{Mode: "standalone"})
+	next, _ := m.handleKey(keyPress("n"))
+	mm := next.(Model)
+	if mm.editor == nil || mm.editor.mode != modeNew {
+		t.Fatalf("n should open a new-tunnel editor, got editor=%v", mm.editor)
+	}
+	if mm.editor.name.Value() != "" {
+		t.Errorf("new editor name should be empty, got %q", mm.editor.name.Value())
+	}
+}
+
+func TestModel_DeleteKeyShowsModal(t *testing.T) {
+	f := newFake(controller.Status{Name: "db"})
+	m := New(f, Options{Mode: "standalone"})
+	next, _ := m.handleKey(keyPress("d"))
+	mm := next.(Model)
+	if !mm.confirmDelete || mm.deleteTarget != "db" {
+		t.Errorf("d should raise delete modal: confirm=%v target=%q", mm.confirmDelete, mm.deleteTarget)
+	}
+	if !strings.Contains(mm.render(), "Delete tunnel") {
+		t.Error("render should show the delete modal")
+	}
+}
+
+func TestModel_DeleteConfirmYes(t *testing.T) {
+	f := newFake(controller.Status{Name: "db"})
+	m := New(f, Options{Mode: "standalone"})
+
+	next, _ := m.Update(keyPress("d"))
+	m = next.(Model)
+	if !m.confirmDelete {
+		t.Fatal("precondition: d should raise modal")
+	}
+	next, _ = m.Update(keyPress("y"))
+	m = next.(Model)
+	if m.confirmDelete {
+		t.Error("y should clear the modal")
+	}
+	if len(f.deletes) != 1 || f.deletes[0] != "db" {
+		t.Errorf("DeleteTunnel(db) expected, got %v", f.deletes)
+	}
+}
+
+func TestModel_DeleteConfirmCancel(t *testing.T) {
+	f := newFake(controller.Status{Name: "db"})
+	m := New(f, Options{Mode: "standalone"})
+	m.confirmDelete = true
+	m.deleteTarget = "db"
+
+	for _, k := range []string{"n", "enter", "esc"} {
+		mm, _ := m.Update(keyPress(k))
+		mm2 := mm.(Model)
+		if mm2.confirmDelete || len(f.deletes) != 0 {
+			t.Errorf("%s should cancel without deleting: confirm=%v deletes=%v", k, mm2.confirmDelete, f.deletes)
+		}
+		m.confirmDelete = true
+		m.deleteTarget = "db"
 	}
 }

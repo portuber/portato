@@ -3,6 +3,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/controller"
 )
 
@@ -10,6 +11,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
+		if m.editor != nil {
+			return m, m.editor.update(msg)
+		}
 		return m, nil
 	case tickMsg:
 		if m.handoffing {
@@ -26,6 +30,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Quit
 	case tea.KeyPressMsg:
+		if m.editor != nil {
+			cmd := m.editor.update(msg)
+			if m.editor.done {
+				m.editor = nil
+			}
+			return m, cmd
+		}
+		if m.confirmDelete {
+			return m.handleDeleteConfirm(msg)
+		}
 		return m.handleKey(msg)
 	}
 	return m, nil
@@ -69,8 +83,66 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		_ = m.ctrl.Reload()
 		m.list = m.ctrl.List()
 		m.clampCursor()
+	case "e":
+		if m.hasCurrent() {
+			ed, cmd := openEditor(m.ctrl, true, m.list[m.cursor].Name, m.width, m.height)
+			m.editor = ed
+			return m, cmd
+		}
+	case "n":
+		ed, cmd := openEditor(m.ctrl, false, "", m.width, m.height)
+		m.editor = ed
+		return m, cmd
+	case "d":
+		if m.hasCurrent() {
+			m.confirmDelete = true
+			m.deleteTarget = m.list[m.cursor].Name
+		}
 	}
 	return m, nil
+}
+
+// handleDeleteConfirm dispatches the "delete tunnel?" modal keys. y deletes
+// (and stops the tunnel via the engine reload); n/enter/esc cancel.
+func (m Model) handleDeleteConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "y":
+		name := m.deleteTarget
+		m.confirmDelete = false
+		m.deleteTarget = ""
+		_ = m.ctrl.DeleteTunnel(name)
+		m.list = m.ctrl.List()
+		m.clampCursor()
+	case "n", "enter", "esc":
+		m.confirmDelete = false
+		m.deleteTarget = ""
+	}
+	return m, nil
+}
+
+// openEditor builds the tunnel editor form. For edit mode the current tunnel
+// is fetched via Config() (the daemon owns the raw fields; Status only has the
+// resolved local address). Returns a nil editor if the config can't be read.
+func openEditor(ctrl controller.Controller, edit bool, selected string, width, height int) (*tunnelEditor, tea.Cmd) {
+	cfg, err := ctrl.Config()
+	if err != nil || cfg == nil {
+		return nil, nil
+	}
+	var names []string
+	var existing config.Tunnel
+	for _, t := range cfg.Tunnels {
+		names = append(names, t.Name)
+		if edit && t.Name == selected {
+			existing = t
+		}
+	}
+	mode := modeNew
+	if edit {
+		mode = modeEdit
+	}
+	e := newTunnelEditor(mode, existing, names, ctrl)
+	e.width, e.height = width, height
+	return e, e.setFocus(fName)
 }
 
 // handleConfirm dispatches the "leave running in background?" modal keys.

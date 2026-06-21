@@ -26,6 +26,12 @@ func (m Model) View() tea.View {
 }
 
 func (m Model) render() string {
+	if m.editor != nil {
+		return m.centered(m.editor.view())
+	}
+	if m.confirmDelete {
+		return m.centered(m.confirmDeleteView())
+	}
 	if m.confirmQuit {
 		return m.centered(m.confirmQuitView())
 	}
@@ -164,7 +170,7 @@ func formatUptime(d time.Duration) string {
 }
 
 func (m Model) footer() string {
-	return footerStyle.Render("↑↓/jk move · space toggle · r restart · a/x all · R reload · ? help · q quit")
+	return footerStyle.Render("↑↓/jk move · space toggle · r restart · a/x all · e edit · n new · d delete · R reload · ? help · q quit")
 }
 
 func (m Model) helpBlock() string {
@@ -177,6 +183,9 @@ func (m Model) helpBlock() string {
 		"r            restart selected tunnel",
 		"a            enable all tunnels",
 		"x            disable all tunnels",
+		"e            edit the selected tunnel",
+		"n            create a new tunnel",
+		"d            delete the selected tunnel",
 		"R            reload config from disk",
 		"? / esc      toggle this help",
 		"q / ctrl+c   quit (stops all tunnels)",
@@ -195,6 +204,13 @@ func (m Model) confirmQuitView() string {
 		}
 	}
 	line := fmt.Sprintf("%d tunnel(s) active.\nLeave them running in the background? [y/N]", n)
+	return modalStyle.Render(line)
+}
+
+// confirmDeleteView renders the "delete tunnel?" modal. Deleting stops an
+// active tunnel (via the engine reload) and removes it from the config.
+func (m Model) confirmDeleteView() string {
+	line := fmt.Sprintf("Delete tunnel %q?\nThis stops it if active and removes it from the config. [y/N]", m.deleteTarget)
 	return modalStyle.Render(line)
 }
 
