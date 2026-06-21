@@ -1,7 +1,7 @@
 ---
 phase: 10
 title: TUI tunnel editor (e/n/d)
-status: in-progress
+status: done
 depends_on: [6]
 ---
 
@@ -127,30 +127,31 @@ The first sub-model in the TUI. Held by the main `Model` as `m.editor
 
 ## Tasks
 
-- [ ] `docs(phase-10): start` — flip status, detail this file.
-- [ ] Add `charm.land/bubbles/v2`; verify `textinput` v2 path/API; `make build`.
-- [ ] `internal/config/patch.go` + `patch_test.go` (AST add/update/delete, comment preservation, validate-before-patch).
-- [ ] Controller interface + `Local`/`Remote` impls + `fakeCtrl`; tests.
-- [ ] Daemon `GET /config`, `POST/PUT/DELETE /tunnels`, `applyReload` refactor; `server_test.go`.
-- [ ] Client methods; tests.
-- [ ] `tui/editor.go` sub-model + `editor_test.go`.
-- [ ] Main model routing + `e/n/d` keys + delete modal + footer/help; `model_test.go`.
-- [ ] `make fmt && make vet && go build ./... && go test ./...` clean.
-- [ ] `docs(phase-10): complete`.
+- [x] `docs(phase-10): start` — flip status, detail this file.
+- [x] Add `charm.land/bubbles/v2`; verify `textinput` v2 path/API; `make build`.
+- [x] `internal/config/patch.go` + `patch_test.go` (AST add/update/delete, comment preservation, validate-before-patch).
+- [x] Controller interface + `Local`/`Remote` impls + `fakeCtrl`; tests.
+- [x] Daemon `GET /config`, `POST/PUT/DELETE /tunnels`, `applyReload` refactor; `server_test.go`.
+- [x] Client methods; tests.
+- [x] `tui/editor.go` sub-model + `editor_test.go`.
+- [x] Main model routing + `e/n/d` keys + delete modal + footer/help; `model_test.go`.
+- [x] Follow-up fixes found during manual testing: `forward.Tunnel.Reconfigure` (stale status after edit + off-tunnel not started), `config.Validate` requires `local` for all types, clearer host-key error, column alignment, uptime redraw tick, bracketed-paste routing.
+- [x] `make fmt && make vet && go build ./... && go test ./...` clean.
+- [x] `docs(phase-10): complete`.
 
 ## Definition of Done
 
-- [ ] `e` opens a form with all tunnel fields, pre-filled with the current values.
-- [ ] `n` opens an empty form for a new tunnel.
-- [ ] All fields are editable; the type is selected from a list (local/remote/dynamic).
-- [ ] Invalid values are highlighted; saving is not possible until fixed.
-- [ ] `Ctrl+S` saves changes to YAML; the list in the TUI is updated.
-- [ ] `Esc` cancels editing without saving.
-- [ ] `d` deletes the tunnel after confirmation; an active tunnel is correctly stopped.
-- [ ] The config file remains valid YAML after any operations (`portato list` works after editing).
-- [ ] Comments on untouched tunnels / `defaults:` survive a save.
-- [ ] Editing works both standalone and in attach.
-- [ ] `go vet`, `gofmt` are clean; `go test ./...` is green.
+- [x] `e` opens a form with all tunnel fields, pre-filled with the current values.
+- [x] `n` opens an empty form for a new tunnel.
+- [x] All fields are editable; the type is selected from a list (local/remote/dynamic).
+- [x] Invalid values are highlighted; saving is not possible until fixed.
+- [x] `Ctrl+S` saves changes to YAML; the list in the TUI is updated.
+- [x] `Esc` cancels editing without saving.
+- [x] `d` deletes the tunnel after confirmation; an active tunnel is correctly stopped.
+- [x] The config file remains valid YAML after any operations (`portato list` works after editing).
+- [x] Comments on untouched tunnels / `defaults:` survive a save.
+- [x] Editing works both standalone and in attach.
+- [x] `go vet`, `gofmt` are clean; `go test ./...` is green.
 
 ## Verification
 
