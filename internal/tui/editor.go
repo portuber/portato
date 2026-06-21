@@ -143,6 +143,16 @@ func (e *tunnelEditor) update(msg tea.Msg) tea.Cmd {
 		return nil
 	case tea.KeyPressMsg:
 		return e.handleKey(msg)
+	case tea.PasteMsg:
+		// Forward bracketed-paste to the focused text field (textinput inserts
+		// the content at the cursor). No-op when a non-text field (Type) is
+		// focused.
+		if ti := e.textInputFor(e.focus); ti != nil {
+			var cmd tea.Cmd
+			*ti, cmd = ti.Update(msg)
+			return cmd
+		}
+		return nil
 	}
 	return nil
 }

@@ -46,6 +46,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.handleDeleteConfirm(msg)
 		}
 		return m.handleKey(msg)
+	case tea.PasteMsg:
+		// Bracketed-paste is only meaningful in the editor's text fields; in
+		// the list view there is nothing to paste into, so it is a no-op.
+		if m.editor != nil {
+			cmd := m.editor.update(msg)
+			if m.editor.done {
+				m.editor = nil
+			}
+			return m, cmd
+		}
+		return m, nil
 	}
 	return m, nil
 }

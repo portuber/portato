@@ -568,6 +568,37 @@ func TestModel_RedrawTickDoesNotFetch(t *testing.T) {
 	}
 }
 
+func TestModel_PasteRoutedToEditor(t *testing.T) {
+	f := newFake(controller.Status{Name: "db"})
+	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db"}}}
+	m := New(f, Options{Mode: "standalone"})
+
+	next, _ := m.handleKey(keyPress("n"))
+	m = next.(Model)
+	if m.editor == nil {
+		t.Fatal("precondition: editor should be open")
+	}
+	next, _ = m.Update(tea.PasteMsg{Content: "pasted"})
+	mm := next.(Model)
+	if got := mm.editor.name.Value(); got != "pasted" {
+		t.Errorf("paste should reach the editor's focused field; name=%q", got)
+	}
+}
+
+func TestModel_PasteInListViewIsNoOp(t *testing.T) {
+	f := newFake(controller.Status{Name: "db"})
+	m := New(f, Options{Mode: "standalone"})
+
+	next, cmd := m.Update(tea.PasteMsg{Content: "pasted"})
+	mm := next.(Model)
+	if cmd != nil {
+		t.Error("paste in list view should return a nil cmd")
+	}
+	if mm.editor != nil {
+		t.Error("paste in list view should not open the editor")
+	}
+}
+
 func TestModel_EditKeyOpensEditor(t *testing.T) {
 	f := newFake(controller.Status{Name: "db", Type: "local"})
 	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db", Type: "local", SSH: "u@h:22", Local: "5432"}}}

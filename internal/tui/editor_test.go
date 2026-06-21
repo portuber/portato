@@ -275,6 +275,30 @@ func TestEditor_TabCyclesFocus(t *testing.T) {
 	}
 }
 
+func TestEditor_PasteInsertsIntoFocusedField(t *testing.T) {
+	f := newEditorFake()
+	e := editorForNew(f) // focus on Name
+	e.name.SetValue("x")
+	e.update(tea.PasteMsg{Content: "pasted"})
+	if got := e.name.Value(); got != "xpasted" {
+		t.Errorf("paste into focused Name: got %q, want %q", got, "xpasted")
+	}
+	// Other fields are untouched.
+	if e.ssh.Value() != "" {
+		t.Errorf("non-focused SSH field changed: %q", e.ssh.Value())
+	}
+}
+
+func TestEditor_PasteOnTypeFieldIsNoOp(t *testing.T) {
+	f := newEditorFake()
+	e := editorForNew(f)
+	e.focus = fType // no textinput behind the Type field
+	e.update(tea.PasteMsg{Content: "pasted"})
+	if e.name.Value() != "" {
+		t.Errorf("paste on Type field should not touch Name, got %q", e.name.Value())
+	}
+}
+
 // assertErr is a tiny error used to flip fakeCtrl into its error mode for the
 // Add/Update/Delete paths.
 type errSentinel string
