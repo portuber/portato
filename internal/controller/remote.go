@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kipkaev55/portato/internal/client"
+	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
 )
 
@@ -21,6 +22,10 @@ type daemonClient interface {
 	Restart(name string) error
 	Reload() error
 	Events(ctx context.Context) (io.ReadCloser, error)
+	Config() (*config.Config, error)
+	AddTunnel(t config.Tunnel) error
+	UpdateTunnel(name string, t config.Tunnel) error
+	DeleteTunnel(name string) error
 }
 
 // Remote is a Controller backed by the daemon via an HTTP client over a unix
@@ -64,6 +69,19 @@ func (r *Remote) Enable(name string) error  { return r.client.Enable(name) }
 func (r *Remote) Disable(name string) error { return r.client.Disable(name) }
 func (r *Remote) Restart(name string) error { return r.client.Restart(name) }
 func (r *Remote) Reload() error             { return r.client.Reload() }
+
+// Config fetches the daemon's current configuration for the TUI editor. The
+// daemon owns the config file (it knows the real --config path), so attached
+// clients read it through the API rather than touching disk. Phase 10.
+func (r *Remote) Config() (*config.Config, error) { return r.client.Config() }
+
+func (r *Remote) AddTunnel(t config.Tunnel) error { return r.client.AddTunnel(t) }
+
+func (r *Remote) UpdateTunnel(name string, t config.Tunnel) error {
+	return r.client.UpdateTunnel(name, t)
+}
+
+func (r *Remote) DeleteTunnel(name string) error { return r.client.DeleteTunnel(name) }
 
 // Changes returns the push channel fed by the daemon's /events SSE stream.
 // A goroutine reads frames, reconnects on break with exponential backoff,

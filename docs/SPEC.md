@@ -150,15 +150,19 @@ Implementations:
 - **Permissions:** the socket is created with mode `0600`, accessible only to the owner.
 - **Endpoints:**
 
-| Method  | Path                              | Action                            |
-|---------|-----------------------------------|-----------------------------------|
-| `GET`   | `/tunnels`                        | list of statuses                  |
-| `POST`  | `/tunnels/{name}/enable`          | enable + persist `enabled=true`   |
-| `POST`  | `/tunnels/{name}/disable`         | disable + persist `enabled=false` |
-| `POST`  | `/tunnels/{name}/restart`         | down + up                         |
-| `POST`  | `/reload`                         | re-read the config from disk      |
-| `GET`   | `/events`                         | SSE stream of state-change signals (Phase 9) |
-| `GET`   | `/healthz`                        | liveness probe (smart-launcher)   |
+| Method   | Path                              | Action                            |
+|----------|-----------------------------------|-----------------------------------|
+| `GET`    | `/tunnels`                        | list of statuses                  |
+| `POST`   | `/tunnels/{name}/enable`          | enable + persist `enabled=true`   |
+| `POST`   | `/tunnels/{name}/disable`         | disable + persist `enabled=false` |
+| `POST`   | `/tunnels/{name}/restart`         | down + up                         |
+| `POST`   | `/reload`                         | re-read the config from disk      |
+| `GET`    | `/events`                         | SSE stream of state-change signals (Phase 9) |
+| `GET`    | `/config`                         | the current config (JSON) — for the TUI editor (Phase 10) |
+| `POST`   | `/tunnels`                        | add a tunnel (validate, persist, reload) — Phase 10 |
+| `PUT`    | `/tunnels/{name}`                 | replace a tunnel (rename allowed) — Phase 10 |
+| `DELETE` | `/tunnels/{name}`                 | remove a tunnel (active one is stopped) — Phase 10 |
+| `GET`    | `/healthz`                        | liveness probe (smart-launcher)   |
 
 `GET /events` (Phase 9) is a `text/event-stream`: the daemon subscribes a
 client to the Engine's event broker and writes a signal-only `data: {}` frame
@@ -166,6 +170,15 @@ on every tunnel state change (plus one initial frame on connect and a 15s
 heartbeat comment). The client reacts by re-fetching `GET /tunnels`. This
 replaces the former 1s polling — an idle attached client issues no periodic
 requests.
+
+The Phase 10 config-editing endpoints (`GET /config`, `POST/PUT/DELETE
+/tunnels`) make the daemon the single owner of config writes: an attached TUI
+never touches the YAML directly, so a custom `--config` path on the daemon is
+respected and concurrent clients cannot race. Persist is comment-preserving
+(the file is edited as a `yaml.Node` tree, so comments on untouched tunnels
+and on `defaults:` survive). Every mutation validates a prospective in-memory
+config first, then patches the file, then reloads — on a validation error the
+file is left untouched and a 4xx is returned.
 
 **Key invariant:** every `enable/disable` writes `enabled` back to the YAML config. This is the foundation of the "leave in the background" hand-off: a fresh daemon reads the same config and brings up the same set of tunnels.
 

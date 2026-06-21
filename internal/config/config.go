@@ -21,28 +21,30 @@ const (
 )
 
 type Config struct {
-	Defaults Defaults `yaml:"defaults"`
-	Tunnels  []Tunnel `yaml:"tunnels"`
+	Defaults Defaults `yaml:"defaults" json:"defaults"`
+	Tunnels  []Tunnel `yaml:"tunnels" json:"tunnels"`
 }
 
 type Defaults struct {
-	Identity       string `yaml:"identity"`
-	KnownHosts     string `yaml:"known_hosts"`
-	AcceptNewHosts bool   `yaml:"accept_new_hosts"`
+	Identity       string `yaml:"identity" json:"identity"`
+	KnownHosts     string `yaml:"known_hosts" json:"known_hosts"`
+	AcceptNewHosts bool   `yaml:"accept_new_hosts" json:"accept_new_hosts"`
 }
 
 type Tunnel struct {
-	Name     string `yaml:"name"`
-	Type     string `yaml:"type"`
-	Local    string `yaml:"local"`
-	Remote   string `yaml:"remote"`
-	SSH      string `yaml:"ssh"`
-	Identity string `yaml:"identity"`
-	Enabled  bool   `yaml:"enabled"`
+	Name     string `yaml:"name" json:"name"`
+	Type     string `yaml:"type" json:"type"`
+	Local    string `yaml:"local" json:"local"`
+	Remote   string `yaml:"remote" json:"remote"`
+	SSH      string `yaml:"ssh" json:"ssh"`
+	Identity string `yaml:"identity" json:"identity"`
+	Enabled  bool   `yaml:"enabled" json:"enabled"`
 
-	User string `yaml:"-"`
-	Host string `yaml:"-"`
-	Port int    `yaml:"-"`
+	// User/Host/Port are derived from SSH via prepare() and never persisted.
+	// Excluded from JSON so they are not echoed over IPC.
+	User string `yaml:"-" json:"-"`
+	Host string `yaml:"-" json:"-"`
+	Port int    `yaml:"-" json:"-"`
 }
 
 func DefaultPath() string {

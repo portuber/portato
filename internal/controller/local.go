@@ -76,6 +76,50 @@ func (l *Local) Reload() error {
 	return nil
 }
 
+// Config returns a deep copy of the current in-memory configuration. The TUI
+// editor uses it to prefill forms and to enforce name uniqueness without
+// touching the file.
+func (l *Local) Config() (*config.Config, error) {
+	return l.cfg.Clone(), nil
+}
+
+// AddTunnel validates the new tunnel against the current config, then applies
+// a comment-preserving append to the YAML file and reloads. The file is not
+// written unless validation passes.
+func (l *Local) AddTunnel(t config.Tunnel) error {
+	if _, err := l.cfg.WithTunnelAdded(t); err != nil {
+		return err
+	}
+	if err := config.AddTunnelNode(l.cfgPath, t); err != nil {
+		return err
+	}
+	return l.Reload()
+}
+
+// UpdateTunnel replaces the tunnel named name with t (rename allowed): validate
+// the prospective config, patch the file, reload.
+func (l *Local) UpdateTunnel(name string, t config.Tunnel) error {
+	if _, err := l.cfg.WithTunnelReplaced(name, t); err != nil {
+		return err
+	}
+	if err := config.ReplaceTunnelNode(l.cfgPath, name, t); err != nil {
+		return err
+	}
+	return l.Reload()
+}
+
+// DeleteTunnel removes the tunnel named name: validate, patch, reload. If the
+// tunnel is active, the engine reload stops and drops it.
+func (l *Local) DeleteTunnel(name string) error {
+	if _, err := l.cfg.WithTunnelRemoved(name); err != nil {
+		return err
+	}
+	if err := config.DeleteTunnelNode(l.cfgPath, name); err != nil {
+		return err
+	}
+	return l.Reload()
+}
+
 func (l *Local) setEnabled(name string, enabled bool) {
 	for i := range l.cfg.Tunnels {
 		if l.cfg.Tunnels[i].Name == name {

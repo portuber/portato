@@ -172,6 +172,10 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /tunnels/{name}/disable", s.handleDisable)
 	mux.HandleFunc("POST /tunnels/{name}/restart", s.handleRestart)
 	mux.HandleFunc("POST /reload", s.handleReload)
+	mux.HandleFunc("GET /config", s.handleGetConfig)
+	mux.HandleFunc("POST /tunnels", s.handleAddTunnel)
+	mux.HandleFunc("PUT /tunnels/{name}", s.handleUpdateTunnel)
+	mux.HandleFunc("DELETE /tunnels/{name}", s.handleDeleteTunnel)
 	return mux
 }
 
@@ -300,14 +304,126 @@ func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleReload(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	cfg, err := config.Load(s.cfgPath)
-	if err != nil {
+	if err := s.applyReload(); err != nil {
 		writeError(w, http.StatusInternalServerError, "reload config: %v", err)
 		return
 	}
+	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// applyReload re-reads the config from disk, applies it to the engine and
+// swaps the server's in-memory copy. Shared by POST /reload and the tunnel
+// mutation handlers (which patch the file first, then reload). Phase 10.
+func (s *Server) applyReload() error {
+	cfg, err := config.Load(s.cfgPath)
+	if err != nil {
+		return err
+	}
 	s.engine.Reload(cfg)
 	s.cfg = cfg
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	return nil
+}
+
+// handleGetConfig returns the daemon's current configuration as JSON. The
+// daemon owns the real config path (it may have been started with --config),
+// so attached clients read it through the API rather than touching disk.
+// Phase 10.
+func (s *Server) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	writeJSON(w, http.StatusOK, s.cfg)
+}
+
+// handleAddTunnel creates a tunnel: validate the prospective config, then
+// apply a comment-preserving append to the YAML file and reload.
+func (s *Server) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
+	t, err := decodeTunnel(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "%v", err)
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.hasTunnel(t.Name) {
+		writeError(w, http.StatusConflict, "tunnel %q already exists", t.Name)
+		return
+	}
+	if _, err := s.cfg.WithTunnelAdded(t); err != nil {
+		writeError(w, http.StatusBadRequest, "%v", err)
+		return
+	}
+	if err := config.AddTunnelNode(s.cfgPath, t); err != nil {
+		writeError(w, http.StatusInternalServerError, "persist: %v", err)
+		return
+	}
+	if err := s.applyReload(); err != nil {
+		writeError(w, http.StatusInternalServerError, "reload: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]string{"status": "created", "tunnel": t.Name})
+}
+
+// handleUpdateTunnel replaces the tunnel named {name} with the body (rename
+// allowed): validate the prospective config, patch the file, reload.
+func (s *Server) handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	t, err := decodeTunnel(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "%v", err)
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasTunnel(name) {
+		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+		return
+	}
+	if _, err := s.cfg.WithTunnelReplaced(name, t); err != nil {
+		writeError(w, http.StatusBadRequest, "%v", err)
+		return
+	}
+	if err := config.ReplaceTunnelNode(s.cfgPath, name, t); err != nil {
+		writeError(w, http.StatusInternalServerError, "persist: %v", err)
+		return
+	}
+	if err := s.applyReload(); err != nil {
+		writeError(w, http.StatusInternalServerError, "reload: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated", "tunnel": t.Name})
+}
+
+// handleDeleteTunnel removes the tunnel named {name}: validate, patch, reload.
+// If the tunnel is active, the engine reload stops and drops it.
+func (s *Server) handleDeleteTunnel(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasTunnel(name) {
+		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+		return
+	}
+	if _, err := s.cfg.WithTunnelRemoved(name); err != nil {
+		writeError(w, http.StatusBadRequest, "%v", err)
+		return
+	}
+	if err := config.DeleteTunnelNode(s.cfgPath, name); err != nil {
+		writeError(w, http.StatusInternalServerError, "persist: %v", err)
+		return
+	}
+	if err := s.applyReload(); err != nil {
+		writeError(w, http.StatusInternalServerError, "reload: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "tunnel": name})
+}
+
+func decodeTunnel(r *http.Request) (config.Tunnel, error) {
+	var t config.Tunnel
+	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
+		return config.Tunnel{}, fmt.Errorf("decode tunnel: %w", err)
+	}
+	return t, nil
 }
 
 func (s *Server) hasTunnel(name string) bool {

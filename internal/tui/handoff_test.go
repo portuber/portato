@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/controller"
 )
 
@@ -23,6 +24,12 @@ func (h *handoffFakeCtrl) Disable(string) error      { return nil }
 func (h *handoffFakeCtrl) Restart(string) error      { return nil }
 func (h *handoffFakeCtrl) Reload() error             { return nil }
 func (h *handoffFakeCtrl) Changes() <-chan struct{}  { return h.changes }
+func (h *handoffFakeCtrl) Config() (*config.Config, error) {
+	return &config.Config{}, nil
+}
+func (h *handoffFakeCtrl) AddTunnel(config.Tunnel) error            { return nil }
+func (h *handoffFakeCtrl) UpdateTunnel(string, config.Tunnel) error { return nil }
+func (h *handoffFakeCtrl) DeleteTunnel(string) error                { return nil }
 func (h *handoffFakeCtrl) Close() error {
 	*h.log = append(*h.log, "close")
 	return nil

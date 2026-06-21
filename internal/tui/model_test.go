@@ -8,6 +8,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/controller"
 )
 
@@ -18,6 +19,10 @@ type fakeCtrl struct {
 	disabled  []string
 	restarted []string
 	reloads   int
+	adds      []config.Tunnel
+	updates   []config.Tunnel
+	deletes   []string
+	cfg       *config.Config
 	changes   chan struct{}
 }
 
@@ -64,6 +69,33 @@ func (f *fakeCtrl) Reload() error {
 }
 func (f *fakeCtrl) Changes() <-chan struct{} { return f.changes }
 func (f *fakeCtrl) Close() error             { return nil }
+
+func (f *fakeCtrl) Config() (*config.Config, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.cfg == nil {
+		return &config.Config{}, nil
+	}
+	return f.cfg.Clone(), nil
+}
+func (f *fakeCtrl) AddTunnel(t config.Tunnel) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.adds = append(f.adds, t)
+	return nil
+}
+func (f *fakeCtrl) UpdateTunnel(name string, t config.Tunnel) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.updates = append(f.updates, t)
+	return nil
+}
+func (f *fakeCtrl) DeleteTunnel(name string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.deletes = append(f.deletes, name)
+	return nil
+}
 
 func newFake(statuses ...controller.Status) *fakeCtrl {
 	cp := make([]controller.Status, len(statuses))

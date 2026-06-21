@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
 )
 
@@ -17,6 +18,12 @@ type fakeClient struct {
 	err  error
 
 	enables, disables, restarts, reloads int
+
+	cfg       *config.Config
+	adds      []config.Tunnel
+	updates   []config.Tunnel
+	deletes   []string
+	muTunnels sync.Mutex
 
 	mu      sync.Mutex
 	streams []io.ReadCloser
@@ -28,6 +35,34 @@ func (f *fakeClient) Enable(string) error             { f.enables++; return nil 
 func (f *fakeClient) Disable(string) error            { f.disables++; return nil }
 func (f *fakeClient) Restart(string) error            { f.restarts++; return nil }
 func (f *fakeClient) Reload() error                   { f.reloads++; return nil }
+
+func (f *fakeClient) Config() (*config.Config, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.cfg == nil {
+		return &config.Config{}, nil
+	}
+	return f.cfg.Clone(), nil
+}
+func (f *fakeClient) AddTunnel(t config.Tunnel) error {
+	f.muTunnels.Lock()
+	defer f.muTunnels.Unlock()
+	f.adds = append(f.adds, t)
+	return f.err
+}
+func (f *fakeClient) UpdateTunnel(name string, t config.Tunnel) error {
+	f.muTunnels.Lock()
+	defer f.muTunnels.Unlock()
+	f.updates = append(f.updates, t)
+	return f.err
+}
+func (f *fakeClient) DeleteTunnel(name string) error {
+	f.muTunnels.Lock()
+	defer f.muTunnels.Unlock()
+	f.deletes = append(f.deletes, name)
+	return f.err
+}
 
 // Events pops the next queued stream; when none remain it blocks on ctx,
 // modelling a daemon that is up but produces no further events. This lets the

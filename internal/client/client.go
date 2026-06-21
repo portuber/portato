@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -9,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
 )
 
@@ -100,6 +102,31 @@ func (c *Client) Reload() error {
 	return err
 }
 
+// Config returns the daemon's current configuration (the daemon owns the real
+// config path). Used by the TUI editor to prefill forms. Phase 10.
+func (c *Client) Config() (*config.Config, error) {
+	var cfg config.Config
+	if err := c.get("/config", &cfg); err != nil {
+		return nil, err
+	}
+	return &cfg, nil
+}
+
+// AddTunnel asks the daemon to create a tunnel (validates, persists, reloads).
+func (c *Client) AddTunnel(t config.Tunnel) error {
+	return c.sendBody(http.MethodPost, "/tunnels", t)
+}
+
+// UpdateTunnel asks the daemon to replace the tunnel named name with t.
+func (c *Client) UpdateTunnel(name string, t config.Tunnel) error {
+	return c.sendBody(http.MethodPut, fmt.Sprintf("/tunnels/%s", name), t)
+}
+
+// DeleteTunnel asks the daemon to remove the tunnel named name.
+func (c *Client) DeleteTunnel(name string) error {
+	return c.sendBody(http.MethodDelete, fmt.Sprintf("/tunnels/%s", name), nil)
+}
+
 // Events opens the daemon's SSE stream (GET /events) and returns the response
 // body for line-by-line reading. The caller owns the ReadCloser and must close
 // it to end the subscription. A context cancellation propagates to the stream.
@@ -152,6 +179,35 @@ func (c *Client) post(path string) (map[string]string, error) {
 	var body map[string]string
 	_ = json.NewDecoder(resp.Body).Decode(&body)
 	return body, nil
+}
+
+// sendBody issues a request with an optional JSON body and returns an error on
+// a non-2xx response. Used by the tunnel mutation endpoints (Phase 10).
+func (c *Client) sendBody(method, path string, body any) error {
+	var r io.Reader
+	if body != nil {
+		data, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("encode request: %w", err)
+		}
+		r = bytes.NewReader(data)
+	}
+	req, err := http.NewRequest(method, url(path), r)
+	if err != nil {
+		return err
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return decodeError(resp)
+	}
+	return nil
 }
 
 func decodeError(resp *http.Response) error {
