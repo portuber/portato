@@ -90,7 +90,38 @@ func newTunnelEditor(mode editorMode, t config.Tunnel, existing []string, ctrl c
 			break
 		}
 	}
+	e.applyTypePlaceholders()
 	return e
+}
+
+// applyTypePlaceholders tunes the remote/local hints to the selected type so
+// the form reflects each type's semantics (e.g. a -R remote may be a bare
+// port that binds loopback on the host).
+func (e *tunnelEditor) applyTypePlaceholders() {
+	switch tunnelTypes[e.typeIdx] {
+	case "remote":
+		e.remote.Placeholder = "9090 or 0.0.0.0:9090"
+		e.local.Placeholder = "127.0.0.1:9090"
+	case "local":
+		e.remote.Placeholder = "db:5432"
+		e.local.Placeholder = "5432 or 127.0.0.1:5432"
+	case "dynamic":
+		e.local.Placeholder = "1080 or 127.0.0.1:1080"
+		e.remote.Placeholder = "unused"
+	}
+}
+
+// typeNote is the one-line semantics hint shown under the Type field.
+func (e *tunnelEditor) typeNote() string {
+	switch tunnelTypes[e.typeIdx] {
+	case "local":
+		return "local: listened here · remote: destination dialed on the host"
+	case "remote":
+		return "remote: listened on the host — bare port binds loopback; non-loopback needs GatewayPorts"
+	case "dynamic":
+		return "local: SOCKS5 proxy here · remote unused (destination from the SOCKS request)"
+	}
+	return ""
 }
 
 func newInput(value, placeholder string) textinput.Model {
@@ -183,6 +214,7 @@ func (e *tunnelEditor) setFocus(idx int) tea.Cmd {
 
 func (e *tunnelEditor) cycleType(dir int) {
 	e.typeIdx = (e.typeIdx + dir + len(tunnelTypes)) % len(tunnelTypes)
+	e.applyTypePlaceholders()
 }
 
 func (e *tunnelEditor) tunnel() config.Tunnel {
@@ -264,6 +296,7 @@ func (e *tunnelEditor) view() string {
 
 	b.WriteString(e.renderText("Name", &e.name, fName, "name"))
 	b.WriteString(e.renderType())
+	b.WriteString("          " + dimStyle.Render(e.typeNote()) + "\n")
 	b.WriteString(e.renderText("SSH", &e.ssh, fSSH, "ssh"))
 	b.WriteString(e.renderText("Local", &e.local, fLocal, "local"))
 	b.WriteString(e.renderText("Remote", &e.remote, fRemote, "remote"))

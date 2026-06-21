@@ -203,6 +203,43 @@ func TestEditor_TypeCycling(t *testing.T) {
 	}
 }
 
+func TestEditor_TypePlaceholdersAreContextual(t *testing.T) {
+	f := newEditorFake()
+	e := editorForNew(f)
+
+	// remote type: remote is a bare port or host:port on the host side.
+	e.typeIdx = indexOf(tunnelTypes, "remote")
+	e.applyTypePlaceholders()
+	if e.remote.Placeholder != "9090 or 0.0.0.0:9090" {
+		t.Errorf("remote placeholder = %q", e.remote.Placeholder)
+	}
+
+	// dynamic type: remote is unused.
+	e.typeIdx = indexOf(tunnelTypes, "dynamic")
+	e.applyTypePlaceholders()
+	if e.remote.Placeholder != "unused" {
+		t.Errorf("dynamic remote placeholder = %q", e.remote.Placeholder)
+	}
+
+	// cycling updates the placeholder too.
+	e.typeIdx = indexOf(tunnelTypes, "local")
+	e.cycleType(1) // -> remote
+	if tunnelTypes[e.typeIdx] != "remote" || e.remote.Placeholder != "9090 or 0.0.0.0:9090" {
+		t.Errorf("cycle to remote: type=%s placeholder=%q", tunnelTypes[e.typeIdx], e.remote.Placeholder)
+	}
+}
+
+func TestEditor_TypeNoteNonEmpty(t *testing.T) {
+	f := newEditorFake()
+	e := editorForNew(f)
+	for _, ty := range tunnelTypes {
+		e.typeIdx = indexOf(tunnelTypes, ty)
+		if e.typeNote() == "" {
+			t.Errorf("type %s has empty note", ty)
+		}
+	}
+}
+
 func TestEditor_TabCyclesFocus(t *testing.T) {
 	f := newEditorFake()
 	e := editorForNew(f)
