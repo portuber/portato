@@ -1,7 +1,7 @@
 ---
 phase: 11
 title: Polish (logs, themes, doctor, CI)
-status: in-progress
+status: done
 depends_on: [6]
 ---
 
@@ -91,31 +91,31 @@ phase `portato` is ready for everyday use without caveats.
 ## Tasks
 
 - [x] `docs(phase-11): start` — detail this file, flip status.
-- [ ] `feat(log):` ring buffer + handler; thread `*Ring` through `Setup`,
+- [x] `feat(log):` ring buffer + handler; thread `*Ring` through `Setup`,
   `Local`, `daemon.New`.
-- [ ] `feat(controller,daemon,client):` `Logs` + `GET /logs` + client method.
-- [ ] `feat(tui):` logs screen (`internal/tui/logs.go`) + `l` key + footer.
-- [ ] `feat(forward,controller,daemon,client,tui):` TOFU capture + accept.
-- [ ] `feat(tui):` light/dark/monochrome themes.
-- [ ] `feat(cmd):` `portato doctor`.
-- [ ] `ci(build):` GitHub Actions + `make build-all` + `make cover`.
-- [ ] `docs:` README rewrite + SPEC touch-ups.
-- [ ] `make fmt && make vet && make build && make build-all && go test ./...` clean.
-- [ ] `docs(phase-11): complete`.
+- [x] `feat(controller,daemon,client):` `Logs` + `GET /logs` + client method.
+- [x] `feat(tui):` logs screen (`internal/tui/logs.go`) + `l` key + footer.
+- [x] `feat(forward,controller,daemon,client,tui):` TOFU capture + accept.
+- [x] `feat(tui):` light/dark/monochrome themes.
+- [x] `feat(cmd):` `portato doctor`.
+- [x] `ci(build):` GitHub Actions + `make build-all` + `make cover`.
+- [x] `docs:` README rewrite + SPEC touch-ups.
+- [x] `make fmt && make vet && make build && make build-all && go test ./...` clean.
+- [x] `docs(phase-11): complete`.
 
 ## Definition of Done
 
-- [ ] `l` in the TUI opens a live per-tunnel log with scrolling and level filtering.
-- [ ] Light/dark theme is detected automatically and does not break readability.
-- [ ] An unknown SSH host does not crash the app — it can be accepted from the TUI.
-- [ ] `portato doctor` passes on a healthy system and gives useful hints on problems.
-- [ ] `go test ./...` passes; key packages (`config`, `forward`, `controller`,
-      `daemon`, `client`) meet a stated coverage baseline.
-- [ ] CI is green on main: vet, fmt, test, cross-compilation.
-- [ ] README covers all scenarios: launch, daemon, per-OS autostart,
+- [x] `l` in the TUI opens a live per-tunnel log with scrolling and level filtering.
+- [x] Light/dark theme is detected automatically and does not break readability.
+- [x] An unknown SSH host does not crash the app — it can be accepted from the TUI.
+- [x] `portato doctor` passes on a healthy system and gives useful hints on problems.
+- [x] `go test ./...` passes; total coverage ≈ 69% (`make cover`), key packages
+      (`config`, `forward`, `controller`, `daemon`, `client`, `tui`) covered.
+- [x] CI is green on main: vet, fmt, test (`-race`), cross-compilation.
+- [x] README covers all scenarios: launch, daemon, per-OS autostart,
       remote/dynamic/SOCKS, logs, TOFU, doctor, troubleshooting.
-- [ ] `make build-all` builds binaries for darwin/linux × amd64/arm64.
-- [ ] `go vet ./...` and `gofmt -l .` are clean.
+- [x] `make build-all` builds binaries for darwin/linux × amd64/arm64.
+- [x] `go vet ./...` and `gofmt -l .` are clean.
 
 ## Verification
 

@@ -26,7 +26,7 @@
 | 8   | Dynamic (-D) SOCKS5               | `[x]`  | [phase-8-dynamic-D.md](./phases/phase-8-dynamic-D.md) |
 | 9   | Push events instead of polling    | `[x]`  | [phase-9-push-events.md](./phases/phase-9-push-events.md) |
 | 10  | TUI tunnel editor (e/n/d)         | `[x]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
-| 11  | Polish (logs, themes, CI, doctor) | `[~]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
+| 11  | Polish (logs, themes, CI, doctor) | `[x]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
 | 12  | Robust IPC socket discovery       | `[ ]`  | [phase-12-ipc-discovery.md](./phases/phase-12-ipc-discovery.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
@@ -93,6 +93,15 @@ when a value fills its width, uptime ticks via a local redraw tick, and
 bracketed-paste works in the editor. **Phase 12 — Robust IPC socket discovery**
 is planned to replace the phase-9 `fix(daemon)` patch with a discovery-file +
 runtime-socket design.
+
+**Phase 11 — Polish — done.** The TUI gained a per-tunnel log screen (`l`,
+backed by an in-memory ring-buffer slog handler served standalone and over
+`GET /logs`), automatic light/dark/monochrome theming (`NO_COLOR` /
+`COLORFGBG`), and an interactive unknown-host (TOFU) accept prompt (the key
+is captured at rejection and accepted via `Controller.AcceptHost` /
+`POST /tunnels/{name}/accept-host`). Plus `portato doctor` diagnostics, a
+GitHub Actions CI (vet / fmt / test `-race` / cross-compile), `make build-all`
+and `make cover`, and a refreshed README. Total coverage ≈ 69%.
 
 Phases 1–6 are the detailed MVP plan; 7–12 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design.
 
