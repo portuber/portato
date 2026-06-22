@@ -8,6 +8,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 type Local struct {
@@ -15,6 +16,7 @@ type Local struct {
 	cfg     *config.Config
 	cfgPath string
 	log     *slog.Logger
+	ring    *routelog.Ring
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -26,7 +28,7 @@ type Local struct {
 	done      chan struct{}
 }
 
-func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger) *Local {
+func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ring) *Local {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -36,6 +38,7 @@ func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger) *Local {
 		cfg:     cfg,
 		cfgPath: cfgPath,
 		log:     log,
+		ring:    ring,
 		ctx:     ctx,
 		cancel:  cancel,
 	}

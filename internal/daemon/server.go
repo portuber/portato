@@ -18,6 +18,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -47,6 +48,7 @@ type Server struct {
 	socketPath string
 	pidPath    string
 	log        *slog.Logger
+	logs       *routelog.Ring
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -60,7 +62,7 @@ type Server struct {
 
 // New prepares a daemon for cfg/cfgPath: it resolves the socket and PID paths
 // and refuses to start if another live daemon holds them (stale files are cleaned).
-func New(cfg *config.Config, cfgPath string, log *slog.Logger) (*Server, error) {
+func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ring) (*Server, error) {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -75,12 +77,12 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger) (*Server, error) 
 	if err := ensureNotRunning(pidPath, socketPath); err != nil {
 		return nil, err
 	}
-	s := newServer(nil, cfg, cfgPath, socketPath, pidPath, log)
+	s := newServer(nil, cfg, cfgPath, socketPath, pidPath, log, ring)
 	s.engine = forward.NewEngine(s.ctx, cfg, log)
 	return s, nil
 }
 
-func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, pidPath string, log *slog.Logger) *Server {
+func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, pidPath string, log *slog.Logger, ring *routelog.Ring) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
 		engine:     engine,
@@ -89,6 +91,7 @@ func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, pidPath
 		socketPath: socketPath,
 		pidPath:    pidPath,
 		log:        log,
+		logs:       ring,
 		ctx:        ctx,
 		cancel:     cancel,
 	}

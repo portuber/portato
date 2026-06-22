@@ -72,13 +72,13 @@ func runStandalone(socket string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger, closer, err := routelog.Setup("")
+	logger, ring, closer, err := routelog.Setup("")
 	if err != nil {
 		return fmt.Errorf("setup logger: %w", err)
 	}
 	defer closer.Close()
 
-	ctrl := controller.NewLocal(cfg, path, logger)
+	ctrl := controller.NewLocal(cfg, path, logger, ring)
 	defer ctrl.Close()
 
 	return tui.Run(ctrl, tui.Options{Mode: "standalone", CfgPath: path, SocketPath: socket})

@@ -41,7 +41,7 @@ func newTunnelServer(t *testing.T, yamlContent string) (*Server, *fakeEngine, st
 	}
 	sock := filepath.Join(dir, "portato.sock")
 	fe := newFakeEngine(cfg)
-	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default())
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default(), nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	go s.Start(ctx)
 	if err := waitForFile(sock, 2*time.Second); err != nil {

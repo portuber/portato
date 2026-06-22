@@ -30,13 +30,13 @@ func daemonRunE(_ *cobra.Command, _ []string) error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger, closer, err := routelog.Setup(routelog.DaemonPath())
+	logger, ring, closer, err := routelog.Setup(routelog.DaemonPath())
 	if err != nil {
 		return fmt.Errorf("setup logger: %w", err)
 	}
 	defer closer.Close()
 
-	srv, err := daemon.New(cfg, path, logger)
+	srv, err := daemon.New(cfg, path, logger, ring)
 	if err != nil {
 		return err
 	}

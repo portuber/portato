@@ -179,7 +179,7 @@ func TestServer_RoundTrip(t *testing.T) {
 	sock := filepath.Join(dir, "portato.sock")
 	pid := filepath.Join(dir, "portato.pid")
 	fe := newFakeEngine(cfg)
-	s := newServer(fe, cfg, cfgPath, sock, pid, slog.Default())
+	s := newServer(fe, cfg, cfgPath, sock, pid, slog.Default(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -269,7 +269,7 @@ func TestServer_EnableIdempotent(t *testing.T) {
 	cfg.Save(cfgPath)
 	sock := filepath.Join(dir, "portato.sock")
 	fe := newFakeEngine(cfg)
-	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default())
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -353,7 +353,7 @@ func newEventServer(t *testing.T) (*Server, *fakeEngine, *client.Client, context
 	}
 	sock := filepath.Join(dir, "portato.sock")
 	fe := newFakeEngine(cfg)
-	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default())
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go s.Start(ctx)

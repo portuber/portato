@@ -28,7 +28,7 @@ func TestLocal_ListOrderAndState(t *testing.T) {
 	p := writeConfigFile(t, body)
 	cfg := mustLoad(t, p)
 
-	l := NewLocal(cfg, p, nil)
+	l := NewLocal(cfg, p, nil, nil)
 	got := l.List()
 	if len(got) != 2 {
 		t.Fatalf("List len = %d, want 2", len(got))
@@ -47,7 +47,7 @@ func TestLocal_ListOrderAndState(t *testing.T) {
 func TestLocal_UnknownTunnelErrors(t *testing.T) {
 	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
 	cfg := mustLoad(t, p)
-	l := NewLocal(cfg, p, nil)
+	l := NewLocal(cfg, p, nil, nil)
 
 	for _, fn := range []func(string) error{l.Enable, l.Disable, l.Restart} {
 		if err := fn("nope"); err == nil {
@@ -60,7 +60,7 @@ func TestLocal_UnknownTunnelErrors(t *testing.T) {
 func TestLocal_ReloadAddsTunnel(t *testing.T) {
 	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
 	cfg := mustLoad(t, p)
-	l := NewLocal(cfg, p, nil)
+	l := NewLocal(cfg, p, nil, nil)
 
 	if got := len(l.List()); got != 1 {
 		t.Fatalf("initial List len = %d, want 1", got)
@@ -83,7 +83,7 @@ func TestLocal_ReloadAddsTunnel(t *testing.T) {
 func TestLocal_ReloadBadConfig(t *testing.T) {
 	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
 	cfg := mustLoad(t, p)
-	l := NewLocal(cfg, p, nil)
+	l := NewLocal(cfg, p, nil, nil)
 
 	if err := os.WriteFile(p, []byte("tunnels:\n  - name: bad name\n"), 0o600); err != nil {
 		t.Fatalf("rewrite config: %v", err)
@@ -100,7 +100,7 @@ func TestLocal_ReloadBadConfig(t *testing.T) {
 func TestLocal_EnableDisablePersists(t *testing.T) {
 	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
 	cfg := mustLoad(t, p)
-	l := NewLocal(cfg, p, nil)
+	l := NewLocal(cfg, p, nil, nil)
 	defer l.Close()
 
 	if err := l.Enable("t1"); err != nil {
@@ -125,7 +125,7 @@ func TestLocal_EnableUnknownDoesNotPersist(t *testing.T) {
 		t.Fatalf("read config: %v", err)
 	}
 	cfg := mustLoad(t, p)
-	l := NewLocal(cfg, p, nil)
+	l := NewLocal(cfg, p, nil, nil)
 	defer l.Close()
 
 	if err := l.Enable("nope"); err == nil {
@@ -143,7 +143,7 @@ func TestLocal_EnableUnknownDoesNotPersist(t *testing.T) {
 func TestLocal_ChangesPushesAndCloses(t *testing.T) {
 	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
 	cfg := mustLoad(t, p)
-	l := NewLocal(cfg, p, nil)
+	l := NewLocal(cfg, p, nil, nil)
 	defer l.Close()
 	ch := l.Changes()
 
