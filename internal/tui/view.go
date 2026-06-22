@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
@@ -20,9 +21,25 @@ const (
 )
 
 func (m Model) View() tea.View {
-	v := tea.NewView(m.render())
+	content := m.render()
+	if surfaceBg != nil && m.width > 0 && m.height > 0 {
+		content = fillBg(content, surfaceBg, m.width, m.height)
+	}
+	v := tea.NewView(content)
 	v.AltScreen = true
 	return v
+}
+
+// fillBg paints bg across the whole TUI surface: each line is padded to width
+// and the content is padded to height, all with bg-coloured cells. This turns
+// the light theme into a real "light mode" (a light page) instead of just
+// recoloured glyphs on the terminal's own background. A no-op when bg is nil
+// or the dimensions are unknown (before the first WindowSizeMsg).
+func fillBg(content string, bg color.Color, width, height int) string {
+	if bg == nil || width <= 0 || height <= 0 {
+		return content
+	}
+	return lipgloss.NewStyle().Background(bg).Width(width).Height(height).Render(content)
 }
 
 func (m Model) render() string {

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"image/color"
 	"os"
 	"strconv"
 	"strings"
@@ -70,6 +71,10 @@ type palette struct {
 	editorTitle lipgloss.Style
 	editorLabel lipgloss.Style
 	state       map[controller.State]lipgloss.Style
+	// surfaceBg, when non-nil, is painted across the whole TUI surface (a
+	// real "light mode" background). Nil = transparent (use the terminal's
+	// own background). Only the light theme sets it.
+	surfaceBg color.Color
 }
 
 func resolvePalette(kind themeKind) palette {
@@ -135,6 +140,7 @@ func lightPalette() palette {
 			controller.Reconnecting: lipgloss.NewStyle().Foreground(lipgloss.Color("130")),
 			controller.Error:        lipgloss.NewStyle().Foreground(lipgloss.Color("124")),
 		},
+		surfaceBg: lipgloss.Color("230"),
 	}
 }
 

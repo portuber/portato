@@ -80,4 +80,15 @@ func TestResolvePaletteAllKinds(t *testing.T) {
 			}
 		}
 	}
+	// Only the light theme paints a surface background (real light mode);
+	// dark and mono stay transparent.
+	if darkPalette().surfaceBg != nil {
+		t.Errorf("dark theme should not paint a surface background")
+	}
+	if monoPalette().surfaceBg != nil {
+		t.Errorf("mono theme should not paint a surface background")
+	}
+	if lightPalette().surfaceBg == nil {
+		t.Errorf("light theme should paint a surface background")
+	}
 }

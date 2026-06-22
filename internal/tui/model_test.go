@@ -558,6 +558,24 @@ func TestRenderCursorGlyph(t *testing.T) {
 	}
 }
 
+// TestFillBg verifies the light-theme surface fill: a no-op without a colour
+// or unknown dimensions, and a height-padded fill with them.
+func TestFillBg(t *testing.T) {
+	if got := fillBg("hi", nil, 10, 10); got != "hi" {
+		t.Errorf("fillBg with nil bg should be a no-op, got %q", got)
+	}
+	if got := fillBg("hi", lipgloss.Color("230"), 0, 0); got != "hi" {
+		t.Errorf("fillBg with zero dims should be a no-op, got %q", got)
+	}
+	got := fillBg("hi", lipgloss.Color("230"), 12, 5)
+	if !strings.Contains(got, "hi") {
+		t.Errorf("fillBg lost the content: %q", got)
+	}
+	if lines := strings.Count(got, "\n") + 1; lines < 5 {
+		t.Errorf("fillBg should pad to height 5, got %d lines", lines)
+	}
+}
+
 func TestRenderErrorIndicatorDistinct(t *testing.T) {
 	f := newFake(controller.Status{Name: "x", Type: "local", Local: "1", Remote: "r", State: controller.Error, Error: "listen fail"})
 	m := New(f, Options{Mode: "standalone"})

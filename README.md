@@ -149,7 +149,9 @@ systemctl --user disable --now portato   # stop (or `portato uninstall`)
 - **Themes** — the TUI picks a palette automatically: `NO_COLOR` forces
   monochrome, `COLORFGBG="fg;bg"` selects dark (bg ≤ 6) vs light, default dark.
   Force one explicitly with `PORTATO_THEME=light|dark|mono` (or `auto` to fall
-  back to the automatic detection).
+  back to the automatic detection). The light theme paints a light background
+  across the whole surface (a real light mode), so it reads as a strong inverse
+  of dark regardless of your terminal's own background.
 - **`portato doctor`** — checks config validity, identity keys and `ssh-agent`,
   `known_hosts`, daemon reachability and socket permissions, and (Linux)
   lingering. Prints a `✓`/`✗` line per check and exits non-zero on any failure.
