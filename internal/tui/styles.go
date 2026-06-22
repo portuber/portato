@@ -1,31 +1,25 @@
 package tui
 
-import (
-	"charm.land/lipgloss/v2"
-	"github.com/kipkaev55/portato/internal/controller"
-)
+// All TUI styles resolve through a single palette chosen by detectKind() at
+// package init (Phase 11: dark / light / monochrome). The package-level
+// variables below are aliases into that palette, so view.go / editor.go /
+// logs.go reference them unchanged regardless of the active theme.
+var pal = resolvePalette(detectKind())
 
 var (
-	titleStyle    = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-	modeStyle     = lipgloss.NewStyle().Faint(true)
-	headerStyle   = lipgloss.NewStyle().Bold(true).Faint(true)
-	selectedStyle = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("63")).Foreground(lipgloss.Color("15"))
-	dimStyle      = lipgloss.NewStyle().Faint(true)
-	errorStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
-	warnStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
-	footerStyle   = lipgloss.NewStyle().Faint(true)
-	helpTitle     = lipgloss.NewStyle().Bold(true).Underline(true)
-	helpPanel     = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 2)
-	modalStyle    = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(1, 3).Bold(true)
-
-	editorTitleStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63"))
-	editorLabelStyle = lipgloss.NewStyle().Bold(true)
+	titleStyle       = pal.title
+	modeStyle        = pal.mode
+	headerStyle      = pal.header
+	selectedStyle    = pal.selected
+	dimStyle         = pal.dim
+	errorStyle       = pal.err
+	warnStyle        = pal.warn
+	footerStyle      = pal.footer
+	helpTitle        = pal.helpTitle
+	helpPanel        = pal.helpPanel
+	modalStyle       = pal.modal
+	editorTitleStyle = pal.editorTitle
+	editorLabelStyle = pal.editorLabel
 )
 
-var stateStyle = map[controller.State]lipgloss.Style{
-	controller.Off:          lipgloss.NewStyle().Foreground(lipgloss.Color("245")),
-	controller.Connecting:   lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
-	controller.Connected:    lipgloss.NewStyle().Foreground(lipgloss.Color("2")),
-	controller.Reconnecting: lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
-	controller.Error:        lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
-}
+var stateStyle = pal.state
