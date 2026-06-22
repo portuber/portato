@@ -14,6 +14,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.editor != nil {
 			return m, m.editor.update(msg)
 		}
+		if m.logs != nil {
+			return m, m.logs.update(msg)
+		}
 		return m, nil
 	case tickMsg:
 		if m.handoffing {
@@ -21,11 +24,19 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.list = m.ctrl.List()
 		m.clampCursor()
+		if m.logs != nil {
+			m.logs.refresh()
+		}
 		return m, waitForChange(m.ctrl.Changes())
 	case redrawTickMsg:
 		// Local re-render tick: refreshes time-based display fields (uptime)
 		// without fetching from the controller. Re-arm; the change-waiter is
 		// an independent pending command. See redrawTickMsg in model.go.
+		// The logs screen (transient modal) does re-fetch here — acceptable:
+		// it is not the idle tunnel-status path Phase 9 made push-driven.
+		if m.logs != nil {
+			m.logs.refresh()
+		}
 		return m, redrawTick()
 	case handoffDoneMsg:
 		m.handoffing = false
@@ -39,6 +50,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmd := m.editor.update(msg)
 			if m.editor.done {
 				m.editor = nil
+			}
+			return m, cmd
+		}
+		if m.logs != nil {
+			cmd := m.logs.update(msg)
+			if m.logs.done {
+				m.logs = nil
 			}
 			return m, cmd
 		}
@@ -113,6 +131,10 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.hasCurrent() {
 			m.confirmDelete = true
 			m.deleteTarget = m.list[m.cursor].Name
+		}
+	case "l":
+		if m.hasCurrent() {
+			m.logs = newLogsView(m.ctrl, m.list[m.cursor].Name, m.width, m.height)
 		}
 	}
 	return m, nil

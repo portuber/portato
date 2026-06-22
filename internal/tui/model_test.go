@@ -26,6 +26,7 @@ type fakeCtrl struct {
 	deletes   []string
 	cfg       *config.Config
 	tunErr    error // returned by Add/Update/Delete when set
+	logs      []routelog.Entry
 	changes   chan struct{}
 }
 
@@ -110,7 +111,13 @@ func (f *fakeCtrl) DeleteTunnel(name string) error {
 	return nil
 }
 
-func (f *fakeCtrl) Logs(string) ([]routelog.Entry, error) { return nil, nil }
+func (f *fakeCtrl) Logs(string) ([]routelog.Entry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]routelog.Entry, len(f.logs))
+	copy(out, f.logs)
+	return out, nil
+}
 
 func newFake(statuses ...controller.Status) *fakeCtrl {
 	cp := make([]controller.Status, len(statuses))
@@ -690,5 +697,77 @@ func TestModel_DeleteConfirmCancel(t *testing.T) {
 		}
 		m.confirmDelete = true
 		m.deleteTarget = "db"
+	}
+}
+
+func TestModel_LogsKeyOpensScreen(t *testing.T) {
+	f := newFake(controller.Status{Name: "db"})
+	f.logs = []routelog.Entry{
+		{Tunnel: "db", Msg: "connected", Level: 0},         // info → shown by default
+		{Tunnel: "db", Msg: "socks5 handshake", Level: -4}, // debug → hidden by default
+	}
+	m := New(f, Options{Mode: "standalone"})
+	m.width, m.height = 80, 24
+
+	next, _ := m.handleKey(keyPress("l"))
+	mm := next.(Model)
+	if mm.logs == nil {
+		t.Fatal("l should open the logs screen")
+	}
+	out := mm.render()
+	if !strings.Contains(out, "connected") || !strings.Contains(out, "Logs") {
+		t.Errorf("logs render should contain the entries\ngot:\n%s", out)
+	}
+	if strings.Contains(out, "socks5 handshake") {
+		t.Errorf("debug entry should be hidden by default\ngot:\n%s", out)
+	}
+
+	// L toggles debug on → the debug entry appears.
+	if mm.logs.update(keyPress("L")) != nil {
+	}
+	if mm.logs == nil {
+		t.Fatal("L should keep the logs screen open")
+	}
+	if out := mm.render(); !strings.Contains(out, "socks5 handshake") {
+		t.Errorf("debug entry should show after toggling debug\ngot:\n%s", out)
+	}
+
+	// l / esc closes the screen.
+	for _, k := range []string{"l", "esc"} {
+		mm2 := New(f, Options{Mode: "standalone"})
+		mm2.logs = newLogsView(f, "db", 60, 20)
+		nn, _ := mm2.Update(keyPress(k))
+		mm3 := nn.(Model)
+		if mm3.logs != nil {
+			t.Errorf("%s should close the logs screen", k)
+		}
+	}
+}
+
+func TestRenderLogsFormatsEntries(t *testing.T) {
+	entries := []routelog.Entry{
+		{Msg: "first", Level: 0},
+		{Msg: "second", Level: 8},
+	}
+	out := renderLogs(entries)
+	if !strings.Contains(out, "first") || !strings.Contains(out, "second") {
+		t.Errorf("renderLogs missing entries: %s", out)
+	}
+	if strings.Count(out, "\n") < 2 {
+		t.Errorf("renderLogs should put each entry on its own line: %s", out)
+	}
+}
+
+func TestFilterLevelHidesDebugByDefault(t *testing.T) {
+	in := []routelog.Entry{
+		{Msg: "dbg", Level: -4},
+		{Msg: "inf", Level: 0},
+		{Msg: "err", Level: 8},
+	}
+	if got := filterLevel(in, false); len(got) != 2 {
+		t.Errorf("filterLevel(debug=false) = %d entries, want 2", len(got))
+	}
+	if got := filterLevel(in, true); len(got) != 3 {
+		t.Errorf("filterLevel(debug=true) = %d entries, want 3", len(got))
 	}
 }

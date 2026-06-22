@@ -32,6 +32,9 @@ type Model struct {
 	confirmDelete bool
 	deleteTarget  string
 
+	// logs is the Phase 11 per-tunnel log screen sub-model (nil when inactive).
+	logs *logsView
+
 	cfgPath   string
 	socketURI string
 

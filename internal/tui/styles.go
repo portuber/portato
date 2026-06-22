@@ -12,6 +12,7 @@ var (
 	selectedStyle = lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("63")).Foreground(lipgloss.Color("15"))
 	dimStyle      = lipgloss.NewStyle().Faint(true)
 	errorStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("1"))
+	warnStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
 	footerStyle   = lipgloss.NewStyle().Faint(true)
 	helpTitle     = lipgloss.NewStyle().Bold(true).Underline(true)
 	helpPanel     = lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 2)
