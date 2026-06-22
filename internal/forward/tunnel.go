@@ -335,7 +335,8 @@ func (t *Tunnel) handleConn(client *ssh.Client, conn net.Conn) {
 // on the server side. No auth (loopback bind only).
 func (t *Tunnel) handleDynamicConn(client *ssh.Client, conn net.Conn) {
 	srv, err := socks5.New(&socks5.Config{
-		Logger: socks5SilencedLogger,
+		Logger:   socks5SilencedLogger,
+		Resolver: loggingResolver{inner: socks5.DNSResolver{}, log: t.log},
 		Dial: func(_ context.Context, network, addr string) (net.Conn, error) {
 			c, derr := client.Dial(network, addr)
 			if derr != nil {
@@ -354,6 +355,26 @@ func (t *Tunnel) handleDynamicConn(client *ssh.Client, conn net.Conn) {
 	if err := srv.ServeConn(conn); err != nil {
 		t.log.Debug("socks5 connection ended", "err", err)
 	}
+}
+
+// loggingResolver wraps go-socks5's name resolver so SOCKS destination
+// resolution is visible in the logs screen: a resolved name logs the hostname
+// + IP at Debug, and a name that fails to resolve logs a Warn (symmetric with
+// socks5 dial failed) — otherwise a typo'd/non-existent host would surface only
+// as an opaque ServeConn error. inner is injectable for tests.
+type loggingResolver struct {
+	inner socks5.NameResolver
+	log   *slog.Logger
+}
+
+func (r loggingResolver) Resolve(ctx context.Context, name string) (context.Context, net.IP, error) {
+	c, ip, err := r.inner.Resolve(ctx, name)
+	if err != nil {
+		r.log.Warn("socks5 resolve failed", "name", name, "err", err)
+		return c, nil, err
+	}
+	r.log.Debug("socks5 resolve", "name", name, "ip", ip.String())
+	return c, ip, nil
 }
 
 // runRemote is the reconnect loop for a type=remote (-R) tunnel. The listener
@@ -476,7 +497,10 @@ func (t *Tunnel) handleRemoteConn(conn net.Conn) {
 		_ = conn.Close()
 		return
 	}
-	t.log.Debug("connection forwarded", "local", target)
+	// conn.RemoteAddr() is the originator the SSH server reported for this
+	// forwarded-tcpip channel (RFC 4254 §7.2): a real external IP when the
+	// server-side port is reachable (GatewayPorts), else 127.0.0.1.
+	t.log.Debug("connection forwarded", "local", target, "peer", conn.RemoteAddr())
 	pipe(conn, local)
 }
 
