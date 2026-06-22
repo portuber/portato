@@ -68,6 +68,14 @@ type Status struct {
 	State       State     `json:"state"`
 	Error       string    `json:"error,omitempty"`
 	ConnectedAt time.Time `json:"connected_at"`
+
+	// TOFU (Phase 11): when the tunnel is blocked by an unknown SSH host key
+	// (accept_new_hosts: false), these carry the offending host, its
+	// fingerprint and a ready-to-append known_hosts line so the TUI can offer
+	// to accept it. Empty when not applicable.
+	PendingHost        string `json:"pending_host,omitempty"`
+	PendingFingerprint string `json:"pending_fingerprint,omitempty"`
+	PendingHostLine    string `json:"pending_host_line,omitempty"`
 }
 
 func (s Status) Uptime() time.Duration {

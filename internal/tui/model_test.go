@@ -27,6 +27,7 @@ type fakeCtrl struct {
 	cfg       *config.Config
 	tunErr    error // returned by Add/Update/Delete when set
 	logs      []routelog.Entry
+	accepted  []string
 	changes   chan struct{}
 }
 
@@ -117,6 +118,13 @@ func (f *fakeCtrl) Logs(string) ([]routelog.Entry, error) {
 	out := make([]routelog.Entry, len(f.logs))
 	copy(out, f.logs)
 	return out, nil
+}
+
+func (f *fakeCtrl) AcceptHost(name string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.accepted = append(f.accepted, name)
+	return f.tunErr
 }
 
 func newFake(statuses ...controller.Status) *fakeCtrl {
@@ -769,5 +777,48 @@ func TestFilterLevelHidesDebugByDefault(t *testing.T) {
 	}
 	if got := filterLevel(in, true); len(got) != 3 {
 		t.Errorf("filterLevel(debug=true) = %d entries, want 3", len(got))
+	}
+}
+
+// TestModel_AcceptHostModalSpaceOpens guards the Phase 11 TOFU flow: pressing
+// space on a tunnel blocked by an unknown host key opens the accept modal
+// (instead of toggling), y accepts via Controller.AcceptHost, and n/esc cancel.
+func TestModel_AcceptHostModalSpaceOpens(t *testing.T) {
+	f := newFake(controller.Status{
+		Name: "db", State: controller.Error,
+		PendingHost: "h.example.com:22", PendingFingerprint: "SHA256:abc", PendingHostLine: "h ssh-ed25519 AAAA",
+	})
+	m := New(f, Options{Mode: "standalone"})
+
+	next, _ := m.handleKey(specialKey(tea.KeySpace))
+	mm := next.(Model)
+	if !mm.confirmAccept || mm.acceptTarget != "db" {
+		t.Fatalf("space on pending-host tunnel should open accept modal: confirm=%v target=%q", mm.confirmAccept, mm.acceptTarget)
+	}
+	out := mm.render()
+	for _, want := range []string{"Unknown host key", "h.example.com:22", "SHA256:abc"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("accept modal missing %q\ngot:\n%s", want, out)
+		}
+	}
+
+	// y accepts → AcceptHost called, modal cleared.
+	next, _ = mm.Update(keyPress("y"))
+	mm = next.(Model)
+	if mm.confirmAccept {
+		t.Error("y should clear the modal")
+	}
+	if len(f.accepted) != 1 || f.accepted[0] != "db" {
+		t.Errorf("AcceptHost(db) expected, got %v", f.accepted)
+	}
+
+	// Fresh modal, n cancels without accepting.
+	f2 := newFake(controller.Status{Name: "db", State: controller.Error, PendingHost: "h:22", PendingHostLine: "x"})
+	m2 := New(f2, Options{Mode: "standalone"})
+	m2.handleKey(specialKey(tea.KeySpace)) // raise modal on m2
+	mm2, _ := m2.Update(keyPress("n"))
+	m3 := mm2.(Model)
+	if m3.confirmAccept || len(f2.accepted) != 0 {
+		t.Errorf("n should cancel without accepting: confirm=%v accepted=%v", m3.confirmAccept, f2.accepted)
 	}
 }

@@ -28,6 +28,7 @@ type daemonClient interface {
 	UpdateTunnel(name string, t config.Tunnel) error
 	DeleteTunnel(name string) error
 	Logs(name string) ([]routelog.Entry, error)
+	AcceptHost(name string) error
 }
 
 // Remote is a Controller backed by the daemon via an HTTP client over a unix
@@ -88,6 +89,10 @@ func (r *Remote) DeleteTunnel(name string) error { return r.client.DeleteTunnel(
 // Logs fetches the daemon's recent in-memory log entries for the TUI logs
 // screen. The daemon owns the ring buffer. Phase 11.
 func (r *Remote) Logs(name string) ([]routelog.Entry, error) { return r.client.Logs(name) }
+
+// AcceptHost asks the daemon to append the tunnel's pending unknown-host key
+// and restart it (Phase 11 TOFU prompt).
+func (r *Remote) AcceptHost(name string) error { return r.client.AcceptHost(name) }
 
 // Changes returns the push channel fed by the daemon's /events SSE stream.
 // A goroutine reads frames, reconnects on break with exponential backoff,

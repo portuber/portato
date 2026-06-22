@@ -46,6 +46,13 @@ type Tunnel struct {
 	cancel      context.CancelFunc
 	done        chan struct{}
 
+	// TOFU (Phase 11): the last rejected unknown host key, captured by the
+	// host-key callback via recordUnknownHost. Surfaced through Status so the
+	// TUI can offer to accept it (and AcceptHost appends PendingHostLine).
+	pendingHost        string
+	pendingFingerprint string
+	pendingHostLine    string
+
 	// onChange is wired by the Engine (Phase 9) so every state transition
 	// fans out to event subscribers. Nil-safe: standalone tests / fakes
 	// leave it unset. Fires after the state mutex is released.
@@ -196,14 +203,47 @@ func (t *Tunnel) Status() Status {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return Status{
-		Name:        t.cfg.Name,
-		Type:        t.cfg.Type,
-		Local:       t.cfg.ListenAddr(),
-		Remote:      t.cfg.Remote,
-		State:       t.state,
-		Error:       t.errMsg,
-		ConnectedAt: t.connectedAt,
+		Name:               t.cfg.Name,
+		Type:               t.cfg.Type,
+		Local:              t.cfg.ListenAddr(),
+		Remote:             t.cfg.Remote,
+		State:              t.state,
+		Error:              t.errMsg,
+		ConnectedAt:        t.connectedAt,
+		PendingHost:        t.pendingHost,
+		PendingFingerprint: t.pendingFingerprint,
+		PendingHostLine:    t.pendingHostLine,
 	}
+}
+
+// recordUnknownHost is the hostKeySink wired into dialSSH: it remembers the
+// rejected key so Status can surface it for the TUI TOFU prompt. Called from
+// the dial goroutine; t.mu is taken here.
+func (t *Tunnel) recordUnknownHost(host, fingerprint, line string) {
+	t.mu.Lock()
+	t.pendingHost = host
+	t.pendingFingerprint = fingerprint
+	t.pendingHostLine = line
+	t.mu.Unlock()
+}
+
+// clearPendingHost forgets a previously recorded unknown host key. Called at
+// the start of each dial attempt so a stale entry does not outlive the
+// rejection that produced it.
+func (t *Tunnel) clearPendingHost() {
+	t.mu.Lock()
+	t.pendingHost = ""
+	t.pendingFingerprint = ""
+	t.pendingHostLine = ""
+	t.mu.Unlock()
+}
+
+// PendingHostLine returns the known_hosts line for the last rejected unknown
+// host (and ok=false when there is none). AcceptHost (controller) reads it.
+func (t *Tunnel) PendingHostLine() (line string, ok bool) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.pendingHostLine, t.pendingHostLine != ""
 }
 
 func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{}) {
@@ -216,7 +256,8 @@ func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{})
 			return
 		}
 		t.setState(Connecting)
-		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log)
+		t.clearPendingHost()
+		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost)
 		if err != nil {
 			t.setStateErr(Error, err.Error())
 			attempt++
@@ -320,7 +361,8 @@ func (t *Tunnel) runRemote(ctx context.Context, done chan<- struct{}) {
 			return
 		}
 		t.setState(Connecting)
-		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log)
+		t.clearPendingHost()
+		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost)
 		if err != nil {
 			t.setStateErr(Error, err.Error())
 			attempt++

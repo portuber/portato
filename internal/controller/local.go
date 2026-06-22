@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -127,6 +128,32 @@ func (l *Local) DeleteTunnel(name string) error {
 // buffer (nil-safe: an unconfigured ring yields nil). Phase 11.
 func (l *Local) Logs(name string) ([]routelog.Entry, error) {
 	return l.ring.Lines(name), nil
+}
+
+// AcceptHost appends the tunnel's pending unknown-host key to known_hosts and
+// restarts it (Phase 11 TOFU). The pending line was captured by the SSH
+// host-key callback at rejection time and carried through Status.
+func (l *Local) AcceptHost(name string) error {
+	line := pendingHostLine(l.engine.List(), name)
+	if line == "" {
+		return fmt.Errorf("no pending host key for %q", name)
+	}
+	hosts := l.cfg.Defaults.ResolvedKnownHosts()
+	if err := forward.AppendKnownHostLine(hosts, line); err != nil {
+		return fmt.Errorf("append known_hosts: %w", err)
+	}
+	return l.engine.Restart(name)
+}
+
+// pendingHostLine finds the captured known_hosts line for name in a status
+// snapshot. Returns "" when the tunnel has no pending key.
+func pendingHostLine(statuses []forward.Status, name string) string {
+	for _, st := range statuses {
+		if st.Name == name {
+			return st.PendingHostLine
+		}
+	}
+	return ""
 }
 
 func (l *Local) setEnabled(name string, enabled bool) {

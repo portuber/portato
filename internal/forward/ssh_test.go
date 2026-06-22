@@ -1,6 +1,9 @@
 package forward
 
 import (
+	"crypto/ed25519"
+	crand "crypto/rand"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -149,5 +152,104 @@ func TestUnknownHostErrorMessage(t *testing.T) {
 	}
 	if strings.HasPrefix(msg, "unknown host ") {
 		t.Errorf("error %q should not read like a DNS 'unknown host' error", msg)
+	}
+}
+
+// TestWrapHostKey_CapturesRejectedKey proves the Phase 11 TOFU sink fires
+// when an unknown host is rejected (accept_new_hosts: false): the callback
+// returns an unknownHostError AND reports the host, fingerprint and a ready
+// known_hosts line through the sink.
+func TestWrapHostKey_CapturesRejectedKey(t *testing.T) {
+	pub, _, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	sshPub, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		t.Fatalf("new public key: %v", err)
+	}
+	// A base callback that behaves like knownhosts on a first connect:
+	// returns a KeyError with empty Want (no recorded key for this host).
+	base := ssh.HostKeyCallback(func(string, net.Addr, ssh.PublicKey) error {
+		return &knownhosts.KeyError{}
+	})
+
+	var gotHost, gotFP, gotLine string
+	var sinkCalled bool
+	sink := hostKeySink(func(host, fp, line string) {
+		sinkCalled = true
+		gotHost, gotFP, gotLine = host, fp, line
+	})
+
+	cb := wrapHostKey("/dev/null", base, false, nil, sink)
+	err = cb("h.example.com:22", nil, sshPub)
+	if err == nil {
+		t.Fatal("expected unknownHostError, got nil")
+	}
+	if !sinkCalled {
+		t.Fatal("sink should be called on unknown-host rejection")
+	}
+	if gotHost != "h.example.com:22" {
+		t.Errorf("sink host = %q", gotHost)
+	}
+	if !strings.HasPrefix(gotFP, "SHA256:") {
+		t.Errorf("sink fingerprint = %q, want SHA256:…", gotFP)
+	}
+	// The captured line must be appendable and resolve back to this host/key.
+	if !strings.Contains(gotLine, "ssh-ed25519") {
+		t.Errorf("sink line = %q, want an ssh-ed25519 entry", gotLine)
+	}
+
+	// Round-trip: appending the captured line makes the real knownhosts
+	// callback accept the same key.
+	hostsFile := filepath.Join(t.TempDir(), "known_hosts")
+	if err := AppendKnownHostLine(hostsFile, gotLine); err != nil {
+		t.Fatalf("AppendKnownHostLine: %v", err)
+	}
+	realCb, err := knownhosts.New(hostsFile)
+	if err != nil {
+		t.Fatalf("knownhosts.New: %v", err)
+	}
+	if err := realCb("h.example.com:22", &net.TCPAddr{}, sshPub); err != nil {
+		t.Errorf("after append, key should be trusted: %v", err)
+	}
+}
+
+// TestWrapHostKey_NilSinkSafe ensures a nil sink never panics.
+func TestWrapHostKey_NilSinkSafe(t *testing.T) {
+	pub, _, err := ed25519.GenerateKey(crand.Reader)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	sshPub, err := ssh.NewPublicKey(pub)
+	if err != nil {
+		t.Fatalf("new public key: %v", err)
+	}
+	base := ssh.HostKeyCallback(func(string, net.Addr, ssh.PublicKey) error {
+		return &knownhosts.KeyError{}
+	})
+	cb := wrapHostKey("/dev/null", base, false, nil, nil)
+	if err := cb("h:22", nil, sshPub); err == nil {
+		t.Fatal("expected unknownHostError even with nil sink")
+	}
+}
+
+// TestAppendKnownHostLine_CreatesFile ensures the accept path creates the
+// known_hosts file (and its directory) owner-only when it does not exist.
+func TestAppendKnownHostLine_CreatesFile(t *testing.T) {
+	dir := t.TempDir()
+	hostsFile := filepath.Join(dir, "nested", "known_hosts")
+	if err := AppendKnownHostLine(hostsFile, "h ssh-ed25519 AAAA"); err != nil {
+		t.Fatalf("AppendKnownHostLine: %v", err)
+	}
+	data, err := os.ReadFile(hostsFile)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if !strings.Contains(string(data), "h ssh-ed25519 AAAA") {
+		t.Errorf("file content = %q", data)
+	}
+	if info, _ := os.Stat(hostsFile); info.Mode().Perm() != 0o600 {
+		t.Errorf("perm = %o, want 0600", info.Mode().Perm())
 	}
 }

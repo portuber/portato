@@ -175,6 +175,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /tunnels/{name}/enable", s.handleEnable)
 	mux.HandleFunc("POST /tunnels/{name}/disable", s.handleDisable)
 	mux.HandleFunc("POST /tunnels/{name}/restart", s.handleRestart)
+	mux.HandleFunc("POST /tunnels/{name}/accept-host", s.handleAcceptHost)
 	mux.HandleFunc("POST /reload", s.handleReload)
 	mux.HandleFunc("GET /config", s.handleGetConfig)
 	mux.HandleFunc("POST /tunnels", s.handleAddTunnel)
@@ -312,6 +313,40 @@ func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "restarted", "tunnel": name})
+}
+
+// handleAcceptHost appends the tunnel's pending unknown-host key (captured by
+// the SSH host-key callback) to known_hosts and restarts it, so the tunnel
+// connects on the next dial. Phase 11 TUI TOFU prompt.
+func (s *Server) handleAcceptHost(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasTunnel(name) {
+		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+		return
+	}
+	line := ""
+	for _, st := range s.engine.List() {
+		if st.Name == name {
+			line = st.PendingHostLine
+			break
+		}
+	}
+	if line == "" {
+		writeError(w, http.StatusConflict, "no pending host key for %q", name)
+		return
+	}
+	hosts := s.cfg.Defaults.ResolvedKnownHosts()
+	if err := forward.AppendKnownHostLine(hosts, line); err != nil {
+		writeError(w, http.StatusInternalServerError, "append known_hosts: %v", err)
+		return
+	}
+	if err := s.engine.Restart(name); err != nil {
+		writeError(w, http.StatusInternalServerError, "restart: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "accepted", "tunnel": name})
 }
 
 func (s *Server) handleReload(w http.ResponseWriter, _ *http.Request) {

@@ -35,6 +35,9 @@ func (m Model) render() string {
 	if m.confirmDelete {
 		return m.centered(m.confirmDeleteView())
 	}
+	if m.confirmAccept {
+		return m.centered(m.confirmAcceptView())
+	}
 	if m.confirmQuit {
 		return m.centered(m.confirmQuitView())
 	}
@@ -215,6 +218,25 @@ func (m Model) confirmQuitView() string {
 // active tunnel (via the engine reload) and removes it from the config.
 func (m Model) confirmDeleteView() string {
 	line := fmt.Sprintf("Delete tunnel %q?\nThis stops it if active and removes it from the config. [y/N]", m.deleteTarget)
+	return modalStyle.Render(line)
+}
+
+// confirmAcceptView renders the Phase 11 TOFU modal: the tunnel is blocked by
+// an unknown SSH host key, and the user can accept it (append to known_hosts
+// and restart) or cancel.
+func (m Model) confirmAcceptView() string {
+	host, fp := m.acceptTarget, ""
+	for _, s := range m.list {
+		if s.Name == m.acceptTarget {
+			host = s.PendingHost
+			fp = s.PendingFingerprint
+			break
+		}
+	}
+	line := fmt.Sprintf(
+		"Unknown host key for %s\nhost: %s\nfingerprint: %s\n[y] accept & restart  ·  [n/esc] cancel",
+		m.acceptTarget, host, fp,
+	)
 	return modalStyle.Render(line)
 }
 

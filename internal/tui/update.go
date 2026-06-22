@@ -63,6 +63,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirmDelete {
 			return m.handleDeleteConfirm(msg)
 		}
+		if m.confirmAccept {
+			return m.handleAcceptConfirm(msg)
+		}
 		return m.handleKey(msg)
 	case tea.PasteMsg:
 		// Bracketed-paste is only meaningful in the editor's text fields; in
@@ -106,6 +109,11 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.cursor++
 		}
 	case "space":
+		if m.hasCurrent() && m.list[m.cursor].PendingHost != "" {
+			m.confirmAccept = true
+			m.acceptTarget = m.list[m.cursor].Name
+			return m, nil
+		}
 		(&m).toggleCurrent()
 	case "r":
 		(&m).restartCurrent()
@@ -154,6 +162,24 @@ func (m Model) handleDeleteConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "n", "enter", "esc":
 		m.confirmDelete = false
 		m.deleteTarget = ""
+	}
+	return m, nil
+}
+
+// handleAcceptConfirm dispatches the "accept unknown host key?" modal keys.
+// y/a appends the key (Controller.AcceptHost) and restarts the tunnel;
+// n/enter/esc dismiss the modal without changing anything. Phase 11 TOFU.
+func (m Model) handleAcceptConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "y", "a":
+		name := m.acceptTarget
+		m.confirmAccept = false
+		m.acceptTarget = ""
+		_ = m.ctrl.AcceptHost(name)
+		m.list = m.ctrl.List()
+	case "n", "enter", "esc":
+		m.confirmAccept = false
+		m.acceptTarget = ""
 	}
 	return m, nil
 }

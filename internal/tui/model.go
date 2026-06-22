@@ -32,6 +32,11 @@ type Model struct {
 	confirmDelete bool
 	deleteTarget  string
 
+	// confirmAccept shows the "accept unknown host key?" modal (Phase 11 TOFU).
+	// Raised by pressing space on a tunnel blocked by an unknown SSH host key.
+	confirmAccept bool
+	acceptTarget  string
+
 	// logs is the Phase 11 per-tunnel log screen sub-model (nil when inactive).
 	logs *logsView
 

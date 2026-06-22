@@ -45,4 +45,10 @@ type Controller interface {
 	// The TUI logs screen (l) reads this; in standalone it is the local ring,
 	// in attach it is fetched from the daemon. Phase 11.
 	Logs(name string) ([]routelog.Entry, error)
+
+	// AcceptHost appends the tunnel's pending unknown-host key (captured when
+	// accept_new_hosts is false) to known_hosts and restarts the tunnel so it
+	// connects. It errors when the tunnel has no pending key. Phase 11 (TOFU
+	// prompt in the TUI).
+	AcceptHost(name string) error
 }

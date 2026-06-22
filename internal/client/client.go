@@ -98,6 +98,13 @@ func (c *Client) Restart(name string) error {
 	return err
 }
 
+// AcceptHost appends the tunnel's pending unknown-host key to known_hosts on
+// the daemon and restarts the tunnel (Phase 11 TOFU prompt).
+func (c *Client) AcceptHost(name string) error {
+	_, err := c.post(fmt.Sprintf("/tunnels/%s/accept-host", name))
+	return err
+}
+
 // Reload makes the daemon re-read the config from disk.
 func (c *Client) Reload() error {
 	_, err := c.post("/reload")

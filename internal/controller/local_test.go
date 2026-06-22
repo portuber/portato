@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/kipkaev55/portato/internal/config"
+	"github.com/kipkaev55/portato/internal/forward"
 )
 
 const oneTunnel = "  - name: t1\n    type: local\n    local: \"19999\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
@@ -165,4 +166,34 @@ func mustLoad(t *testing.T, p string) *config.Config {
 		t.Fatalf("config.Load: %v", err)
 	}
 	return cfg
+}
+
+// TestPendingHostLineLookup exercises the helper behind AcceptHost (Phase 11
+// TOFU): it finds the captured known_hosts line for a tunnel, and returns ""
+// for an unknown tunnel or one without a pending key.
+func TestPendingHostLineLookup(t *testing.T) {
+	statuses := []forward.Status{
+		{Name: "a", PendingHostLine: "a ssh-ed25519 AAAA"},
+		{Name: "b"},
+	}
+	if got := pendingHostLine(statuses, "a"); got != "a ssh-ed25519 AAAA" {
+		t.Errorf("pendingHostLine(a) = %q", got)
+	}
+	if got := pendingHostLine(statuses, "b"); got != "" {
+		t.Errorf("pendingHostLine(b) = %q, want empty", got)
+	}
+	if got := pendingHostLine(statuses, "missing"); got != "" {
+		t.Errorf("pendingHostLine(missing) = %q, want empty", got)
+	}
+}
+
+// TestLocal_AcceptHostNoPending proves AcceptHost fails cleanly when the
+// tunnel has no captured key (e.g. it was never rejected).
+func TestLocal_AcceptHostNoPending(t *testing.T) {
+	p := writeConfigFile(t, "tunnels:\n  - name: t1\n    type: local\n    local: \"19993\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n")
+	cfg := mustLoad(t, p)
+	l := NewLocal(cfg, p, nil, nil)
+	if err := l.AcceptHost("t1"); err == nil {
+		t.Fatal("AcceptHost without a pending key should error")
+	}
 }

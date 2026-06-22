@@ -32,6 +32,7 @@ func (h *handoffFakeCtrl) AddTunnel(config.Tunnel) error            { return nil
 func (h *handoffFakeCtrl) UpdateTunnel(string, config.Tunnel) error { return nil }
 func (h *handoffFakeCtrl) DeleteTunnel(string) error                { return nil }
 func (h *handoffFakeCtrl) Logs(string) ([]routelog.Entry, error)    { return nil, nil }
+func (h *handoffFakeCtrl) AcceptHost(string) error                  { return nil }
 func (h *handoffFakeCtrl) Close() error {
 	*h.log = append(*h.log, "close")
 	return nil

@@ -26,15 +26,22 @@ import (
 
 const connectTimeout = 5 * time.Second
 
+// hostKeySink receives a rejected unknown host key so the caller (the Tunnel,
+// and through Status the TUI) can offer to accept it. The arguments are the
+// hostname as dialed, the key fingerprint, and a ready-to-append known_hosts
+// line. Nil-safe: a nil sink records nothing.
+type hostKeySink func(host, fingerprint, line string)
+
 // dialSSH establishes an SSH client connection to the tunnel's server.
 // The TCP dial is context-aware so it can be interrupted by tunnel shutdown.
-func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger) (*ssh.Client, error) {
+// sink, when non-nil, receives any rejected unknown host key (TOFU prompt).
+func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger, sink hostKeySink) (*ssh.Client, error) {
 	auths, closeAgent, err := authMethods(cfg, def, log)
 	if err != nil {
 		return nil, err
 	}
 	defer closeAgent()
-	hostCb, err := hostKeyCallback(def, log)
+	hostCb, err := hostKeyCallback(def, log, sink)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +125,7 @@ func loadIdentity(path string) (ssh.Signer, error) {
 	return signer, nil
 }
 
-func hostKeyCallback(def config.Defaults, log *slog.Logger) (ssh.HostKeyCallback, error) {
+func hostKeyCallback(def config.Defaults, log *slog.Logger, sink hostKeySink) (ssh.HostKeyCallback, error) {
 	hosts := def.ResolvedKnownHosts()
 	if err := ensureKnownHostsFile(hosts); err != nil {
 		return nil, err
@@ -127,7 +134,7 @@ func hostKeyCallback(def config.Defaults, log *slog.Logger) (ssh.HostKeyCallback
 	if err != nil {
 		return nil, fmt.Errorf("load known_hosts %s: %w", hosts, err)
 	}
-	return wrapHostKey(hosts, base, def.AcceptNewHosts, log), nil
+	return wrapHostKey(hosts, base, def.AcceptNewHosts, log, sink), nil
 }
 
 func ensureKnownHostsFile(path string) error {
@@ -154,7 +161,7 @@ func (e *unknownHostError) Error() string {
 	return fmt.Sprintf("%s: host key not in known_hosts (%s); add it to known_hosts or set accept_new_hosts: true", e.host, e.fingerprint)
 }
 
-func wrapHostKey(hostsFile string, base ssh.HostKeyCallback, acceptNew bool, log *slog.Logger) ssh.HostKeyCallback {
+func wrapHostKey(hostsFile string, base ssh.HostKeyCallback, acceptNew bool, log *slog.Logger, sink hostKeySink) ssh.HostKeyCallback {
 	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
 		err := base(hostname, remote, key)
 		if err == nil {
@@ -169,11 +176,13 @@ func wrapHostKey(hostsFile string, base ssh.HostKeyCallback, acceptNew bool, log
 			if acceptNew {
 				if werr := appendKnownHost(hostsFile, hostname, key); werr != nil {
 					log.Warn("tofu: failed to append known_hosts", "host", hostname, "err", werr)
+					recordUnknownHost(sink, hostname, fp, key)
 					return &unknownHostError{host: hostname, fingerprint: fp}
 				}
 				log.Info("tofu: added new host to known_hosts", "host", hostname, "fingerprint", fp)
 				return nil
 			}
+			recordUnknownHost(sink, hostname, fp, key)
 			return &unknownHostError{host: hostname, fingerprint: fp}
 		}
 		want := ke.Want[0].Key
@@ -181,8 +190,29 @@ func wrapHostKey(hostsFile string, base ssh.HostKeyCallback, acceptNew bool, log
 	}
 }
 
+// recordUnknownHost reports the rejected key to the sink (nil-safe) so the
+// caller can surface an accept prompt. It builds the known_hosts line up
+// front — the exact bytes that AcceptHost will append later.
+func recordUnknownHost(sink hostKeySink, hostname, fingerprint string, key ssh.PublicKey) {
+	if sink == nil {
+		return
+	}
+	line := knownhosts.Line([]string{knownhosts.Normalize(hostname)}, key)
+	sink(hostname, fingerprint, line)
+}
+
 func appendKnownHost(hostsFile, hostname string, key ssh.PublicKey) error {
 	line := knownhosts.Line([]string{knownhosts.Normalize(hostname)}, key)
+	return AppendKnownHostLine(hostsFile, line)
+}
+
+// AppendKnownHostLine writes a single pre-built known_hosts line to hostsFile
+// (creating it owner-only if absent). It is the accept path for the TUI TOFU
+// prompt: the line was captured at rejection time and is appended verbatim.
+func AppendKnownHostLine(hostsFile, line string) error {
+	if err := os.MkdirAll(filepath.Dir(hostsFile), 0o700); err != nil {
+		return fmt.Errorf("create known_hosts dir: %w", err)
+	}
 	f, err := os.OpenFile(hostsFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return err
