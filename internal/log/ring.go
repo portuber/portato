@@ -78,13 +78,23 @@ type ringHandler struct {
 	attrs []slog.Attr
 }
 
+// ringLevel is the minimum level captured into the ring. The TUI logs screen
+// surfaces per-connection activity (logged at Debug), so the ring captures at
+// Debug regardless of the file handler's threshold. The file write is still
+// gated by the base handler (Info) in Handle — the ring simply sees more.
+const ringLevel = slog.LevelDebug
+
+// Enabled admits a record if either the ring wants it (>= ringLevel) or the
+// base/file handler would write it. This is what lets Debug records reach
+// Handle so they can be captured into the ring even when the file is at Info.
 func (h ringHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	return h.base.Enabled(ctx, level)
+	return level >= ringLevel || h.base.Enabled(ctx, level)
 }
 
 func (h ringHandler) Handle(ctx context.Context, r slog.Record) error {
-	// Capture into the ring first (cheap); then let the base handler format
-	// and write the file line as usual.
+	// Capture into the ring first (cheap); the ring keeps Debug+ independent
+	// of the file level. The base handler writes the file line only when the
+	// record meets the base (Info) threshold.
 	tunnel := attrString(h.attrs, "tunnel")
 	if tunnel == "" {
 		tunnel = recordAttrString(r, "tunnel")
@@ -95,7 +105,10 @@ func (h ringHandler) Handle(ctx context.Context, r slog.Record) error {
 		Tunnel: tunnel,
 		Msg:    r.Message,
 	})
-	return h.base.Handle(ctx, r)
+	if h.base.Enabled(ctx, r.Level) {
+		return h.base.Handle(ctx, r)
+	}
+	return nil
 }
 
 func (h ringHandler) WithAttrs(attrs []slog.Attr) slog.Handler {

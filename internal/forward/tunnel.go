@@ -336,7 +336,13 @@ func (t *Tunnel) handleDynamicConn(client *ssh.Client, conn net.Conn) {
 	srv, err := socks5.New(&socks5.Config{
 		Logger: socks5SilencedLogger,
 		Dial: func(_ context.Context, network, addr string) (net.Conn, error) {
-			return client.Dial(network, addr)
+			c, derr := client.Dial(network, addr)
+			if derr != nil {
+				t.log.Warn("socks5 dial failed", "dest", addr, "err", derr)
+				return nil, derr
+			}
+			t.log.Debug("socks5 dial", "dest", addr)
+			return c, nil
 		},
 	})
 	if err != nil {

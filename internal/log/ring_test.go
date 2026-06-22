@@ -78,15 +78,34 @@ func TestRing_NilSafe(t *testing.T) {
 	}
 }
 
-func TestRingHandler_EnabledDelegates(t *testing.T) {
+func TestRingHandler_RingCapturesBelowFileLevel(t *testing.T) {
+	var buf bytes.Buffer
 	ring := NewRing()
-	h := ringHandler{base: slog.NewTextHandler(io.Discard, &slog.HandlerOptions{Level: slog.LevelWarn}), ring: ring}
+	// The file handler is at Warn; the ring must still capture Info/Debug.
+	base := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn})
+	h := ringHandler{base: base, ring: ring}
 	logger := slog.New(h)
-	logger.Info("dropped") // below Warn → not enabled, not captured
-	if got := len(ring.Lines("")); got != 0 {
-		t.Fatalf("below-threshold record captured: %d", got)
+
+	logger.Info("info-msg")   // below Warn → not written, but captured by the ring
+	logger.Debug("debug-msg") // below Warn → not written, but captured by the ring
+
+	if got := len(ring.Lines("")); got != 2 {
+		t.Fatalf("ring = %d entries, want 2 (ring captures below the file level)", got)
 	}
-	if h.Enabled(context.Background(), slog.LevelError) == false {
-		t.Fatalf("Enabled should delegate Error=true")
+	if buf.Len() != 0 {
+		t.Errorf("file should not receive below-threshold records: %q", buf.String())
+	}
+	// A record below even the ring level (Debug) must not be captured.
+	logger.Log(context.Background(), slog.LevelDebug-8, "trace-msg")
+	if got := len(ring.Lines("")); got != 2 {
+		t.Errorf("trace-level record should not enter the ring: got %d", got)
+	}
+	// An Error meets both thresholds: captured and written.
+	logger.Error("boom")
+	if got := len(ring.Lines("")); got != 3 {
+		t.Errorf("error record missing from ring: %d", got)
+	}
+	if !strings.Contains(buf.String(), "boom") {
+		t.Errorf("error should reach the file: %q", buf.String())
 	}
 }
