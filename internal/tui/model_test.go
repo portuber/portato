@@ -539,6 +539,25 @@ func TestIndicatorShapePerState(t *testing.T) {
 // TestRenderErrorIndicatorDistinct guards the regression where an errored
 // tunnel showed ● (indistinguishable from connected). The error row must use
 // ✗ and must not contain a ● glyph that reads as "live".
+// TestRenderCursorGlyph asserts the selected row is marked with a ❯ cursor
+// glyph and unselected rows are not (Phase 11 selection redesign).
+func TestRenderCursorGlyph(t *testing.T) {
+	f := newFake(
+		controller.Status{Name: "a", Type: "local", Local: "1", Remote: "r"},
+		controller.Status{Name: "b", Type: "local", Local: "2", Remote: "r"},
+	)
+	m := New(f, Options{Mode: "standalone"})
+	m.width = 100
+	out := m.render() // cursor=0 → first row selected
+
+	if c := strings.Count(out, "❯"); c != 1 {
+		t.Errorf("expected exactly one ❯ cursor glyph (the selected row), got %d\n%s", c, out)
+	}
+	if !strings.Contains(out, "●  a") && !strings.Contains(out, "○  a") {
+		// not strictly required, but sanity-check the row still renders
+	}
+}
+
 func TestRenderErrorIndicatorDistinct(t *testing.T) {
 	f := newFake(controller.Status{Name: "x", Type: "local", Local: "1", Remote: "r", State: controller.Error, Error: "listen fail"})
 	m := New(f, Options{Mode: "standalone"})

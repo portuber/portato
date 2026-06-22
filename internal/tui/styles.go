@@ -11,6 +11,7 @@ var (
 	modeStyle        = pal.mode
 	headerStyle      = pal.header
 	selectedStyle    = pal.selected
+	cursorStyle      = pal.cursor
 	dimStyle         = pal.dim
 	errorStyle       = pal.err
 	warnStyle        = pal.warn

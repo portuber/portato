@@ -171,7 +171,7 @@ func (l *logsView) view() string {
 	if l.debug {
 		level = warnStyle.Render("debug")
 	}
-	b.WriteString(titleStyle.Render("Logs") + " " + dimStyle.Render("— "+l.name+"  level: "+level))
+	b.WriteString(titleStyle.Render("Portato") + " " + dimStyle.Render("— Logs — "+l.name+"  level: "+level))
 	b.WriteString("\n")
 	b.WriteString(l.vp.View())
 	b.WriteString("\n")

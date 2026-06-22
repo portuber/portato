@@ -19,11 +19,21 @@ const (
 	themeMono
 )
 
-// detectKind picks a theme from the environment:
+// detectKind picks a theme from the environment, in priority order:
+//   - PORTATO_THEME (light|dark|mono) forces that theme; "auto"/empty falls
+//     through to detection.
 //   - NO_COLOR set (any value) → monochrome (no ANSI foregrounds).
 //   - COLORFGBG "fg;bg" with bg ≤ 6 → dark; otherwise light.
 //   - default → dark (the historical palette).
 func detectKind() themeKind {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("PORTATO_THEME"))) {
+	case "light":
+		return themeLight
+	case "dark":
+		return themeDark
+	case "mono", "nocolor":
+		return themeMono
+	}
 	if os.Getenv("NO_COLOR") != "" {
 		return themeMono
 	}
@@ -49,6 +59,7 @@ type palette struct {
 	mode        lipgloss.Style
 	header      lipgloss.Style
 	selected    lipgloss.Style
+	cursor      lipgloss.Style
 	dim         lipgloss.Style
 	err         lipgloss.Style
 	warn        lipgloss.Style
@@ -78,7 +89,8 @@ func darkPalette() palette {
 		title:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63")),
 		mode:        lipgloss.NewStyle().Faint(true),
 		header:      lipgloss.NewStyle().Bold(true).Faint(true),
-		selected:    lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("63")).Foreground(lipgloss.Color("15")),
+		selected:    lipgloss.NewStyle().Bold(true),
+		cursor:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63")),
 		dim:         lipgloss.NewStyle().Faint(true),
 		err:         lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
 		warn:        lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
@@ -99,13 +111,14 @@ func darkPalette() palette {
 }
 
 // lightPalette uses darker foregrounds that stay readable on a light terminal
-// background (deeper green/red/orange, a blue title, a dark-on-light cursor).
+// background (deeper green/red/orange, a blue title, a blue cursor).
 func lightPalette() palette {
 	return palette{
 		title:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("26")),
 		mode:        lipgloss.NewStyle().Faint(true),
 		header:      lipgloss.NewStyle().Bold(true).Faint(true),
-		selected:    lipgloss.NewStyle().Bold(true).Background(lipgloss.Color("26")).Foreground(lipgloss.Color("255")),
+		selected:    lipgloss.NewStyle().Bold(true),
+		cursor:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("26")),
 		dim:         lipgloss.NewStyle().Faint(true),
 		err:         lipgloss.NewStyle().Foreground(lipgloss.Color("124")),
 		warn:        lipgloss.NewStyle().Foreground(lipgloss.Color("130")),
@@ -127,13 +140,14 @@ func lightPalette() palette {
 
 // monoPalette keeps the layout but drops all foreground colours (NO_COLOR).
 // State is still distinguishable via the indicator glyph (○/✗/●) and label
-// text; the cursor uses reverse video so it stays visible.
+// text; the cursor is bold to stay visible without colour.
 func monoPalette() palette {
 	return palette{
 		title:       lipgloss.NewStyle().Bold(true),
 		mode:        lipgloss.NewStyle().Faint(true),
 		header:      lipgloss.NewStyle().Bold(true).Faint(true),
-		selected:    lipgloss.NewStyle().Reverse(true),
+		selected:    lipgloss.NewStyle().Bold(true),
+		cursor:      lipgloss.NewStyle().Bold(true),
 		dim:         lipgloss.NewStyle().Faint(true),
 		err:         lipgloss.NewStyle().Bold(true),
 		warn:        lipgloss.NewStyle().Bold(true),

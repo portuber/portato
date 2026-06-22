@@ -148,6 +148,8 @@ systemctl --user disable --now portato   # stop (or `portato uninstall`)
   they go to `~/Library/Logs/portato.log` (macOS) or the journal (Linux).
 - **Themes** — the TUI picks a palette automatically: `NO_COLOR` forces
   monochrome, `COLORFGBG="fg;bg"` selects dark (bg ≤ 6) vs light, default dark.
+  Force one explicitly with `PORTATO_THEME=light|dark|mono` (or `auto` to fall
+  back to the automatic detection).
 - **`portato doctor`** — checks config validity, identity keys and `ssh-agent`,
   `known_hosts`, daemon reachability and socket permissions, and (Linux)
   lingering. Prints a `✓`/`✗` line per check and exits non-zero on any failure.

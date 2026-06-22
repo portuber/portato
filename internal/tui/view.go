@@ -89,7 +89,7 @@ func (m Model) table() string {
 
 func columnHeader() string {
 	return headerStyle.Render(
-		"  " +
+		"    " +
 			pad("NAME", colName) + gutter +
 			pad("TYPE", colType) + gutter +
 			pad("ENDPOINT", colEndpoint) + gutter +
@@ -105,23 +105,39 @@ func (m Model) row(i int, s controller.Status) string {
 	if s.Error != "" {
 		status += " " + dimStyle.Render(truncate(s.Error, 18))
 	}
-	cells := indicator(s) + " " +
-		pad(s.Name, colName) + gutter +
-		pad(s.Type, colType) + gutter +
-		pad(endpoint, colEndpoint) + gutter +
-		pad(status, colStatus) + gutter +
-		uptime(s)
+
+	name, typ, ep, up := s.Name, s.Type, endpoint, uptime(s)
 	if selected {
-		return selectedStyle.Render(cells)
+		// Selection is marked by the ❯ cursor glyph; the plain text cells are
+		// bolded for emphasis. The cells are styled individually (not wrapped
+		// in one outer style) because the indicator is already colour-rendered
+		// and a nested ANSI reset would otherwise drop the outer styling after
+		// it. Each plain cell has no inner sequences, so bolding is reliable.
+		name = selectedStyle.Render(name)
+		typ = selectedStyle.Render(typ)
+		ep = selectedStyle.Render(ep)
+		if up != "" {
+			up = selectedStyle.Render(up)
+		}
 	}
-	return cells
+
+	cells := indicator(s) + " " +
+		pad(name, colName) + gutter +
+		pad(typ, colType) + gutter +
+		pad(ep, colEndpoint) + gutter +
+		pad(status, colStatus) + gutter +
+		up
+
+	cursor := " "
+	if selected {
+		cursor = cursorStyle.Render("❯")
+	}
+	return cursor + " " + cells
 }
 
 // indicator returns the leading status glyph, coloured by state. Error uses a
 // distinct ✗ so a failed tunnel cannot be mistaken for a connected one — the
-// old "● for everything not Off" made an errored tunnel look live. In a
-// selected (inverse-video) row the colour may wash out, but the ✗ shape still
-// distinguishes error from ●/○.
+// old "● for everything not Off" made an errored tunnel look live.
 func indicator(s controller.Status) string {
 	switch s.State {
 	case controller.Off:

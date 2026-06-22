@@ -18,6 +18,28 @@ func TestDetectKind(t *testing.T) {
 		want themeKind
 	}{
 		{"default dark", clearThemeEnv, themeDark},
+		{"PORTATO_THEME light", func(t *testing.T) {
+			clearThemeEnv(t)
+			t.Setenv("PORTATO_THEME", "light")
+		}, themeLight},
+		{"PORTATO_THEME dark", func(t *testing.T) {
+			clearThemeEnv(t)
+			t.Setenv("PORTATO_THEME", "dark")
+		}, themeDark},
+		{"PORTATO_THEME mono", func(t *testing.T) {
+			clearThemeEnv(t)
+			t.Setenv("PORTATO_THEME", "mono")
+		}, themeMono},
+		{"PORTATO_THEME wins over NO_COLOR", func(t *testing.T) {
+			clearThemeEnv(t)
+			t.Setenv("NO_COLOR", "1")
+			t.Setenv("PORTATO_THEME", "light")
+		}, themeLight},
+		{"PORTATO_THEME auto falls through to NO_COLOR", func(t *testing.T) {
+			clearThemeEnv(t)
+			t.Setenv("PORTATO_THEME", "auto")
+			t.Setenv("NO_COLOR", "1")
+		}, themeMono},
 		{"NO_COLOR -> mono", func(t *testing.T) {
 			clearThemeEnv(t)
 			t.Setenv("NO_COLOR", "1")
