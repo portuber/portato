@@ -326,6 +326,7 @@ func (t *Tunnel) handleConn(client *ssh.Client, conn net.Conn) {
 		_ = conn.Close()
 		return
 	}
+	t.log.Debug("connection forwarded", "remote", t.cfg.Remote)
 	pipe(conn, remote)
 }
 
@@ -475,6 +476,7 @@ func (t *Tunnel) handleRemoteConn(conn net.Conn) {
 		_ = conn.Close()
 		return
 	}
+	t.log.Debug("connection forwarded", "local", target)
 	pipe(conn, local)
 }
 

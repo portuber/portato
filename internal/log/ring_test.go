@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"strings"
@@ -57,6 +58,38 @@ func TestRingHandler_PerCallAttr(t *testing.T) {
 	logger.Info("msg", "tunnel", "alpha")
 	if e := ring.Lines("alpha"); len(e) != 1 || e[0].Msg != "msg" {
 		t.Fatalf("per-call attr not captured: %+v", ring.Lines("alpha"))
+	}
+}
+
+// TestRingHandler_RendersAttrs proves the non-tunnel record attributes are
+// captured into Entry.Attrs as "k=v" (e.g. dest / err), so the logs screen
+// can show connection context instead of a bare message.
+func TestRingHandler_RendersAttrs(t *testing.T) {
+	ring := NewRing()
+	h := ringHandler{base: slog.NewTextHandler(io.Discard, nil), ring: ring}
+	logger := slog.New(h)
+
+	// Per-tunnel sub-logger: the tunnel attr is routed to Entry.Tunnel and
+	// must NOT appear in Attrs.
+	tn := logger.With("tunnel", "db")
+	tn.Warn("socks5 dial failed", "dest", "ipinfo.po:443", "err", errors.New("no such host"))
+
+	got := ring.Lines("db")
+	if len(got) != 1 {
+		t.Fatalf("Lines(db) = %d entries, want 1", len(got))
+	}
+	e := got[0]
+	if e.Tunnel != "db" {
+		t.Errorf("Tunnel = %q, want db", e.Tunnel)
+	}
+	if !strings.Contains(e.Attrs, "dest=ipinfo.po:443") {
+		t.Errorf("Attrs %q missing dest=ipinfo.po:443", e.Attrs)
+	}
+	if !strings.Contains(e.Attrs, "err=no such host") {
+		t.Errorf("Attrs %q missing err=no such host", e.Attrs)
+	}
+	if strings.Contains(e.Attrs, "tunnel=") {
+		t.Errorf("tunnel must not appear in Attrs: %q", e.Attrs)
 	}
 }
 

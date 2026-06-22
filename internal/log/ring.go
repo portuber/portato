@@ -2,7 +2,9 @@ package log
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 	"time"
 )
@@ -13,6 +15,10 @@ type Entry struct {
 	Level  slog.Level `json:"level"`
 	Tunnel string     `json:"tunnel,omitempty"`
 	Msg    string     `json:"msg"`
+	// Attrs is the record's non-tunnel attributes rendered as "k=v k2=v2"
+	// (e.g. dest=host:port, err=…). Pre-rendered so it is JSON-safe across the
+	// daemon IPC and trivial to display.
+	Attrs string `json:"attrs,omitempty"`
 }
 
 // ringCap bounds how many entries the ring keeps in memory. Old entries are
@@ -104,11 +110,34 @@ func (h ringHandler) Handle(ctx context.Context, r slog.Record) error {
 		Level:  r.Level,
 		Tunnel: tunnel,
 		Msg:    r.Message,
+		Attrs:  renderAttrs(h.attrs, r),
 	})
 	if h.base.Enabled(ctx, r.Level) {
 		return h.base.Handle(ctx, r)
 	}
 	return nil
+}
+
+// renderAttrs renders the record's attributes (persistent WithAttrs ones plus
+// the per-call ones) as "k=v k2=v2", skipping the tunnel attribute (it is
+// already carried by Entry.Tunnel). Used so the logs screen shows context like
+// dest=host:port or err=… instead of a bare message.
+func renderAttrs(persistent []slog.Attr, r slog.Record) string {
+	var b strings.Builder
+	add := func(a slog.Attr) {
+		if a.Equal(slog.Attr{}) || a.Key == "tunnel" {
+			return
+		}
+		if b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+		fmt.Fprintf(&b, "%s=%v", a.Key, a.Value.Any())
+	}
+	for _, a := range persistent {
+		add(a)
+	}
+	r.Attrs(func(a slog.Attr) bool { add(a); return true })
+	return b.String()
 }
 
 func (h ringHandler) WithAttrs(attrs []slog.Attr) slog.Handler {

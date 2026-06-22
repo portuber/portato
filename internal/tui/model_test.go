@@ -755,11 +755,14 @@ func TestModel_LogsKeyOpensScreen(t *testing.T) {
 func TestRenderLogsFormatsEntries(t *testing.T) {
 	entries := []routelog.Entry{
 		{Msg: "first", Level: 0},
-		{Msg: "second", Level: 8},
+		{Msg: "second", Level: 8, Attrs: "dest=ipinfo.po:443 err=no such host"},
 	}
 	out := renderLogs(entries)
 	if !strings.Contains(out, "first") || !strings.Contains(out, "second") {
 		t.Errorf("renderLogs missing entries: %s", out)
+	}
+	if !strings.Contains(out, "dest=ipinfo.po:443") || !strings.Contains(out, "err=no such host") {
+		t.Errorf("renderLogs should append attrs: %s", out)
 	}
 	if strings.Count(out, "\n") < 2 {
 		t.Errorf("renderLogs should put each entry on its own line: %s", out)
