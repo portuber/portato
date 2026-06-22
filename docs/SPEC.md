@@ -162,6 +162,8 @@ Implementations:
 | `POST`   | `/tunnels`                        | add a tunnel (validate, persist, reload) — Phase 10 |
 | `PUT`    | `/tunnels/{name}`                 | replace a tunnel (rename allowed) — Phase 10 |
 | `DELETE` | `/tunnels/{name}`                 | remove a tunnel (active one is stopped) — Phase 10 |
+| `GET`    | `/logs?name=`                     | recent in-memory log entries for a tunnel (Phase 11 TUI logs screen) |
+| `POST`   | `/tunnels/{name}/accept-host`     | append the tunnel's pending unknown-host key + restart (Phase 11 TOFU) |
 | `GET`    | `/healthz`                        | liveness probe (smart-launcher)   |
 
 `GET /events` (Phase 9) is a `text/event-stream`: the daemon subscribes a
@@ -322,7 +324,10 @@ Since tunnels are `enabled: false` by default, at system boot **only** the contr
 - `log/slog`, level `Info` (configurable via a `--log-level` flag post-MVP).
 - Handler: text, writes to `xdg.StateHome/portato/portato.log` + stderr (in daemon mode, only the file + a separate `daemon.log`, in the `StandardOutPath`/`StandardErrorPath` of launchd/systemd).
 - Each tunnel gets a sub-logger `log.With("tunnel", name)`.
-- Rotation is simple (size/time), added as needed (Phase 11).
+- The slog handler also feeds an in-memory ring buffer (Phase 11) so the TUI
+  logs screen (`l`) can show recent per-tunnel entries without reading the
+  file; in attach mode they are fetched over `GET /logs`.
+- Rotation is simple (size/time), added as needed (post-Phase-11).
 
 ## 15. Non-functional requirements
 

@@ -1,5 +1,7 @@
 # Portato
 
+[![CI](https://github.com/kipkaev55/portato/actions/workflows/ci.yml/badge.svg)](https://github.com/kipkaev55/portato/actions/workflows/ci.yml)
+
 **Portato** is an SSH port-forwarding manager with a TUI. It lets you turn
 individual SSH tunnels on and off, restart them, and watch their status from a
 single screen — either running standalone, or attached to a background daemon.
@@ -32,10 +34,14 @@ Requires Go 1.22+.
 
 ## Status
 
-Phases 0–5 are done: config, native-SSH forwarding, standalone TUI, the daemon
-with HTTP-over-unix-socket IPC, and the CLI + smart launcher + background
-hand-off all work. Phase 6 adds system autostart (`portato install` /
-`uninstall`) for macOS (launchd) and Linux (systemd --user).
+Phases 0–11 are done. The single binary runs the smart launcher, a background
+daemon with HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands,
+and system autostart (`portato install` / `uninstall`) for macOS (launchd) and
+Linux (systemd --user). It supports `local` (`-L`), `remote` (`-R`) and
+`dynamic` (`-D`, SOCKS5) tunnels, push-based status events, an in-TUI tunnel
+editor (`e`/`n`/`d`), a per-tunnel log screen (`l`), an interactive unknown-host
+(TOFU) prompt, automatic light/dark theming, and a `portato doctor` diagnostics
+command.
 
 See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase status.
 
@@ -133,6 +139,40 @@ launchctl bootout  "gui/$(id -u)/dev.portato.daemon" # stop (or `portato uninsta
 systemctl --user status portato      # status
 systemctl --user disable --now portato   # stop (or `portato uninstall`)
 ```
+
+## Logs, themes & diagnostics
+
+- **Per-tunnel logs** — press `l` in the TUI to open the selected tunnel's
+  live log (scrolling with `↑↓`/`pgup`/`pgdn`/`g`/`G`, `L` toggles the debug
+  level, `esc`/`l` closes). Logs are kept in an in-memory ring buffer; on disk
+  they go to `~/Library/Logs/portato.log` (macOS) or the journal (Linux).
+- **Themes** — the TUI picks a palette automatically: `NO_COLOR` forces
+  monochrome, `COLORFGBG="fg;bg"` selects dark (bg ≤ 6) vs light, default dark.
+- **`portato doctor`** — checks config validity, identity keys and `ssh-agent`,
+  `known_hosts`, daemon reachability and socket permissions, and (Linux)
+  lingering. Prints a `✓`/`✗` line per check and exits non-zero on any failure.
+
+### Unknown host keys (TOFU)
+
+When a tunnel connects to a host not in `~/.ssh/known_hosts` and
+`accept_new_hosts: false` (the default), the TUI shows the key fingerprint and
+offers to accept it inline (`y` appends it to `known_hosts` and restarts the
+tunnel). To trust new hosts automatically instead, set:
+
+```yaml
+defaults:
+  accept_new_hosts: true
+```
+
+## Troubleshooting
+
+| Symptom | Check |
+|---------|-------|
+| Tunnel stuck on `✗ host key not in known_hosts` | Accept the key in the TUI, or set `accept_new_hosts: true`. |
+| `✗ listen ...: address already in use` | A local port is busy — `lsof -i :<port>` to find and stop the holder. |
+| `portato list` errors with "daemon not running" | Start the daemon: `portato daemon`, or `portato install` to autostart it. |
+| `✗ auth failed` | Start `ssh-agent` / `ssh-add`, or set an `identity:` key. Run `portato doctor`. |
+| Tunnels die after logout (Linux) | Enable lingering: `loginctl enable-linger "$USER"`. |
 
 ## Documentation
 
