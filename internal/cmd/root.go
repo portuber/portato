@@ -108,6 +108,7 @@ func Execute() error {
 		installCmd,
 		uninstallCmd,
 		forwardCmd,
+		doctorCmd,
 	)
 	return rootCmd.Execute()
 }
