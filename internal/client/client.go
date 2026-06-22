@@ -8,10 +8,12 @@ import (
 	"io"
 	"net"
 	"net/http"
+	neturl "net/url"
 	"time"
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 // defaultTimeout caps a single HTTP round-trip to the daemon.
@@ -125,6 +127,20 @@ func (c *Client) UpdateTunnel(name string, t config.Tunnel) error {
 // DeleteTunnel asks the daemon to remove the tunnel named name.
 func (c *Client) DeleteTunnel(name string) error {
 	return c.sendBody(http.MethodDelete, fmt.Sprintf("/tunnels/%s", name), nil)
+}
+
+// Logs fetches the recent in-memory log entries for a tunnel from the daemon's
+// ring buffer (Phase 11). An empty name returns every tunnel's entries.
+func (c *Client) Logs(name string) ([]routelog.Entry, error) {
+	path := "/logs"
+	if name != "" {
+		path += "?name=" + neturl.QueryEscape(name)
+	}
+	var out []routelog.Entry
+	if err := c.get(path, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 // Events opens the daemon's SSE stream (GET /events) and returns the response

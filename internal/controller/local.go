@@ -123,6 +123,12 @@ func (l *Local) DeleteTunnel(name string) error {
 	return l.Reload()
 }
 
+// Logs returns the recent in-memory log entries for name from the shared ring
+// buffer (nil-safe: an unconfigured ring yields nil). Phase 11.
+func (l *Local) Logs(name string) ([]routelog.Entry, error) {
+	return l.ring.Lines(name), nil
+}
+
 func (l *Local) setEnabled(name string, enabled bool) {
 	for i := range l.cfg.Tunnels {
 		if l.cfg.Tunnels[i].Name == name {

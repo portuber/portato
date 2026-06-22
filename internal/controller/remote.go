@@ -11,6 +11,7 @@ import (
 	"github.com/kipkaev55/portato/internal/client"
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 // daemonClient is the subset of *client.Client that Remote needs. Kept
@@ -26,6 +27,7 @@ type daemonClient interface {
 	AddTunnel(t config.Tunnel) error
 	UpdateTunnel(name string, t config.Tunnel) error
 	DeleteTunnel(name string) error
+	Logs(name string) ([]routelog.Entry, error)
 }
 
 // Remote is a Controller backed by the daemon via an HTTP client over a unix
@@ -82,6 +84,10 @@ func (r *Remote) UpdateTunnel(name string, t config.Tunnel) error {
 }
 
 func (r *Remote) DeleteTunnel(name string) error { return r.client.DeleteTunnel(name) }
+
+// Logs fetches the daemon's recent in-memory log entries for the TUI logs
+// screen. The daemon owns the ring buffer. Phase 11.
+func (r *Remote) Logs(name string) ([]routelog.Entry, error) { return r.client.Logs(name) }
 
 // Changes returns the push channel fed by the daemon's /events SSE stream.
 // A goroutine reads frames, reconnects on break with exponential backoff,

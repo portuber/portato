@@ -3,6 +3,7 @@ package controller
 import (
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 type (
@@ -38,4 +39,10 @@ type Controller interface {
 	// DeleteTunnel removes the tunnel named name, persists and applies it; an
 	// active tunnel is stopped by the engine reload.
 	DeleteTunnel(name string) error
+
+	// Logs returns the recent in-memory log entries for the tunnel named name
+	// (the Phase 11 ring buffer). An empty name returns every tunnel's logs.
+	// The TUI logs screen (l) reads this; in standalone it is the local ring,
+	// in attach it is fetched from the daemon. Phase 11.
+	Logs(name string) ([]routelog.Entry, error)
 }

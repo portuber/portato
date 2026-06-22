@@ -8,6 +8,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/controller"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 // handoffFakeCtrl records the order of operations against a shared log so a
@@ -30,6 +31,7 @@ func (h *handoffFakeCtrl) Config() (*config.Config, error) {
 func (h *handoffFakeCtrl) AddTunnel(config.Tunnel) error            { return nil }
 func (h *handoffFakeCtrl) UpdateTunnel(string, config.Tunnel) error { return nil }
 func (h *handoffFakeCtrl) DeleteTunnel(string) error                { return nil }
+func (h *handoffFakeCtrl) Logs(string) ([]routelog.Entry, error)    { return nil, nil }
 func (h *handoffFakeCtrl) Close() error {
 	*h.log = append(*h.log, "close")
 	return nil

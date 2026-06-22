@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/controller"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 type fakeCtrl struct {
@@ -108,6 +109,8 @@ func (f *fakeCtrl) DeleteTunnel(name string) error {
 	f.deletes = append(f.deletes, name)
 	return nil
 }
+
+func (f *fakeCtrl) Logs(string) ([]routelog.Entry, error) { return nil, nil }
 
 func newFake(statuses ...controller.Status) *fakeCtrl {
 	cp := make([]controller.Status, len(statuses))

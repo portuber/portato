@@ -11,6 +11,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 type fakeClient struct {
@@ -63,6 +64,8 @@ func (f *fakeClient) DeleteTunnel(name string) error {
 	f.deletes = append(f.deletes, name)
 	return f.err
 }
+
+func (f *fakeClient) Logs(string) ([]routelog.Entry, error) { return nil, f.err }
 
 // Events pops the next queued stream; when none remain it blocks on ctx,
 // modelling a daemon that is up but produces no further events. This lets the

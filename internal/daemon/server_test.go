@@ -16,6 +16,7 @@ import (
 	"github.com/kipkaev55/portato/internal/client"
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 // fakeEngine is a tunneler stand-in: it flips in-memory states instead of
@@ -282,6 +283,51 @@ func TestServer_EnableIdempotent(t *testing.T) {
 	}
 	if err := c.Enable("db"); err != nil {
 		t.Fatalf("second enable: %v", err)
+	}
+}
+
+// TestServer_Logs verifies the daemon serves its ring buffer over GET /logs,
+// filtered by the ?name= query (Phase 11 TUI logs screen).
+func TestServer_Logs(t *testing.T) {
+	dir := shortDir(t)
+	cfgPath := filepath.Join(dir, "config.yaml")
+	cfg := testConfig()
+	if err := cfg.Save(cfgPath); err != nil {
+		t.Fatalf("save config: %v", err)
+	}
+	ring := routelog.NewRing()
+	ring.Append(routelog.Entry{Tunnel: "db", Msg: "connected", Level: slog.LevelInfo})
+	ring.Append(routelog.Entry{Tunnel: "other", Msg: "noise", Level: slog.LevelDebug})
+
+	sock := filepath.Join(dir, "portato.sock")
+	fe := newFakeEngine(cfg)
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default(), ring)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.Start(ctx)
+	if err := waitForFile(sock, 2*time.Second); err != nil {
+		t.Fatalf("socket not created: %v", err)
+	}
+
+	c := client.New(sock)
+
+	// Filtered by tunnel.
+	db, err := c.Logs("db")
+	if err != nil {
+		t.Fatalf("Logs(db): %v", err)
+	}
+	if len(db) != 1 || db[0].Msg != "connected" {
+		t.Fatalf("Logs(db) = %+v, want one connected entry", db)
+	}
+
+	// Unfiltered returns everything.
+	all, err := c.Logs("")
+	if err != nil {
+		t.Fatalf("Logs(\"\"): %v", err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("Logs(\"\") = %d entries, want 2", len(all))
 	}
 }
 

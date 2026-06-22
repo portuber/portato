@@ -171,6 +171,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
 	mux.HandleFunc("GET /tunnels", s.handleList)
 	mux.HandleFunc("GET /events", s.handleEvents)
+	mux.HandleFunc("GET /logs", s.handleLogs)
 	mux.HandleFunc("POST /tunnels/{name}/enable", s.handleEnable)
 	mux.HandleFunc("POST /tunnels/{name}/disable", s.handleDisable)
 	mux.HandleFunc("POST /tunnels/{name}/restart", s.handleRestart)
@@ -188,6 +189,15 @@ func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
 
 func (s *Server) handleList(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.engine.List())
+}
+
+// handleLogs returns the recent in-memory log entries for a tunnel from the
+// daemon's ring buffer. Optional ?name= filters by tunnel; without it every
+// tunnel's entries are returned. Nil-safe: a daemon with no ring returns an
+// empty list. Phase 11 (TUI logs screen).
+func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
+	name := r.URL.Query().Get("name")
+	writeJSON(w, http.StatusOK, s.logs.Lines(name))
 }
 
 // eventHeartbeat is how often the SSE stream emits a comment line to keep the
