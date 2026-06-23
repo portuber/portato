@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"fmt"
+
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kipkaev55/portato/internal/config"
@@ -135,6 +137,12 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		ed, cmd := openEditor(m.ctrl, false, "", m.width, m.height)
 		m.editor = ed
 		return m, cmd
+	case "C":
+		if m.hasCurrent() {
+			ed, cmd := openDuplicateEditor(m.ctrl, m.list[m.cursor].Name, m.width, m.height)
+			m.editor = ed
+			return m, cmd
+		}
 	case "d":
 		if m.hasCurrent() {
 			m.confirmDelete = true
@@ -207,6 +215,63 @@ func openEditor(ctrl controller.Controller, edit bool, selected string, width, h
 	e := newTunnelEditor(mode, existing, names, ctrl)
 	e.width, e.height = width, height
 	return e, e.setFocus(fName)
+}
+
+// openDuplicateEditor opens the Phase 10 editor in create mode, prefilled from
+// the selected tunnel under a fresh "<name>-copy" name with Enabled=false. It
+// commits via AddTunnel (not UpdateTunnel) when saved, so the source tunnel is
+// untouched — the "same SSH host, a second local port" convenience becomes a
+// keystroke plus a small edit. Returns a nil editor when the config can't be
+// read or the source is no longer present (mirrors openEditor's cfg-error path).
+func openDuplicateEditor(ctrl controller.Controller, selected string, width, height int) (*tunnelEditor, tea.Cmd) {
+	cfg, err := ctrl.Config()
+	if err != nil || cfg == nil {
+		return nil, nil
+	}
+	var names []string
+	var src config.Tunnel
+	found := false
+	for _, t := range cfg.Tunnels {
+		names = append(names, t.Name)
+		if t.Name == selected {
+			src = t
+			found = true
+		}
+	}
+	if !found {
+		return nil, nil
+	}
+	src.Name = freshName(selected, names)
+	src.Enabled = false
+	e := newTunnelEditor(modeNew, src, names, ctrl)
+	e.original = ""
+	e.width, e.height = width, height
+	return e, e.setFocus(fName)
+}
+
+// freshName returns a unique name for a duplicate of base: base+"-copy", or
+// base+"-copy-N" (N=2,3,…) when "-copy" is already taken. The scheme keeps the
+// result inside validEditorName's alphabet ([a-zA-Z0-9_-]).
+func freshName(base string, existing []string) string {
+	candidate := base + "-copy"
+	if !containsName(existing, candidate) {
+		return candidate
+	}
+	for i := 2; ; i++ {
+		c := fmt.Sprintf("%s-copy-%d", base, i)
+		if !containsName(existing, c) {
+			return c
+		}
+	}
+}
+
+func containsName(names []string, s string) bool {
+	for _, n := range names {
+		if n == s {
+			return true
+		}
+	}
+	return false
 }
 
 // handleConfirm dispatches the "leave running in background?" modal keys.

@@ -256,7 +256,7 @@ func formatUptime(d time.Duration) string {
 }
 
 func (m Model) footer() string {
-	return footerStyle.Render("↑↓/jk move · space toggle · r restart · a/x all · e edit · n new · d delete · l logs · R reload · ? help · q quit")
+	return footerStyle.Render("↑↓/jk move · space toggle · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · R reload · ? help · q quit")
 }
 
 func (m Model) helpBlock() string {
@@ -271,6 +271,7 @@ func (m Model) helpBlock() string {
 		"x            disable all tunnels",
 		"e            edit the selected tunnel",
 		"n            create a new tunnel",
+		"C            duplicate the selected tunnel",
 		"d            delete the selected tunnel",
 		"l            view the selected tunnel's logs",
 		"R            reload config from disk",

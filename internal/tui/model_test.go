@@ -744,6 +744,97 @@ func TestModel_NewKeyOpensEditor(t *testing.T) {
 	}
 }
 
+func TestModel_DuplicateKeyOpensEditor(t *testing.T) {
+	f := newFake(controller.Status{Name: "db", Type: "local"})
+	f.cfg = &config.Config{Tunnels: []config.Tunnel{{
+		Name: "db", Type: "local", SSH: "u@h:22", Local: "5432", Remote: "db:5432", Identity: "~/.ssh/id",
+	}}}
+	m := New(f, Options{Mode: "standalone"})
+
+	next, _ := m.handleKey(keyPress("C"))
+	mm := next.(Model)
+	if mm.editor == nil {
+		t.Fatal("C should open the editor")
+	}
+	if mm.editor.mode != modeNew {
+		t.Errorf("duplicate editor mode = %v, want modeNew", mm.editor.mode)
+	}
+	if mm.editor.original != "" {
+		t.Errorf("duplicate editor original = %q, want \"\" (clean modeNew)", mm.editor.original)
+	}
+	if mm.editor.focus != fName {
+		t.Errorf("duplicate editor focus = %d, want fName (%d)", mm.editor.focus, fName)
+	}
+	if got := mm.editor.name.Value(); got != "db-copy" {
+		t.Errorf("duplicate name = %q, want db-copy", got)
+	}
+	if mm.editor.enabled {
+		t.Error("duplicate should be created enabled=false")
+	}
+	if tunnelTypes[mm.editor.typeIdx] != "local" {
+		t.Errorf("type not prefilled from source: %s", tunnelTypes[mm.editor.typeIdx])
+	}
+	if got := mm.editor.ssh.Value(); got != "u@h:22" {
+		t.Errorf("ssh not prefilled: %q", got)
+	}
+	if got := mm.editor.local.Value(); got != "5432" {
+		t.Errorf("local not prefilled: %q", got)
+	}
+	if got := mm.editor.remote.Value(); got != "db:5432" {
+		t.Errorf("remote not prefilled: %q", got)
+	}
+	if got := mm.editor.identity.Value(); got != "~/.ssh/id" {
+		t.Errorf("identity not prefilled: %q", got)
+	}
+}
+
+func TestModel_DuplicateKeyNoSelection(t *testing.T) {
+	f := newFake()
+	m := New(f, Options{Mode: "standalone"})
+	next, _ := m.handleKey(keyPress("C"))
+	mm := next.(Model)
+	if mm.editor != nil {
+		t.Error("C on empty list should not open the editor")
+	}
+}
+
+func TestModel_LowercaseCIsNoOp(t *testing.T) {
+	f := newFake(controller.Status{Name: "db", Type: "local"})
+	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db"}}}
+	m := New(f, Options{Mode: "standalone"})
+
+	next, _ := m.handleKey(keyPress("c"))
+	mm := next.(Model)
+	if mm.editor != nil {
+		t.Error("lowercase c must not open the editor (only Shift+C duplicates)")
+	}
+	if len(f.adds) != 0 {
+		t.Errorf("lowercase c must not add anything, got %+v", f.adds)
+	}
+}
+
+func TestFreshName(t *testing.T) {
+	cases := []struct {
+		name     string
+		base     string
+		existing []string
+		want     string
+	}{
+		{"first copy", "db", []string{"db"}, "db-copy"},
+		{"copy taken -> -2", "db", []string{"db", "db-copy"}, "db-copy-2"},
+		{"copy and -2 taken -> -3", "db", []string{"db", "db-copy", "db-copy-2"}, "db-copy-3"},
+		{"source without other copies", "web", []string{"web", "api"}, "web-copy"},
+		{"ignores unrelated names", "db", []string{"db", "other-copy", "db-copy-9"}, "db-copy"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := freshName(c.base, c.existing); got != c.want {
+				t.Errorf("freshName(%q, %v) = %q, want %q", c.base, c.existing, got, c.want)
+			}
+		})
+	}
+}
+
 func TestModel_DeleteKeyShowsModal(t *testing.T) {
 	f := newFake(controller.Status{Name: "db"})
 	m := New(f, Options{Mode: "standalone"})
