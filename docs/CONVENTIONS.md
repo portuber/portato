@@ -23,7 +23,8 @@ glm-complex/docs/
     ├── phase-10-tui-editor.md       # outline
     ├── phase-11-polish.md           # outline
     ├── phase-12-ipc-discovery.md    # outline
-    └── phase-13-polish-2.md         # outline
+    ├── phase-13-polish-2.md         # outline
+    └── phase-14-tui-duplicate.md    # outline
 ```
 
 - **SPEC.md** — the source of truth for the stack, architecture, config, TUI, and IPC. Changes rarely.

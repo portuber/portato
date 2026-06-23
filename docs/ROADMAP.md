@@ -18,7 +18,7 @@
 | 5   | CLI commands + smart launcher + hand-off | `[x]`  | [phase-5-cli-smart-launcher.md](./phases/phase-5-cli-smart-launcher.md) |
 | 6   | Autostart (launchd/systemd) + E2E     | `[x]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
 
-### Post-MVP (phases 7–13, outline — detailed when reached)
+### Post-MVP (phases 7–14, outline — detailed when reached)
 
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
@@ -29,6 +29,7 @@
 | 11  | Polish (logs, themes, CI, doctor) | `[x]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
 | 12  | Robust IPC socket discovery       | `[~]`  | [phase-12-ipc-discovery.md](./phases/phase-12-ipc-discovery.md) |
 | 13  | Polish 2 (log rotation, `/` filter, goreleaser) | `[ ]`  | [phase-13-polish-2.md](./phases/phase-13-polish-2.md) |
+| 14  | TUI: duplicate tunnel (Shift+C)   | `[ ]`  | [phase-14-tui-duplicate.md](./phases/phase-14-tui-duplicate.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -38,7 +39,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) are described in detail; phases 7–11 (post-MVP) are outline only, filled in when reached.
+5. **Level of detail:** phases 0–6 (MVP) are described in detail; phases 7–14 (post-MVP) are outline only, filled in when reached.
 
 ## Current focus
 
@@ -104,7 +105,7 @@ is captured at rejection and accepted via `Controller.AcceptHost` /
 GitHub Actions CI (vet / fmt / test `-race` / cross-compile), `make build-all`
 and `make cover`, and a refreshed README. Total coverage ≈ 69%.
 
-Phases 1–6 are the detailed MVP plan; 7–13 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design. Phase 13 (Polish 2) picks up the three items deferred from phase 11: log rotation, the `/` list filter, and goreleaser.
+Phases 1–6 are the detailed MVP plan; 7–14 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design. Phase 13 (Polish 2) picks up the three items deferred from phase 11: log rotation, the `/` list filter, and goreleaser. Phase 14 adds a "duplicate the selected tunnel" action (`Shift+C`) to the TUI, reusing the Phase 10 editor.
 
 ## Phase summary
 
@@ -122,6 +123,7 @@ Phases 1–6 are the detailed MVP plan; 7–13 are outline (goal + DoD), refined
 - **Phase 11** — logs in the TUI (`l`), themes, `portato doctor`, tests, CI.
 - **Phase 12** — robust IPC socket discovery: the daemon advertises its socket path via a stable discovery file; clients read it (socket lives in `$TMPDIR` / `$XDG_RUNTIME_DIR`).
 - **Phase 13** — polish 2 (deferred phase-11 items): persistent rotated log file, the `/` tunnel-list filter, goreleaser release tooling.
+- **Phase 14** — duplicate the selected tunnel in the TUI (`Shift+C`): opens the Phase 10 editor in create mode, prefilled under a fresh `<name>-copy`; commits via `AddTunnel`.
 
 ## Final MVP E2E (on completing Phase 6)
 
