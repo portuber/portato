@@ -1,7 +1,7 @@
 ---
 phase: 13
 title: Polish 2 (deferred phase-11): log rotation, list filter, release tooling
-status: todo
+status: in-progress
 depends_on: [11]
 ---
 

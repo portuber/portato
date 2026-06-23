@@ -28,7 +28,7 @@
 | 10  | TUI tunnel editor (e/n/d)         | `[x]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
 | 11  | Polish (logs, themes, CI, doctor) | `[x]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
 | 12  | Robust IPC socket discovery       | `[x]`  | [phase-12-ipc-discovery.md](./phases/phase-12-ipc-discovery.md) |
-| 13  | Polish 2 (log rotation, `/` filter, goreleaser) | `[ ]`  | [phase-13-polish-2.md](./phases/phase-13-polish-2.md) |
+| 13  | Polish 2 (log rotation, `/` filter, goreleaser) | `[~]`  | [phase-13-polish-2.md](./phases/phase-13-polish-2.md) |
 | 14  | TUI: duplicate tunnel (Shift+C)   | `[x]`  | [phase-14-tui-duplicate.md](./phases/phase-14-tui-duplicate.md) |
 | 15  | Light-theme color tuning          | `[x]`  | [phase-15-light-theme-colors.md](./phases/phase-15-light-theme-colors.md) |
 
