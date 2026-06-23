@@ -18,6 +18,7 @@ import (
 var (
 	cfgFile         string
 	forceStandalone bool
+	socketFlag      string
 )
 
 // probeTimeout caps the smart-launcher daemon probe: a live daemon (or
@@ -46,23 +47,21 @@ See docs/SPEC.md for the full specification.`,
 }
 
 func rootRunE(_ *cobra.Command, _ []string) error {
-	socket, err := daemon.SocketPath()
-	if err != nil {
-		return fmt.Errorf("resolve socket path: %w", err)
+	if !forceStandalone {
+		if socket, err := daemon.ResolveSocket(); err == nil && socket != "" && probeDaemon(socket) {
+			ctrl := controller.NewRemote(client.New(socket))
+			defer ctrl.Close()
+			return tui.Run(ctrl, tui.Options{Mode: "attach @ " + socket})
+		}
 	}
-
-	if !forceStandalone && probeDaemon(socket) {
-		ctrl := controller.NewRemote(client.New(socket))
-		defer ctrl.Close()
-		return tui.Run(ctrl, tui.Options{Mode: "attach @ " + socket})
-	}
-	return runStandalone(socket)
+	return runStandalone()
 }
 
 // runStandalone loads the config, builds a local controller and runs the TUI
 // without a daemon. This is the fallback when no daemon answers, and the
-// forced path under --force-standalone.
-func runStandalone(socket string) error {
+// forced path under --force-standalone. The hand-off reads the daemon's
+// socket from the discovery marker once the spawned daemon advertises it.
+func runStandalone() error {
 	path := cfgFile
 	if path == "" {
 		path = config.DefaultPath()
@@ -81,7 +80,7 @@ func runStandalone(socket string) error {
 	ctrl := controller.NewLocal(cfg, path, logger, ring)
 	defer ctrl.Close()
 
-	return tui.Run(ctrl, tui.Options{Mode: "standalone", CfgPath: path, SocketPath: socket})
+	return tui.Run(ctrl, tui.Options{Mode: "standalone", CfgPath: path})
 }
 
 // probeDaemon reports whether a live daemon is answering on the socket within
@@ -95,6 +94,14 @@ func probeDaemon(socket string) bool {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to config file (default: XDG config home)")
 	rootCmd.Flags().BoolVar(&forceStandalone, "force-standalone", false, "skip daemon auto-detection and run a standalone TUI")
+	rootCmd.PersistentFlags().StringVar(&socketFlag, "socket", "",
+		"override the daemon IPC socket path; the daemon binds it and clients dial it directly (also PORTATO_SOCKET)")
+	// Push the --socket flag (if any) into the daemon package before any
+	// subcommand runs, so both the daemon (bind) and clients (dial) honour it.
+	rootCmd.PersistentPreRunE = func(*cobra.Command, []string) error {
+		daemon.SetSocketOverride(socketFlag)
+		return nil
+	}
 }
 
 func Execute() error {

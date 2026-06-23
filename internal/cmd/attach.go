@@ -18,9 +18,12 @@ var attachCmd = &cobra.Command{
 }
 
 func attachRunE(_ *cobra.Command, _ []string) error {
-	socket, err := daemon.SocketPath()
+	socket, err := daemon.ResolveSocket()
 	if err != nil {
-		return fmt.Errorf("resolve socket path: %w", err)
+		return err
+	}
+	if socket == "" {
+		return fmt.Errorf("daemon not running, try 'portato daemon' or 'portato install'")
 	}
 	c := client.New(socket)
 	if err := c.Healthz(); err != nil {

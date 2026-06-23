@@ -23,9 +23,12 @@ var errDaemonDown = errors.New("daemon is not running")
 var dialDaemon = defaultDialDaemon
 
 func defaultDialDaemon() (*client.Client, error) {
-	socket, err := daemon.SocketPath()
+	socket, err := daemon.ResolveSocket()
 	if err != nil {
-		return nil, fmt.Errorf("resolve socket path: %w", err)
+		return nil, err
+	}
+	if socket == "" {
+		return nil, errDaemonDown
 	}
 	c := client.New(socket)
 	if err := c.Healthz(); err != nil {

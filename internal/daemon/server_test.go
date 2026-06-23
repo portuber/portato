@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -178,9 +177,9 @@ func TestServer_RoundTrip(t *testing.T) {
 	}
 
 	sock := filepath.Join(dir, "portato.sock")
-	pid := filepath.Join(dir, "portato.pid")
+	marker := filepath.Join(dir, "daemon.socket")
 	fe := newFakeEngine(cfg)
-	s := newServer(fe, cfg, cfgPath, sock, pid, slog.Default(), nil)
+	s := newServer(fe, cfg, cfgPath, sock, marker, slog.Default(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -258,8 +257,8 @@ func TestServer_RoundTrip(t *testing.T) {
 	if err := waitForGone(sock, 2*time.Second); err != nil {
 		t.Fatalf("socket not removed on shutdown: %v", err)
 	}
-	if err := waitForGone(pid, 2*time.Second); err != nil {
-		t.Fatalf("pid not removed on shutdown: %v", err)
+	if err := waitForGone(marker, 2*time.Second); err != nil {
+		t.Fatalf("discovery marker not removed on shutdown: %v", err)
 	}
 }
 
@@ -270,7 +269,7 @@ func TestServer_EnableIdempotent(t *testing.T) {
 	cfg.Save(cfgPath)
 	sock := filepath.Join(dir, "portato.sock")
 	fe := newFakeEngine(cfg)
-	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default(), nil)
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "daemon.socket"), slog.Default(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -301,7 +300,7 @@ func TestServer_Logs(t *testing.T) {
 
 	sock := filepath.Join(dir, "portato.sock")
 	fe := newFakeEngine(cfg)
-	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default(), ring)
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "daemon.socket"), slog.Default(), ring)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -333,41 +332,48 @@ func TestServer_Logs(t *testing.T) {
 
 func TestEnsureNotRunning(t *testing.T) {
 	dir := t.TempDir()
-	pid := filepath.Join(dir, "portato.pid")
+	marker := filepath.Join(dir, "daemon.socket")
 	sock := filepath.Join(dir, "portato.sock")
 
-	// No PID file + stale socket → ok, stale socket removed.
+	// No marker + stale socket → ok, stale socket removed.
 	if err := os.WriteFile(sock, []byte{}, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(pid, sock); err != nil {
-		t.Fatalf("no pid: %v", err)
+	if err := ensureNotRunning(marker, sock); err != nil {
+		t.Fatalf("no marker: %v", err)
 	}
 	if _, err := os.Stat(sock); !os.IsNotExist(err) {
 		t.Fatalf("stale socket not removed")
 	}
 
-	// Corrupt PID → ok, cleaned.
-	if err := os.WriteFile(pid, []byte("nope"), 0o600); err != nil {
+	// Corrupt marker → ok, cleaned.
+	if err := os.WriteFile(marker, []byte("nope"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(pid, sock); err != nil {
-		t.Fatalf("corrupt pid: %v", err)
+	if err := ensureNotRunning(marker, sock); err != nil {
+		t.Fatalf("corrupt marker: %v", err)
 	}
 
-	// Dead PID → ok, cleaned.
-	if err := os.WriteFile(pid, []byte("999999"), 0o600); err != nil {
+	// Dead PID marker → ok, marker + its socket removed.
+	deadSock := filepath.Join(dir, "dead.sock")
+	if err := WriteMarker(marker, deadSock, 999999); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(pid, sock); err != nil {
+	if err := os.WriteFile(deadSock, []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureNotRunning(marker, sock); err != nil {
 		t.Fatalf("dead pid: %v", err)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("dead-pid marker not removed")
 	}
 
 	// Live PID (the test process itself) → already-running error.
-	if err := os.WriteFile(pid, []byte(strconv.Itoa(os.Getpid())), 0o600); err != nil {
+	if err := WriteMarker(marker, sock, os.Getpid()); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(pid, sock); err == nil {
+	if err := ensureNotRunning(marker, sock); err == nil {
 		t.Fatalf("expected already-running error for live pid")
 	}
 }
@@ -399,7 +405,7 @@ func newEventServer(t *testing.T) (*Server, *fakeEngine, *client.Client, context
 	}
 	sock := filepath.Join(dir, "portato.sock")
 	fe := newFakeEngine(cfg)
-	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "portato.pid"), slog.Default(), nil)
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "daemon.socket"), slog.Default(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go s.Start(ctx)

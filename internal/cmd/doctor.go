@@ -83,12 +83,12 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 	}
 
 	// 5. Daemon reachability (the daemon is optional, so absent is informational).
-	socket, err := daemon.SocketPath()
-	if err == nil {
+	socket, err := daemon.ResolveSocket()
+	if err == nil && socket != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), doctorProbeTimeout)
-		err := client.New(socket).HealthzCtx(ctx)
+		herr := client.New(socket).HealthzCtx(ctx)
 		cancel()
-		if err == nil {
+		if herr == nil {
 			d.ok("daemon", "reachable at %s", socket)
 			// 6. The IPC socket must be owner-only (SPEC §6: 0600).
 			if info, statErr := os.Stat(socket); statErr == nil {
@@ -99,6 +99,8 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		} else {
 			d.info("daemon", "not reachable at %s (start with `portato daemon` or `portato install`)", socket)
 		}
+	} else {
+		d.info("daemon", "not running (start with `portato daemon` or `portato install`)")
 	}
 
 	// 7. Linux: lingering must be enabled for the daemon to survive logout.

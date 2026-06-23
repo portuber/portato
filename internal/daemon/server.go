@@ -10,10 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/kipkaev55/portato/internal/config"
@@ -46,7 +43,7 @@ type Server struct {
 	cfg        *config.Config
 	cfgPath    string
 	socketPath string
-	pidPath    string
+	markerPath string
 	log        *slog.Logger
 	logs       *routelog.Ring
 
@@ -60,36 +57,47 @@ type Server struct {
 	shutdownOnce sync.Once
 }
 
-// New prepares a daemon for cfg/cfgPath: it resolves the socket and PID paths
-// and refuses to start if another live daemon holds them (stale files are cleaned).
+// New prepares a daemon for cfg/cfgPath: it resolves the socket path (a
+// runtime location, or the --socket override) and the stable discovery marker
+// path, and refuses to start if another live daemon holds them (stale markers
+// are cleaned).
 func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ring) (*Server, error) {
 	if log == nil {
 		log = slog.Default()
 	}
-	socketPath, err := SocketPath()
+	socketPath, err := resolveListenSocket()
 	if err != nil {
 		return nil, fmt.Errorf("resolve socket path: %w", err)
 	}
-	pidPath, err := PIDPath()
+	markerPath, err := DiscoveryPath()
 	if err != nil {
-		return nil, fmt.Errorf("resolve pid path: %w", err)
+		return nil, fmt.Errorf("resolve discovery path: %w", err)
 	}
-	if err := ensureNotRunning(pidPath, socketPath); err != nil {
+	if err := ensureNotRunning(markerPath, socketPath); err != nil {
 		return nil, err
 	}
-	s := newServer(nil, cfg, cfgPath, socketPath, pidPath, log, ring)
+	s := newServer(nil, cfg, cfgPath, socketPath, markerPath, log, ring)
 	s.engine = forward.NewEngine(s.ctx, cfg, log)
 	return s, nil
 }
 
-func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, pidPath string, log *slog.Logger, ring *routelog.Ring) *Server {
+// resolveListenSocket picks the socket the daemon binds: the --socket /
+// PORTATO_SOCKET override if set, otherwise the runtime-dir default.
+func resolveListenSocket() (string, error) {
+	if ov := SocketOverride(); ov != "" {
+		return ov, nil
+	}
+	return RuntimeSocketPath()
+}
+
+func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, markerPath string, log *slog.Logger, ring *routelog.Ring) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
 		engine:     engine,
 		cfg:        cfg,
 		cfgPath:    cfgPath,
 		socketPath: socketPath,
-		pidPath:    pidPath,
+		markerPath: markerPath,
 		log:        log,
 		logs:       ring,
 		ctx:        ctx,
@@ -100,9 +108,9 @@ func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, pidPath
 // Socket returns the unix-socket path the daemon binds (for logging/display).
 func (s *Server) Socket() string { return s.socketPath }
 
-// Start binds the socket, writes the PID file, starts the enabled tunnels and
-// serves HTTP until ctx is cancelled (or serving fails). It always shuts down
-// cleanly on return. SPEC §6.
+// Start binds the socket, writes the discovery marker (advertising the socket
+// path + PID), starts the enabled tunnels and serves HTTP until ctx is
+// cancelled (or serving fails). It always shuts down cleanly on return. SPEC §6.
 func (s *Server) Start(ctx context.Context) error {
 	if err := os.MkdirAll(filepath.Dir(s.socketPath), 0o700); err != nil {
 		return fmt.Errorf("create socket dir: %w", err)
@@ -116,10 +124,10 @@ func (s *Server) Start(ctx context.Context) error {
 		s.cleanup()
 		return fmt.Errorf("chmod socket: %w", err)
 	}
-	if err := s.writePID(); err != nil {
+	if err := WriteMarker(s.markerPath, s.socketPath, os.Getpid()); err != nil {
 		_ = ln.Close()
 		s.cleanup()
-		return fmt.Errorf("write pid: %w", err)
+		return fmt.Errorf("write discovery marker: %w", err)
 	}
 	s.listener = ln
 	s.srv = &http.Server{Handler: s.routes()}
@@ -140,7 +148,7 @@ func (s *Server) Start(ctx context.Context) error {
 }
 
 // Shutdown stops the HTTP server, tears down all tunnels and removes the
-// socket and PID file. Safe to call once.
+// socket and the discovery marker. Safe to call once.
 func (s *Server) Shutdown() error {
 	s.shutdownOnce.Do(func() {
 		s.cancel()
@@ -156,14 +164,9 @@ func (s *Server) Shutdown() error {
 	return nil
 }
 
-func (s *Server) writePID() error {
-	pid := strconv.Itoa(os.Getpid())
-	return os.WriteFile(s.pidPath, []byte(pid), 0o600)
-}
-
 func (s *Server) cleanup() {
 	_ = os.Remove(s.socketPath)
-	_ = os.Remove(s.pidPath)
+	_ = RemoveMarker(s.markerPath)
 }
 
 func (s *Server) routes() http.Handler {
@@ -511,28 +514,25 @@ func writeError(w http.ResponseWriter, status int, format string, args ...any) {
 	writeJSON(w, status, map[string]string{"error": fmt.Sprintf(format, args...)})
 }
 
-// ensureNotRunning reads the PID file (if any) and signals the process to
-// detect a live daemon. A dead PID or corrupt file means stale artefacts,
-// which are removed so a fresh daemon can start.
-func ensureNotRunning(pidPath, socketPath string) error {
-	data, err := os.ReadFile(pidPath)
+// ensureNotRunning reads the discovery marker (if any) and signals its PID to
+// detect a live daemon. A dead/corrupt marker or a stray socket file are stale
+// artefacts and are removed so a fresh daemon can start.
+func ensureNotRunning(markerPath, socketPath string) error {
+	m, err := ReadMarker(markerPath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			_ = os.Remove(socketPath)
-			return nil
+		if !os.IsNotExist(err) {
+			// Corrupt marker — clean it up and fall through.
+			_ = RemoveMarker(markerPath)
 		}
-		return fmt.Errorf("read pid file: %w", err)
-	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	if err != nil || pid <= 0 {
-		_ = os.Remove(pidPath)
 		_ = os.Remove(socketPath)
 		return nil
 	}
-	if err := syscall.Kill(pid, 0); err == nil || errors.Is(err, syscall.EPERM) {
-		return fmt.Errorf("daemon already running (pid %d)", pid)
+	if pidAlive(m.PID) {
+		return fmt.Errorf("daemon already running (pid %d) at %s", m.PID, m.Socket)
 	}
-	_ = os.Remove(pidPath)
+	// Stale marker (dead PID): remove it and any leftover socket it pointed at.
+	_ = RemoveMarker(markerPath)
+	_ = os.Remove(m.Socket)
 	_ = os.Remove(socketPath)
 	return nil
 }

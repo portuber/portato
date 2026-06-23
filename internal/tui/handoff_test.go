@@ -54,13 +54,13 @@ func TestHandoff_ClosesBeforeSpawn_WaitsForSocket(t *testing.T) {
 
 	startCmd = func(string) error { log = append(log, "spawn"); return nil }
 	probes := 0
-	probeSocket = func(string) bool {
+	probeSocket = func() bool {
 		probes++
 		log = append(log, "probe")
 		return probes >= 2 // ready on the second probe
 	}
 
-	if err := handoffToDaemon(ctrl, "/cfg", "/sock"); err != nil {
+	if err := handoffToDaemon(ctrl, "/cfg"); err != nil {
 		t.Fatalf("handoffToDaemon: %v", err)
 	}
 	if probes < 2 {
@@ -82,9 +82,9 @@ func TestHandoff_SpawnError(t *testing.T) {
 
 	boom := errors.New("no such binary")
 	startCmd = func(string) error { return boom }
-	probeSocket = func(string) bool { return true }
+	probeSocket = func() bool { return true }
 
-	err := handoffToDaemon(ctrl, "/cfg", "/sock")
+	err := handoffToDaemon(ctrl, "/cfg")
 	if err == nil || !strings.Contains(err.Error(), "spawn daemon") {
 		t.Errorf("expected spawn error, got %v", err)
 	}
@@ -101,9 +101,9 @@ func TestHandoff_Timeout(t *testing.T) {
 	handoffPollInterval = 5 * time.Millisecond
 	handoffTimeout = 20 * time.Millisecond
 	startCmd = func(string) error { return nil }
-	probeSocket = func(string) bool { return false } // never becomes ready
+	probeSocket = func() bool { return false } // never becomes ready
 
-	err := handoffToDaemon(ctrl, "/cfg", "/sock")
+	err := handoffToDaemon(ctrl, "/cfg")
 	if err == nil || !strings.Contains(err.Error(), "did not become ready") {
 		t.Errorf("expected timeout error, got %v", err)
 	}

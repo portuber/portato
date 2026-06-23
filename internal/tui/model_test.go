@@ -421,7 +421,7 @@ func TestFitEndpoint(t *testing.T) {
 
 func TestModel_QuitStandaloneLiveShowsModal(t *testing.T) {
 	f := newFake(controller.Status{Name: "a", State: controller.Connected})
-	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})
 
 	next, cmd := m.handleKey(keyPress("q"))
 	m = next.(Model)
@@ -469,10 +469,10 @@ func TestModel_QuitAttachNoModal(t *testing.T) {
 func TestModel_ConfirmKeys(t *testing.T) {
 	restoreHandoffSeams(t)
 	startCmd = func(string) error { return nil }
-	probeSocket = func(string) bool { return true }
+	probeSocket = func() bool { return true }
 
 	f := newFake(controller.Status{Name: "a", State: controller.Connected})
-	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})
 	next, _ := m.handleKey(keyPress("q"))
 	m = next.(Model)
 	if !m.confirmQuit {
@@ -487,7 +487,7 @@ func TestModel_ConfirmKeys(t *testing.T) {
 	}
 
 	// reset to modal, then "n" -> quit
-	m2 := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	m2 := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})
 	m2.list = []controller.Status{{Name: "a", State: controller.Connected}}
 	m2.confirmQuit = true
 	next, cmd = m2.handleKey(keyPress("n"))
@@ -497,7 +497,7 @@ func TestModel_ConfirmKeys(t *testing.T) {
 	}
 
 	// enter declines (same as n): stop + exit
-	mEnter := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	mEnter := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})
 	mEnter.list = []controller.Status{{Name: "a", State: controller.Connected}}
 	mEnter.confirmQuit = true
 	next, cmd = mEnter.handleKey(keyPress("enter"))
@@ -507,7 +507,7 @@ func TestModel_ConfirmKeys(t *testing.T) {
 	}
 
 	// esc cancels the modal: back to the list, no quit, tunnels untouched
-	mEsc := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	mEsc := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})
 	mEsc.list = []controller.Status{{Name: "a", State: controller.Connected}}
 	mEsc.confirmQuit = true
 	next, cmd = mEsc.handleKey(keyPress("esc"))
@@ -639,7 +639,7 @@ func TestRenderErrorIndicatorDistinct(t *testing.T) {
 
 func TestModel_TickIgnoredDuringHandoff(t *testing.T) {
 	f := newFake(controller.Status{Name: "a", State: controller.Connected})
-	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg", SocketPath: "/sock"})
+	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})
 	m.handoffing = true
 
 	next, cmd := m.Update(tickMsg{})

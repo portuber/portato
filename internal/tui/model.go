@@ -40,8 +40,7 @@ type Model struct {
 	// logs is the Phase 11 per-tunnel log screen sub-model (nil when inactive).
 	logs *logsView
 
-	cfgPath   string
-	socketURI string
+	cfgPath string
 
 	help bool
 	quit bool
@@ -49,12 +48,11 @@ type Model struct {
 
 func New(ctrl controller.Controller, opt Options) Model {
 	return Model{
-		ctrl:      ctrl,
-		list:      ctrl.List(),
-		mode:      opt.Mode,
-		attach:    strings.HasPrefix(opt.Mode, "attach"),
-		cfgPath:   opt.CfgPath,
-		socketURI: opt.SocketPath,
+		ctrl:    ctrl,
+		list:    ctrl.List(),
+		mode:    opt.Mode,
+		attach:  strings.HasPrefix(opt.Mode, "attach"),
+		cfgPath: opt.CfgPath,
 	}
 }
 

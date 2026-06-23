@@ -11,6 +11,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/client"
 	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/kipkaev55/portato/internal/daemon"
 	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
@@ -63,30 +64,36 @@ func openDaemonLogAppend() (*os.File, error) {
 	return os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 }
 
-// probeSocket reports whether the daemon is answering on the socket. Seam for
-// tests; production uses a short-timeout healthz probe.
-var probeSocket = func(socket string) bool {
+// probeSocket reports whether the daemon is answering, by reading the
+// discovery marker and probing the advertised socket. Seam for tests;
+// production uses a short-timeout healthz probe.
+var probeSocket = func() bool {
+	socket, err := daemon.ResolveSocket()
+	if err != nil || socket == "" {
+		return false
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), handoffPollInterval)
 	defer cancel()
 	return client.New(socket).HealthzCtx(ctx) == nil
 }
 
 // handoffToDaemon releases the standalone's local ports (so the daemon can
-// bind them), spawns a detached daemon and waits for its socket to answer.
+// bind them), spawns a detached daemon and waits for its discovery marker to
+// appear and answer.
 //
 // Ports are released before the spawn on purpose: the daemon binds its tunnel
 // listeners once at startup (see forward.Tunnel.Start) and does not retry a
 // failed bind, so the ports must be free by the time it starts. The brief
 // gap between release and the daemon rebinding is the accepted MVP "blip"
 // (SPEC §12). FD-passing would remove it — post-MVP.
-func handoffToDaemon(ctrl controller.Controller, cfgPath, socket string) error {
+func handoffToDaemon(ctrl controller.Controller, cfgPath string) error {
 	_ = ctrl.Close()
 	if err := startCmd(cfgPath); err != nil {
 		return fmt.Errorf("spawn daemon: %w", err)
 	}
 	deadline := time.Now().Add(handoffTimeout)
 	for time.Now().Before(deadline) {
-		if probeSocket(socket) {
+		if probeSocket() {
 			return nil
 		}
 		time.Sleep(handoffPollInterval)

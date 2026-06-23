@@ -231,7 +231,7 @@ func (m Model) handleConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 func (m Model) handoffCmd() tea.Cmd {
 	ctrl := m.ctrl
 	return func() tea.Msg {
-		return handoffDoneMsg{err: handoffToDaemon(ctrl, m.cfgPath, m.socketURI)}
+		return handoffDoneMsg{err: handoffToDaemon(ctrl, m.cfgPath)}
 	}
 }
 
