@@ -18,7 +18,7 @@
 | 5   | CLI commands + smart launcher + hand-off | `[x]`  | [phase-5-cli-smart-launcher.md](./phases/phase-5-cli-smart-launcher.md) |
 | 6   | Autostart (launchd/systemd) + E2E     | `[x]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
 
-### Post-MVP (phases 7–12, outline — detailed when reached)
+### Post-MVP (phases 7–13, outline — detailed when reached)
 
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
@@ -28,6 +28,7 @@
 | 10  | TUI tunnel editor (e/n/d)         | `[x]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
 | 11  | Polish (logs, themes, CI, doctor) | `[x]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
 | 12  | Robust IPC socket discovery       | `[ ]`  | [phase-12-ipc-discovery.md](./phases/phase-12-ipc-discovery.md) |
+| 13  | Polish 2 (log rotation, `/` filter, goreleaser) | `[ ]`  | [phase-13-polish-2.md](./phases/phase-13-polish-2.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -103,7 +104,7 @@ is captured at rejection and accepted via `Controller.AcceptHost` /
 GitHub Actions CI (vet / fmt / test `-race` / cross-compile), `make build-all`
 and `make cover`, and a refreshed README. Total coverage ≈ 69%.
 
-Phases 1–6 are the detailed MVP plan; 7–12 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design.
+Phases 1–6 are the detailed MVP plan; 7–13 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design. Phase 13 (Polish 2) picks up the three items deferred from phase 11: log rotation, the `/` list filter, and goreleaser.
 
 ## Phase summary
 
@@ -120,6 +121,7 @@ Phases 1–6 are the detailed MVP plan; 7–12 are outline (goal + DoD), refined
 - **Phase 10** — a tunnel editor in the TUI (`e`/`n`/`d`).
 - **Phase 11** — logs in the TUI (`l`), themes, `portato doctor`, tests, CI.
 - **Phase 12** — robust IPC socket discovery: the daemon advertises its socket path via a stable discovery file; clients read it (socket lives in `$TMPDIR` / `$XDG_RUNTIME_DIR`).
+- **Phase 13** — polish 2 (deferred phase-11 items): persistent rotated log file, the `/` tunnel-list filter, goreleaser release tooling.
 
 ## Final MVP E2E (on completing Phase 6)
 
