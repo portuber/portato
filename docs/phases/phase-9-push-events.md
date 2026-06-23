@@ -49,3 +49,13 @@ extra load on the daemon.
 
 - SSE or chunked JSON? → **SSE** (`text/event-stream`).
 - Push full-status on event, or only a diff? → **signal-only** (no payload); the client re-fetches via `List()`. Diff/full-status is a future optimization.
+
+## Note
+
+The `fix(daemon)` patch landed during this phase (a fixed macOS
+`~/Library/Application Support/portato/` socket path, replacing the
+session-variable `XDG_RUNTIME_DIR` lookup) was a short-term workaround.
+**Phase 12 (Robust IPC socket discovery) supersedes it**: the socket now lives
+in a runtime/temp dir and is advertised via a stable discovery marker, so the
+fixed-path workaround and the build-tagged `paths_darwin.go` / `paths_unix.go`
+files have been removed.

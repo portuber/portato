@@ -59,7 +59,7 @@ portato --config <path> -> custom config path (global flag)
 portato --help
 ```
 
-For `portato` (smart): the daemon's presence is detected by trying to connect to the socket and checking the liveness of the PID from the PID file.
+For `portato` (smart): the daemon's presence is detected by reading the discovery marker (§6) for its socket path and PID, then probing the socket.
 
 ## 4. Project layout
 
@@ -142,10 +142,30 @@ Implementations:
 ## 6. IPC (daemon <-> clients)
 
 - **Transport:** a unix domain socket (a file). No TCP ports exposed to the network.
-- **Socket path:** resolved per OS so the daemon and every client always agree, regardless of which shell launched them.
-  - Linux: `$XDG_RUNTIME_DIR/portato.sock` (reliable — set by systemd/logind as a per-user tmpfs; fallback `$HOME/.config/portato/portato.sock` when unset).
-  - macOS: `$HOME/Library/Application Support/portato/portato.sock` — a fixed subdirectory. macOS has no reliable per-user runtime dir (`XDG_RUNTIME_DIR` is not set by the OS and varies across terminal/tmux sessions; relying on it made the daemon and clients disagree on the path), so a deterministic Application Support location is used.
-- **PID file:** next to the socket, `portato.pid`. On daemon startup, verify the process is alive via the PID — protection against double launches.
+- **Socket discovery (Phase 12):** the daemon's socket lives in a semantically
+  correct but *session-variable* runtime location, so the daemon advertises its
+  actual path via a stable discovery marker that every client reads instead of
+  guessing. Daemon and clients therefore always agree regardless of which
+  shell/session launched them.
+  - **Discovery marker** (the pointer, not the socket):
+    `xdg.ConfigHome/portato/daemon.socket` — a small JSON document
+    `{"socket":"<path>","pid":<int>}`, written atomically (tmp + rename),
+    mode `0600`. Stable and env-independent.
+  - **Socket** (the thing that is listened on), under a runtime/temp dir,
+    uid-scoped to avoid collisions:
+    - Linux: `$XDG_RUNTIME_DIR/portato-<uid>.sock` (`/run/user/<uid>`, a per-user
+      tmpfs set by systemd/logind; falls back to `os.TempDir()` when unset).
+    - macOS: `$TMPDIR/portato-<uid>.sock` (via `os.TempDir()`); macOS has no
+      reliable per-user runtime dir (`XDG_RUNTIME_DIR` is not set by the OS and
+      varies across terminal/tmux sessions), which is exactly why the marker is
+      needed — the socket path differs per session but the marker always points
+      at the live one.
+  - **Liveness:** a client reads the marker and checks the owning PID is alive
+    before dialing; a stale marker (e.g. the daemon was `kill -9`'d) is removed
+    on the first contact, so clients report "not running" instead of hanging.
+- **Override:** `--socket <path>` (or the `PORTATO_SOCKET` env var) bypasses
+  discovery — the daemon binds the given path and clients dial it directly.
+  Intended for tests and CI.
 - **Protocol:** HTTP over the unix socket (`net.Listen("unix", path)` + `http.Serve`). JSON in request/response bodies.
 - **Permissions:** the socket is created with mode `0600`, accessible only to the owner.
 - **Endpoints:**
@@ -195,7 +215,8 @@ Default path (via `xdg.ConfigHome`):
 
 Overridden by the global `--config` flag.
 
-The IPC socket, PID file, and logs live in `xdg.RuntimeDir` / `xdg.StateHome` respectively.
+The IPC socket lives in a runtime/temp dir (see §6); its path is advertised via
+a discovery marker under `xdg.ConfigHome`. Logs live in `xdg.StateHome`.
 
 ### Schema
 
@@ -304,7 +325,7 @@ When quitting standalone mode (`q`):
 
 1. If there are no live (Connecting/Connected/Reconnecting) tunnels -> exit immediately with `StopAll()`.
 2. If there are live tunnels -> modal: `"N tunnels active. Leave them in the background? [y/N]"`.
-3. **`y`**: standalone first runs `StopAll()` (releases the local ports), then spawns `portato daemon --config <cfg>` as a separate detached process (`exec.Command` + `cmd.Start()`, `Setsid`). The ports are released before the spawn on purpose: `Tunnel.Start` binds its listener synchronously and does not retry a failed bind, so by the time the daemon starts the ports must be free — otherwise the daemon's tunnel falls into `Error` with no recovery. The standalone process periodically (every 100ms, up to a 5s timeout) tries `GET /healthz` on the socket; once it gets a 200, it exits. The fresh daemon reads `enabled: true` from the persisted config (the section 6 invariant) and brings up the same set of tunnels.
+3. **`y`**: standalone first runs `StopAll()` (releases the local ports), then spawns `portato daemon --config <cfg>` as a separate detached process (`exec.Command` + `cmd.Start()`, `Setsid`). The ports are released before the spawn on purpose: `Tunnel.Start` binds its listener synchronously and does not retry a failed bind, so by the time the daemon starts the ports must be free — otherwise the daemon's tunnel falls into `Error` with no recovery. The standalone process periodically (every 100ms, up to a 5s timeout) reads the discovery marker (§6) and probes the advertised socket with `GET /healthz`; once it gets a 200, it exits. The fresh daemon reads `enabled: true` from the persisted config (the section 6 invariant) and brings up the same set of tunnels.
 4. **`n`** or `enter`: `StopAll()` + exit; **`Esc`**: cancel — close the modal and return to the list (without stopping the tunnels and without exiting).
 
 MVP limitation: between the standalone `StopAll()` and the daemon rebinding/SSH-handshaking the tunnels, there is a window (~hundreds of ms — seconds) during which the local port is unavailable. This is an MVP compromise. Post-MVP — passing the tunnels' FDs to the daemon via FD-passing (a seamless transition).
