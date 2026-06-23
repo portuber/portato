@@ -27,7 +27,7 @@
 | 9   | Push events instead of polling    | `[x]`  | [phase-9-push-events.md](./phases/phase-9-push-events.md) |
 | 10  | TUI tunnel editor (e/n/d)         | `[x]`  | [phase-10-tui-editor.md](./phases/phase-10-tui-editor.md) |
 | 11  | Polish (logs, themes, CI, doctor) | `[x]`  | [phase-11-polish.md](./phases/phase-11-polish.md)     |
-| 12  | Robust IPC socket discovery       | `[ ]`  | [phase-12-ipc-discovery.md](./phases/phase-12-ipc-discovery.md) |
+| 12  | Robust IPC socket discovery       | `[~]`  | [phase-12-ipc-discovery.md](./phases/phase-12-ipc-discovery.md) |
 | 13  | Polish 2 (log rotation, `/` filter, goreleaser) | `[ ]`  | [phase-13-polish-2.md](./phases/phase-13-polish-2.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
