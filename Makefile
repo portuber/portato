@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet cross build-all cover install-service
+.PHONY: build run test fmt vet cross build-all cover install-service snapshot
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -31,6 +31,12 @@ build-all:
 	done
 
 cross: build-all
+
+# snapshot builds the full cross-platform release matrix locally via goreleaser
+# (darwin/linux × amd64/arm64), writing archives + checksums.txt to dist/.
+# No publish. Requires goreleaser: go install github.com/goreleaser/goreleaser/v2@latest
+snapshot:
+	goreleaser release --snapshot --clean
 
 # install-service builds the local binary and registers autostart (Phase 6).
 install-service: build

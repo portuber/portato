@@ -1,0 +1,50 @@
+version: 2
+
+project_name: portato
+
+builds:
+  - id: portato
+    main: ./cmd/portato
+    binary: portato
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      # -s -w strip debug info for a smaller binary; inject the version from
+      # the git tag into internal/cmd.version (see internal/cmd/version.go).
+      - -s -w -X github.com/kipkaev55/portato/internal/cmd.version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+    # Use a human-friendly archive name (macOS, x86_64) matching the matrix
+    # already produced by `make build-all`.
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin"}}macOS{{- else}}{{ .Os }}{{- end}}_
+      {{- if eq .Arch "amd64"}}x86_64{{- else}}{{ .Arch }}{{- end}}
+
+checksum:
+  name_template: checksums.txt
+
+# The project may be built with `make snapshot` before a git remote is
+# configured; skip publishing to any SCM.
+release:
+  disable: true
+
+changelog:
+  use: git
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^Merge"
+
+snapshot:
+  version_template: "{{ .Tag }}-next"

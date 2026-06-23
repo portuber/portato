@@ -116,6 +116,7 @@ func Execute() error {
 		uninstallCmd,
 		forwardCmd,
 		doctorCmd,
+		versionCmd,
 	)
 	return rootCmd.Execute()
 }
