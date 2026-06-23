@@ -1,10 +1,8 @@
 package log
 
 import (
-	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
 
 	"github.com/adrg/xdg"
@@ -23,17 +21,15 @@ func Setup(path string) (*slog.Logger, *Ring, io.Closer, error) {
 	if path == "" {
 		path = DefaultPath()
 	}
-	if dir := filepath.Dir(path); dir != "" {
-		if err := os.MkdirAll(dir, 0o700); err != nil {
-			return nil, nil, nil, fmt.Errorf("create log dir: %w", err)
-		}
-	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	// The base writer is a size-rotating file so logs persist across restarts
+	// in bounded disk; it feeds the same records the ring captures, so the
+	// on-disk log and the TUI's scrollback stay identical.
+	w, err := NewRotatingWriter(path, defaultMaxSize, defaultKeep)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("open log file: %w", err)
+		return nil, nil, nil, err
 	}
 	ring := NewRing()
-	base := slog.NewTextHandler(f, &slog.HandlerOptions{Level: slog.LevelInfo})
+	base := slog.NewTextHandler(w, &slog.HandlerOptions{Level: slog.LevelInfo})
 	h := ringHandler{base: base, ring: ring}
-	return slog.New(h), ring, f, nil
+	return slog.New(h), ring, w, nil
 }

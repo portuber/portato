@@ -348,7 +348,11 @@ Since tunnels are `enabled: false` by default, at system boot **only** the contr
 - The slog handler also feeds an in-memory ring buffer (Phase 11) so the TUI
   logs screen (`l`) can show recent per-tunnel entries without reading the
   file; in attach mode they are fetched over `GET /logs`.
-- Rotation is simple (size/time), added as needed (post-Phase-11).
+- Rotation (Phase 13): the file is a size-capped rotating writer
+  (`internal/log` `RotatingWriter`, ~1 MiB, 3 archives) so a long-running
+  daemon's log stays bounded — `portato.log`/`daemon.log` → `.log.1` → `.2`
+  → `.3` (oldest dropped). `portato doctor` reports the path and the last
+  rotation.
 
 ## 15. Non-functional requirements
 

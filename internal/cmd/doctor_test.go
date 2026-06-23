@@ -82,3 +82,71 @@ func TestDoctor_FailsOnBadConfig(t *testing.T) {
 		t.Errorf("output should flag the config failure\ngot:\n%s", out)
 	}
 }
+
+// TestDoctor_ReportsLogPathAndRotation verifies the Phase 13 `logs` check:
+// with a daemon log file and one archive, doctor prints the path and the
+// archive's mtime as the last rotation.
+func TestDoctor_ReportsLogPathAndRotation(t *testing.T) {
+	dir := t.TempDir()
+	daemonLog := filepath.Join(dir, "daemon.log")
+	if err := os.WriteFile(daemonLog, []byte("current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(daemonLog+".1", []byte("archive\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	withLogPaths(t, daemonLog)
+
+	cfgPath := filepath.Join(dir, "config.yaml")
+	body := "tunnels:\n  - name: t1\n    type: local\n    local: \"19997\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should pass, got err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "✓ logs") {
+		t.Errorf("output missing the logs check\ngot:\n%s", out)
+	}
+	if !strings.Contains(out, "last rotated") {
+		t.Errorf("output should report the last rotation\ngot:\n%s", out)
+	}
+	if !strings.Contains(out, "daemon.log") {
+		t.Errorf("output should name the log path\ngot:\n%s", out)
+	}
+}
+
+// TestDoctor_ReportsNoRotationYet covers the fresh-install path: the daemon
+// log exists but no archive has been produced yet.
+func TestDoctor_ReportsNoRotationYet(t *testing.T) {
+	dir := t.TempDir()
+	daemonLog := filepath.Join(dir, "daemon.log")
+	if err := os.WriteFile(daemonLog, []byte("current\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	withLogPaths(t, daemonLog)
+
+	cfgPath := filepath.Join(dir, "config.yaml")
+	body := "tunnels:\n  - name: t1\n    type: local\n    local: \"19998\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should pass, got err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "no rotation yet") {
+		t.Errorf("output should report no rotation yet\ngot:\n%s", out)
+	}
+}
+
+// withLogPaths points doctor's log check at the given temp paths for the test.
+func withLogPaths(t *testing.T, paths ...string) {
+	t.Helper()
+	saved := logStatePaths
+	logStatePaths = func() []string { return paths }
+	t.Cleanup(func() { logStatePaths = saved })
+}

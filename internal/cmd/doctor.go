@@ -16,6 +16,7 @@ import (
 	"github.com/kipkaev55/portato/internal/client"
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/daemon"
+	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
 var doctorCmd = &cobra.Command{
@@ -82,7 +83,23 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// 5. Daemon reachability (the daemon is optional, so absent is informational).
+	// 5. Log file + rotation. The daemon/standalone write a size-rotated file
+	// under the state home; report its path and the most recent rotation
+	// (evidenced by the newest archive's mtime — doctor is a separate process
+	// and cannot read the in-memory RotatingWriter state).
+	paths := logStatePaths()
+	logPath := paths[0]
+	if fileExists(logPath) {
+		if t, ok := lastRotation(paths...); ok {
+			d.ok("logs", "%s (last rotated %s)", logPath, t.Format("2006-01-02 15:04:05"))
+		} else {
+			d.ok("logs", "%s (no rotation yet)", logPath)
+		}
+	} else {
+		d.info("logs", "%s (created when the daemon or standalone runs)", logPath)
+	}
+
+	// 6. Daemon reachability (the daemon is optional, so absent is informational).
 	socket, err := daemon.ResolveSocket()
 	if err == nil && socket != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), doctorProbeTimeout)
@@ -90,7 +107,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		cancel()
 		if herr == nil {
 			d.ok("daemon", "reachable at %s", socket)
-			// 6. The IPC socket must be owner-only (SPEC §6: 0600).
+			// 7. The IPC socket must be owner-only (SPEC §6: 0600).
 			if info, statErr := os.Stat(socket); statErr == nil {
 				if perm := info.Mode().Perm(); perm != 0o600 {
 					d.fail("socket perms", "%s mode %o, expected 0600", socket, perm)
@@ -103,7 +120,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		d.info("daemon", "not running (start with `portato daemon` or `portato install`)")
 	}
 
-	// 7. Linux: lingering must be enabled for the daemon to survive logout.
+	// 8. Linux: lingering must be enabled for the daemon to survive logout.
 	if runtime.GOOS == "linux" {
 		checkLinger(d)
 	}
@@ -158,6 +175,25 @@ func isReachableSock(path string) bool {
 		_ = c.Close()
 	}
 	return err == nil
+}
+
+// logStatePaths returns the candidate log paths doctor inspects (the daemon
+// log first, then the standalone one). It is a variable so tests can point it
+// at a temp dir without depending on the real XDG state home.
+var logStatePaths = func() []string {
+	return []string{routelog.DaemonPath(), routelog.DefaultPath()}
+}
+
+// lastRotation reports the mtime of the most recent archive among the given log
+// paths (path + ".1"), so `portato doctor` can show when logs last rotated.
+// Returns ok=false when no archive exists yet.
+func lastRotation(paths ...string) (time.Time, bool) {
+	for _, p := range paths {
+		if info, err := os.Stat(p + ".1"); err == nil {
+			return info.ModTime(), true
+		}
+	}
+	return time.Time{}, false
 }
 
 // checkLinger runs `loginctl show-user` and inspects the Linger property.
