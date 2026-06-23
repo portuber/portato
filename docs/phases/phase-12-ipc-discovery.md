@@ -28,34 +28,34 @@ with the proper architecture: a runtime socket + a stable pointer to it.
 
 ## Tasks
 
-- [ ] `internal/daemon/discovery.go`: `DiscoveryPath()` (stable marker under
+- [x] `internal/daemon/discovery.go`: `DiscoveryPath()` (stable marker under
       `xdg.ConfigHome/portato/daemon.socket`), atomic `Write(socketPath, pid)`
       (tmp + rename), `Read() (socket, pid, err)`, `Remove()`.
-- [ ] Socket location → runtime dir: mac `$TMPDIR`, linux `$XDG_RUNTIME_DIR`,
+- [x] Socket location → runtime dir: mac `$TMPDIR`, linux `$XDG_RUNTIME_DIR`,
       fallback `os.TempDir()/portato-<uid>.sock`. Replaces the build-tagged
       `paths_darwin.go` / `paths_unix.go` fixed path introduced in phase 9's
       `fix(daemon)`.
-- [ ] Daemon `Start`: bind socket → `discovery.Write`; `Shutdown` / cleanup →
+- [x] Daemon `Start`: bind socket → `discovery.Write`; `Shutdown` / cleanup →
       `discovery.Remove` + remove the socket file.
-- [ ] Clients (`dialDaemon`, `attach`, the smart-launcher): `discovery.Read` →
+- [x] Clients (`dialDaemon`, `attach`, the smart-launcher`): `discovery.Read` →
       connect to the advertised path; keep the PID-liveness check for stale
       markers. Remove direct `daemon.SocketPath()` calls from clients.
-- [ ] `ensureNotRunning` reads the PID from the discovery marker.
-- [ ] Optional: `--socket` / `PORTATO_SOCKET` override (for tests / CI).
-- [ ] SPEC §6: rewrite the socket-path section to the discovery model.
-- [ ] Note in the phase-9 file that phase 12 supersedes its `fix(daemon)` patch.
+- [x] `ensureNotRunning` reads the PID from the discovery marker.
+- [x] Optional: `--socket` / `PORTATO_SOCKET` override (for tests / CI).
+- [x] SPEC §6: rewrite the socket-path section to the discovery model.
+- [x] Note in the phase-9 file that phase 12 supersedes its `fix(daemon)` patch.
 
 ## Definition of Done
 
-- [ ] From any shell/session (different `XDG_RUNTIME_DIR`, different `TMPDIR`),
+- [x] From any shell/session (different `XDG_RUNTIME_DIR`, different `TMPDIR`),
       `portato list` / `attach` find a running daemon with no `unset`.
-- [ ] `lsof` / the marker content confirms the socket lives under `$TMPDIR`
+- [x] `lsof` / the marker content confirms the socket lives under `$TMPDIR`
       (macOS) / `$XDG_RUNTIME_DIR` (Linux).
-- [ ] A stale marker (daemon `kill -9`) is detected on the first client request
+- [x] A stale marker (daemon `kill -9`) is detected on the first client request
       → friendly "not running", no hang.
-- [ ] Graceful daemon shutdown removes both the socket and the marker.
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean.
-- [ ] SPEC §6 is updated to the discovery model.
+- [x] Graceful daemon shutdown removes both the socket and the marker.
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean.
+- [x] SPEC §6 is updated to the discovery model.
 
 ## Verification
 
