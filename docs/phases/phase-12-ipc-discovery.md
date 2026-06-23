@@ -1,7 +1,7 @@
 ---
 phase: 12
 title: Robust IPC socket discovery (discovery-file)
-status: in-progress
+status: done
 depends_on: [4]
 ---
 
