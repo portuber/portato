@@ -1,7 +1,7 @@
 ---
 phase: 14
 title: TUI: duplicate the selected tunnel (Shift+C)
-status: todo
+status: done
 depends_on: [10]
 ---
 
@@ -34,40 +34,40 @@ it behind Shift avoids an accidental keypress interrupting the session. Lowercas
 
 ## Tasks
 
-- [ ] `internal/tui/update.go`: a `case "C":` in `handleKey` (next to the `d`
+- [x] `internal/tui/update.go`: a `case "C":` in `handleKey` (next to the `d`
       case), guarded by `m.hasCurrent()` → `openDuplicateEditor(m.ctrl,
       m.list[m.cursor].Name, m.width, m.height)`. Lowercase `c` stays unbound.
-- [ ] `internal/tui/update.go`: `openDuplicateEditor(ctrl, selected, w, h)`
+- [x] `internal/tui/update.go`: `openDuplicateEditor(ctrl, selected, w, h)`
       next to `openEditor` — fetch `ctrl.Config()`, collect existing names,
       find the source tunnel, set `src.Name = freshName(selected, names)` and
       `src.Enabled = false`, then `newTunnelEditor(modeNew, src, names, ctrl)`;
       set `e.original = ""` so the modeNew uniqueness check is clean, and
       `e.width/height = w/h`; return `(e, e.setFocus(fName))`.
-- [ ] `freshName(base, existing) string` helper (`update.go` or `editor.go`):
+- [x] `freshName(base, existing) string` helper (`update.go` or `editor.go`):
       `db` → `db-copy` → `db-copy-2` → `db-copy-3` … (satisfies
       `validEditorName` `[a-zA-Z0-9_-]`).
-- [ ] `internal/tui/view.go`: `footer()` adds `· C duplicate`; `helpBlock()`
+- [x] `internal/tui/view.go`: `footer()` adds `· C duplicate`; `helpBlock()`
       adds `C            duplicate the selected tunnel` after the `n …` line.
-- [ ] `internal/tui/model_test.go`: `TestModel_DuplicateKeyOpensEditor`
+- [x] `internal/tui/model_test.go`: `TestModel_DuplicateKeyOpensEditor`
       (mirror of `TestModel_EditKeyOpensEditor`) — `C` opens the editor,
       `mode == modeNew`, `original == ""`, the name field equals `<src>-copy`,
       and ssh/local/remote/type/identity equal the source's.
 
 ## Definition of Done
 
-- [ ] On the tunnel under the cursor, `C` opens the editor prefilled with all
+- [x] On the tunnel under the cursor, `C` opens the editor prefilled with all
       of the source's fields, in create mode, focus on Name, name
       `<src>-copy`.
-- [ ] `ctrl+s` persists the duplicate via `AddTunnel` (not `UpdateTunnel`); the
+- [x] `ctrl+s` persists the duplicate via `AddTunnel` (not `UpdateTunnel`); the
       new tunnel appears in the list without a manual refresh; the original is
       unchanged.
-- [ ] The duplicate is created `enabled: false`; enabling it fails predictably
+- [x] The duplicate is created `enabled: false`; enabling it fails predictably
       if its `local` port collides with the source's (the user is expected to
       change it in the form).
-- [ ] Lowercase `c` does nothing.
-- [ ] `portato list` and the attach-mode TUI show the duplicate identically to
+- [x] Lowercase `c` does nothing.
+- [x] `portato list` and the attach-mode TUI show the duplicate identically to
       any other tunnel (no IPC/controller/daemon change).
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean.
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean.
 
 ## Verification
 
