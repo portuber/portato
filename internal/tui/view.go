@@ -113,6 +113,10 @@ func (m Model) render() string {
 	b.WriteString("\n\n")
 	b.WriteString(m.table())
 	b.WriteString("\n\n")
+	if m.filtering || m.filter.Value() != "" {
+		b.WriteString(m.filterLine())
+		b.WriteString("\n\n")
+	}
 	b.WriteString(m.footer())
 	if m.help {
 		b.WriteString("\n\n")
@@ -141,14 +145,34 @@ func (m Model) table() string {
 	if len(m.list) == 0 {
 		return dimStyle.Render("no tunnels — add one to config and press R to reload")
 	}
+	var rows []int
+	for i, s := range m.list {
+		if m.matches(s) {
+			rows = append(rows, i)
+		}
+	}
+	if len(rows) == 0 {
+		return dimStyle.Render(fmt.Sprintf("no tunnels match %q — esc clears", m.filter.Value()))
+	}
 	var b strings.Builder
 	b.WriteString(columnHeader())
 	b.WriteString("\n")
-	for i, s := range m.list {
-		b.WriteString(m.row(i, s))
+	for _, i := range rows {
+		b.WriteString(m.row(i, m.list[i]))
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+// filterLine renders the `/`-input line: a prompt, the query (with a cursor
+// while typing), and a matched/total count. Shown whenever the filter is open
+// or has a query applied.
+func (m Model) filterLine() string {
+	count := dimStyle.Render(fmt.Sprintf("(%d/%d)", m.visibleCount(), len(m.list)))
+	if m.filtering {
+		return bodyStyle.Render("/ ") + m.filter.View() + "  " + count
+	}
+	return dimStyle.Render(fmt.Sprintf("/ %s  %s  — esc clears", m.filter.Value(), count))
 }
 
 func columnHeader() string {
@@ -263,7 +287,7 @@ func formatUptime(d time.Duration) string {
 }
 
 func (m Model) footer() string {
-	return footerStyle.Render("↑↓/jk move · space toggle · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · R reload · ? help · q quit")
+	return footerStyle.Render("↑↓/jk move · space toggle · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · / filter · R reload · ? help · q quit")
 }
 
 func (m Model) helpBlock() string {
@@ -281,6 +305,7 @@ func (m Model) helpBlock() string {
 		"C            duplicate the selected tunnel",
 		"d            delete the selected tunnel",
 		"l            view the selected tunnel's logs",
+		"/            filter the list (name/type/endpoint; esc clears)",
 		"R            reload config from disk",
 		"? / esc      toggle this help",
 		"q / ctrl+c   quit (stops all tunnels)",

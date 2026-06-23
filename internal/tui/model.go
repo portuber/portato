@@ -4,6 +4,7 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/kipkaev55/portato/internal/controller"
@@ -17,6 +18,14 @@ type Model struct {
 	height int
 	mode   string
 	attach bool
+
+	// filter is the Phase 13 `/` substring filter over the list. filtering is
+	// true while the input is focused (typing/editing); the query stays
+	// applied after `enter` until cleared. Pure view-state: the list is
+	// narrowed client-side, the controller/IPC are untouched, so it works
+	// identically in standalone and attach.
+	filter    textinput.Model
+	filtering bool
 
 	// confirmQuit shows the "leave running in background?" modal. Only raised
 	// in standalone mode when there are live tunnels.
@@ -47,13 +56,26 @@ type Model struct {
 }
 
 func New(ctrl controller.Controller, opt Options) Model {
-	return Model{
+	m := Model{
 		ctrl:    ctrl,
 		list:    ctrl.List(),
 		mode:    opt.Mode,
 		attach:  strings.HasPrefix(opt.Mode, "attach"),
 		cfgPath: opt.CfgPath,
 	}
+	m.filter = newFilterInput()
+	m.clampCursor()
+	return m
+}
+
+// newFilterInput builds the `/`-opened substring filter input. It has no prompt
+// glyph of its own; the filter line composes "/ " + the value + a count.
+func newFilterInput() textinput.Model {
+	ti := textinput.New()
+	ti.Prompt = ""
+	ti.Placeholder = "filter name/type/endpoint…"
+	ti.CharLimit = 64
+	return ti
 }
 
 type tickMsg struct{}

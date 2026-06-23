@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -70,13 +71,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m.handleKey(msg)
 	case tea.PasteMsg:
-		// Bracketed-paste is only meaningful in the editor's text fields; in
-		// the list view there is nothing to paste into, so it is a no-op.
+		// Bracketed-paste is only meaningful in the editor's text fields and
+		// the `/` filter; in the plain list view there is nothing to paste
+		// into, so it is a no-op.
 		if m.editor != nil {
 			cmd := m.editor.update(msg)
 			if m.editor.done {
 				m.editor = nil
 			}
+			return m, cmd
+		}
+		if m.filtering {
+			var cmd tea.Cmd
+			m.filter, cmd = m.filter.Update(msg)
+			(&m).clampCursor()
 			return m, cmd
 		}
 		return m, nil
@@ -85,8 +93,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.filtering {
+		return m.handleFilterKey(k)
+	}
 	if m.confirmQuit {
 		return m.handleConfirm(k)
+	}
+	// A filter that has been applied (enter) but is no longer being typed:
+	// `esc` clears it and restores the full list; `/` re-opens the input to
+	// edit the query. Everything else (navigate, toggle, edit, …) acts on the
+	// filtered view. The confirm-quit modal above takes precedence over esc.
+	if m.filter.Value() != "" {
+		switch k.String() {
+		case "esc":
+			m.filter.SetValue("")
+			(&m).clampCursor()
+			return m, nil
+		case "/":
+			m.filtering = true
+			return m, m.filter.Focus()
+		}
 	}
 	switch k.String() {
 	case "q", "ctrl+c":
@@ -102,14 +128,13 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "?":
 		m.help = !m.help
 		return m, nil
+	case "/":
+		m.filtering = true
+		return m, m.filter.Focus()
 	case "up", "k":
-		if m.cursor > 0 {
-			m.cursor--
-		}
+		(&m).moveCursor(-1)
 	case "down", "j":
-		if m.cursor < len(m.list)-1 {
-			m.cursor++
-		}
+		(&m).moveCursor(1)
 	case "space":
 		if m.hasCurrent() && m.list[m.cursor].PendingHost != "" {
 			m.confirmAccept = true
@@ -274,6 +299,39 @@ func containsName(names []string, s string) bool {
 	return false
 }
 
+// handleFilterKey owns the `/`-input: every key but the control keys goes to
+// the text field (so letters, digits, backspace, cursor movement all edit the
+// query). `esc` clears and closes; `enter` closes keeping the query applied;
+// `ctrl+c` still quits.
+func (m Model) handleFilterKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "esc":
+		m.filtering = false
+		m.filter.SetValue("")
+		m.filter.Blur()
+		(&m).clampCursor()
+		return m, nil
+	case "enter":
+		m.filtering = false
+		m.filter.Blur()
+		(&m).clampCursor()
+		return m, nil
+	case "ctrl+c":
+		if m.attach || !m.hasLiveTunnels() {
+			m.quit = true
+			return m, tea.Quit
+		}
+		m.confirmQuit = true
+		m.filtering = false
+		m.filter.Blur()
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.filter, cmd = m.filter.Update(k)
+	(&m).clampCursor()
+	return m, cmd
+}
+
 // handleConfirm dispatches the "leave running in background?" modal keys.
 func (m Model) handleConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch k.String() {
@@ -310,14 +368,63 @@ func (m Model) hasLiveTunnels() bool {
 	return false
 }
 
+// matches reports whether a tunnel passes the `/` filter (case-insensitive
+// substring over name / type / endpoint). An empty query matches everything.
+func (m Model) matches(s controller.Status) bool {
+	q := strings.ToLower(m.filter.Value())
+	if q == "" {
+		return true
+	}
+	return strings.Contains(strings.ToLower(s.Name), q) ||
+		strings.Contains(strings.ToLower(s.Type), q) ||
+		strings.Contains(strings.ToLower(s.Endpoint()), q)
+}
+
+// visibleCount returns how many tunnels currently pass the filter, for the
+// filter line's matched/total count.
+func (m Model) visibleCount() int {
+	n := 0
+	for _, s := range m.list {
+		if m.matches(s) {
+			n++
+		}
+	}
+	return n
+}
+
+// moveCursor advances the cursor by delta, skipping rows hidden by the filter.
+func (m *Model) moveCursor(delta int) {
+	for i := m.cursor + delta; i >= 0 && i < len(m.list); i += delta {
+		if m.matches(m.list[i]) {
+			m.cursor = i
+			return
+		}
+	}
+}
+
 func (m *Model) clampCursor() {
+	if len(m.list) == 0 {
+		m.cursor = 0
+		return
+	}
 	if m.cursor < 0 {
 		m.cursor = 0
 	}
-	if n := len(m.list); m.cursor >= n {
-		m.cursor = n - 1
-		if m.cursor < 0 {
-			m.cursor = 0
+	if m.cursor >= len(m.list) {
+		m.cursor = len(m.list) - 1
+	}
+	// Keep the cursor on a visible (matching) row: if it sits on a hidden one,
+	// advance to the next visible, else scan backward.
+	for i := m.cursor; i < len(m.list); i++ {
+		if m.matches(m.list[i]) {
+			m.cursor = i
+			return
+		}
+	}
+	for i := m.cursor; i >= 0; i-- {
+		if m.matches(m.list[i]) {
+			m.cursor = i
+			return
 		}
 	}
 }
@@ -362,5 +469,5 @@ func (m *Model) disableAll() {
 }
 
 func (m *Model) hasCurrent() bool {
-	return len(m.list) > 0 && m.cursor >= 0 && m.cursor < len(m.list)
+	return len(m.list) > 0 && m.cursor >= 0 && m.cursor < len(m.list) && m.matches(m.list[m.cursor])
 }

@@ -317,7 +317,7 @@ server (`armon/go-socks5`) whose `Dial` is routed through the current
 
 The header shows the mode: `standalone` or `attach @ <socket>`.
 
-Post-MVP hotkeys: `e/n/d` (Phase 10 — editor), `l` (Phase 11 — logs), `/` (filter/search).
+Post-MVP hotkeys: `e/n/d` (Phase 10 — editor), `l` (Phase 11 — logs), `/` (Phase 13 — substring filter over name/type/endpoint; `esc` clears).
 
 ## 12. The "leave in the background" hand-off
 
