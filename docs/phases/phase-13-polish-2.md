@@ -26,44 +26,44 @@ independent and may land in its own commit.
 
 ## Tasks
 
-- [ ] Log rotation
-  - [ ] `internal/log/file.go`: a rotating file `slog.Handler` writing to
+- [x] Log rotation
+  - [x] `internal/log/file.go`: a rotating file `slog.Handler` writing to
         `xdg.StateHome/portato/portato.log`, rotating by size and keeping N
         archives (e.g. `portato.log`, `portato.log.1`, …).
-  - [ ] Rotation knobs: max size (default ~1 MiB), keep (default 3). Constants
+  - [x] Rotation knobs: max size (default ~1 MiB), keep (default 3). Constants
         for now; config later if needed.
-  - [ ] Daemon wires the file handler alongside the ring handler so persisted
+  - [x] Daemon wires the file handler alongside the ring handler so persisted
         logs are identical to what the TUI shows, in both standalone and attach.
-  - [ ] `portato doctor` reports the log path and the last rotation.
-- [ ] List filter (`/`)
-  - [ ] `Model.filter` (string) + `Model.filtering` (bool); `/` opens the input,
+  - [x] `portato doctor` reports the log path and the last rotation.
+- [x] List filter (`/`)
+  - [x] `Model.filter` (string) + `Model.filtering` (bool); `/` opens the input,
         `esc` clears, live-filter as you type.
-  - [ ] `table()` narrows `m.list` by a case-insensitive substring over
+  - [x] `table()` narrows `m.list` by a case-insensitive substring over
         name / endpoint / type.
-  - [ ] Render a one-line filter input (footer area) showing the query and a
+  - [x] Render a one-line filter input (footer area) showing the query and a
         matched/total count (e.g. `3/12`).
-  - [ ] Pure view-state: works identically in standalone and `attach` (filter is
+  - [x] Pure view-state: works identically in standalone and `attach` (filter is
         applied client-side over the status list; no IPC change).
-- [ ] goreleaser
-  - [ ] `.goreleaser.yml`: build the darwin/linux × amd64/arm64 matrix already
+- [x] goreleaser
+  - [x] `.goreleaser.yml`: build the darwin/linux × amd64/arm64 matrix already
         used by `make build-all`, with archives + checksums and a changelog.
-  - [ ] `make snapshot` target → `goreleaser release --snapshot --clean`.
-  - [ ] README: a short "Releases / install from tarball" note.
-- [ ] Docs: note in phase-11-polish.md that these items moved to phase 13; SPEC
+  - [x] `make snapshot` target → `goreleaser release --snapshot --clean`.
+  - [x] README: a short "Releases / install from tarball" note.
+- [x] Docs: note in phase-11-polish.md that these items moved to phase 13; SPEC
       §logs/hotkeys updated to the new behaviour.
 
 ## Definition of Done
 
-- [ ] Logs are written to a file under the state dir; rotation triggers at the
+- [x] Logs are written to a file under the state dir; rotation triggers at the
       size cap and keeps the configured number of archives; recent lines are
       still queryable from the TUI's in-memory ring.
-- [ ] `/foo` narrows the list to matching tunnels; `esc` restores the full list;
+- [x] `/foo` narrows the list to matching tunnels; `esc` restores the full list;
       the filter survives a redraw tick and works in both standalone and
       `attach`.
-- [ ] `goreleaser release --snapshot --clean` builds all four targets and writes
+- [x] `goreleaser release --snapshot --clean` builds all four targets and writes
       archives + checksums to `dist/`.
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean.
-- [ ] phase-11-polish.md is annotated that these items moved here; SPEC updated.
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean.
+- [x] phase-11-polish.md is annotated that these items moved here; SPEC updated.
 
 ## Verification
 
@@ -87,9 +87,14 @@ independent and may land in its own commit.
 - goreleaser: mirror `make build-all`'s `GOOS`/`GOARCH` list; `-ldflags` injects
   the version from git tags. Homebrew/scoop/deb-rpm are out of scope for now.
 
-## Open questions
+## Open questions (resolved)
 
-- Rotation: hand-rolled vs a dependency (`lumberjack`)? (lean: hand-rolled.)
-- Filter: live-filter-as-you-type vs `enter` to apply? (lean: live.)
-- goreleaser: also publish a Homebrew tap / scoop now or later? (lean: later —
-  archives + checksums only for now.)
+- Rotation: hand-rolled vs a dependency (`lumberjack`)? → **hand-rolled**
+  (`internal/log.RotatingWriter`, an `io.WriteCloser` that the existing slog
+  text handler writes through — not a separate `slog.Handler`; the rotation
+  happens at the writer layer, so the ring and the file still see identical
+  records).
+- Filter: live-filter-as-you-type vs `enter` to apply? → **live** as you type;
+  `enter` closes the input keeping the query applied.
+- goreleaser: also publish a Homebrew tap / scoop now or later? → **later**;
+  archives + checksums only.

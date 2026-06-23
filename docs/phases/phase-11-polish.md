@@ -17,7 +17,9 @@ phase `portato` is ready for everyday use without caveats.
 1. **Scope = the baseline DoD** (all 9 items): logs in TUI, automatic theme
    detection, the TOFU prompt, `portato doctor`, a coverage baseline, CI,
    README, `make build-all`, clean vet/fmt. **Deferred** (candidates, not
-   DoD): log rotation, the `/` list filter, `goreleaser`.
+   DoD): log rotation, the `/` list filter, `goreleaser`. *— delivered in
+   [Phase 13](./phase-13-polish-2.md): a size-rotating log writer, the `/`
+   list filter, and the goreleaser release config.*
 2. **Logs via an in-memory ring buffer.** A custom `slog.Handler` writes to
    the file handler AND records each record into a process-owned `Ring`
    (keyed by the `tunnel` slog attribute). This works identically in
