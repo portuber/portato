@@ -19,6 +19,8 @@ The single binary works in several modes:
 | `portato restart <name>`     | Restart a tunnel                                                    |
 | `portato install`            | Install system autostart (launchd / systemd --user)                 |
 | `portato uninstall`          | Remove system autostart                                             |
+| `portato doctor`             | Diagnose the setup (config, keys, agent, daemon, logs)             |
+| `portato version`            | Print the version                                                   |
 
 ## Build
 
@@ -31,6 +33,27 @@ make fmt     # gofmt -w .
 ```
 
 Requires Go 1.22+.
+
+## Releases
+
+Releases are built with [goreleaser](https://goreleaser.com) across the
+darwin/linux × amd64/arm64 matrix, producing per-target tarballs and a
+`checksums.txt`. To build a local snapshot (no publish, writes to `dist/`):
+
+```sh
+make snapshot   # needs goreleaser: go install github.com/goreleaser/goreleaser/v2@latest
+```
+
+Install from a released tarball by extracting it and putting the `portato`
+binary on your `PATH`:
+
+```sh
+tar -xzf portato_<version>_macOS_arm64.tar.gz
+install -m 0755 portato ~/.local/bin/portato
+portato version
+```
+
+The version baked into the binary comes from the git tag at build time.
 
 ## Status
 
