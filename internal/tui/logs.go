@@ -92,12 +92,11 @@ func renderLogs(entries []routelog.Entry) string {
 	}
 	var b strings.Builder
 	for _, e := range entries {
-		fmt.Fprintf(&b, "%s %s %s", e.Time.Format(time.TimeOnly), levelTag(e.Level), e.Msg)
+		msg := e.Msg
 		if e.Attrs != "" {
-			b.WriteByte(' ')
-			b.WriteString(e.Attrs)
+			msg += " " + e.Attrs
 		}
-		b.WriteByte('\n')
+		fmt.Fprintf(&b, "%s %s %s\n", dimStyle.Render(e.Time.Format(time.TimeOnly)), levelTag(e.Level), bodyStyle.Render(msg))
 	}
 	return b.String()
 }

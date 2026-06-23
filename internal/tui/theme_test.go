@@ -107,7 +107,7 @@ func TestLightPaletteBakesBackground(t *testing.T) {
 	}{
 		{"title", p.title}, {"mode", p.mode}, {"header", p.header},
 		{"selected", p.selected}, {"cursor", p.cursor}, {"dim", p.dim},
-		{"err", p.err}, {"warn", p.warn}, {"footer", p.footer},
+		{"body", p.body}, {"err", p.err}, {"warn", p.warn}, {"footer", p.footer},
 		{"helpTitle", p.helpTitle}, {"helpPanel", p.helpPanel}, {"modal", p.modal},
 		{"editorTitle", p.editorTitle}, {"editorLabel", p.editorLabel},
 	}

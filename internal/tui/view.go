@@ -183,6 +183,13 @@ func (m Model) row(i int, s controller.Status) string {
 		if up != "" {
 			up = selectedStyle.Render(up)
 		}
+	} else {
+		name = bodyStyle.Render(name)
+		typ = bodyStyle.Render(typ)
+		ep = bodyStyle.Render(ep)
+		if up != "" {
+			up = bodyStyle.Render(up)
+		}
 	}
 
 	cells := indicator(s) + " " +

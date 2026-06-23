@@ -17,6 +17,7 @@ var (
 	selectedStyle    = pal.selected
 	cursorStyle      = pal.cursor
 	dimStyle         = pal.dim
+	bodyStyle        = pal.body
 	errorStyle       = pal.err
 	warnStyle        = pal.warn
 	footerStyle      = pal.footer

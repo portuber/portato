@@ -62,6 +62,7 @@ type palette struct {
 	selected    lipgloss.Style
 	cursor      lipgloss.Style
 	dim         lipgloss.Style
+	body        lipgloss.Style
 	err         lipgloss.Style
 	warn        lipgloss.Style
 	footer      lipgloss.Style
@@ -97,6 +98,7 @@ func darkPalette() palette {
 		selected:    lipgloss.NewStyle().Bold(true),
 		cursor:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63")),
 		dim:         lipgloss.NewStyle().Faint(true),
+		body:        lipgloss.NewStyle(),
 		err:         lipgloss.NewStyle().Foreground(lipgloss.Color("1")),
 		warn:        lipgloss.NewStyle().Foreground(lipgloss.Color("3")),
 		footer:      lipgloss.NewStyle().Faint(true),
@@ -129,9 +131,10 @@ func lightPalette() palette {
 		header:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("240")),
 		selected:    lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("235")),
 		cursor:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("26")),
-		dim:         lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		dim:         lipgloss.NewStyle().Foreground(lipgloss.Color("241")),
+		body:        lipgloss.NewStyle().Foreground(lipgloss.Color("235")),
 		err:         lipgloss.NewStyle().Foreground(lipgloss.Color("124")),
-		warn:        lipgloss.NewStyle().Foreground(lipgloss.Color("130")),
+		warn:        lipgloss.NewStyle().Foreground(lipgloss.Color("166")),
 		footer:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 		helpTitle:   lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("235")),
 		helpPanel:   lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 2).Foreground(lipgloss.Color("235")),
@@ -139,15 +142,16 @@ func lightPalette() palette {
 		editorTitle: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("26")),
 		editorLabel: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("235")),
 		state: map[controller.State]lipgloss.Style{
-			controller.Off:          lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-			controller.Connecting:   lipgloss.NewStyle().Foreground(lipgloss.Color("130")),
+			controller.Off:          lipgloss.NewStyle().Foreground(lipgloss.Color("241")),
+			controller.Connecting:   lipgloss.NewStyle().Foreground(lipgloss.Color("166")),
 			controller.Connected:    lipgloss.NewStyle().Foreground(lipgloss.Color("28")),
-			controller.Reconnecting: lipgloss.NewStyle().Foreground(lipgloss.Color("130")),
+			controller.Reconnecting: lipgloss.NewStyle().Foreground(lipgloss.Color("166")),
 			controller.Error:        lipgloss.NewStyle().Foreground(lipgloss.Color("124")),
 		},
 		surfaceBg: bg,
 	}
-	return p.withBackground(bg)
+	p = p.withBackground(bg)
+	return p
 }
 
 // withBackground returns a copy of the palette with bg set as the background of
@@ -163,6 +167,7 @@ func (p palette) withBackground(bg color.Color) palette {
 	p.selected = p.selected.Background(bg)
 	p.cursor = p.cursor.Background(bg)
 	p.dim = p.dim.Background(bg)
+	p.body = p.body.Background(bg)
 	p.err = p.err.Background(bg)
 	p.warn = p.warn.Background(bg)
 	p.footer = p.footer.Background(bg)
@@ -190,6 +195,7 @@ func monoPalette() palette {
 		selected:    lipgloss.NewStyle().Bold(true),
 		cursor:      lipgloss.NewStyle().Bold(true),
 		dim:         lipgloss.NewStyle().Faint(true),
+		body:        lipgloss.NewStyle(),
 		err:         lipgloss.NewStyle().Bold(true),
 		warn:        lipgloss.NewStyle().Bold(true),
 		footer:      lipgloss.NewStyle().Faint(true),

@@ -6,7 +6,6 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"charm.land/lipgloss/v2"
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/controller"
 )
@@ -131,6 +130,10 @@ func newInput(value, placeholder string) textinput.Model {
 	ti.CharLimit = 256
 	ti.SetWidth(40)
 	ti.SetValue(value)
+	s := ti.Styles()
+	s.Focused.Text = bodyStyle
+	s.Blurred.Text = bodyStyle
+	ti.SetStyles(s)
 	return ti
 }
 
@@ -346,7 +349,7 @@ func (e *tunnelEditor) renderType() string {
 	}
 	val := tunnelTypes[e.typeIdx]
 	if focused {
-		val = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("2")).Render(val) + "  " + dimStyle.Render("←/→")
+		val = cursorStyle.Render(val) + "  " + dimStyle.Render("←/→")
 	} else {
 		val = dimStyle.Render(val)
 	}
