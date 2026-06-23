@@ -576,6 +576,54 @@ func TestFillBg(t *testing.T) {
 	}
 }
 
+// TestFillBgReassertsAfterReset checks the core fix for the light-theme bg
+// artifacts: a styled run ends with an ANSI reset, and the raw cells after it
+// (glued spaces, plain text) must still carry the surface background. fillBg
+// must re-insert the bg SGR right after every reset rather than leaving the
+// trailing cells on the terminal's default background.
+func TestFillBgReassertsAfterReset(t *testing.T) {
+	styled := lipgloss.NewStyle().Foreground(lipgloss.Color("26")).Render("AB")
+	content := styled + " CD"
+	got := fillBg(content, lipgloss.Color("#FAFAFA"), 20, 1)
+
+	// lipgloss emits the reset as "\x1b[m"; accept the full "\x1b[0m" form too.
+	reset := "\x1b[m"
+	i := strings.Index(got, reset)
+	if i < 0 {
+		reset = "\x1b[0m"
+		i = strings.Index(got, reset)
+	}
+	if i < 0 {
+		t.Fatalf("no reset in fillBg output: %q", got)
+	}
+	after := got[i+len(reset):]
+	// Right after the reset the bg must be re-asserted: the next bytes must be
+	// an SGR sequence (ESC), not raw text/space falling back to default bg.
+	if !strings.HasPrefix(after, "\x1b[") {
+		t.Errorf("fillBg did not re-assert bg after reset: %q", after)
+	}
+	// The raw " CD" tail must still be present under the fill.
+	if !strings.Contains(got, "CD") {
+		t.Errorf("fillBg dropped raw content after a styled run: %q", got)
+	}
+}
+
+func TestRenderHasSideMargin(t *testing.T) {
+	f := newFake(controller.Status{Name: "a", Type: "local", Local: "1", Remote: "r"})
+	m := New(f, Options{Mode: "standalone"})
+	m.width, m.height = 80, 24
+	out := m.render()
+	want := strings.Repeat(" ", sideMargin)
+	for i, line := range strings.Split(out, "\n") {
+		if line == "" {
+			continue
+		}
+		if !strings.HasPrefix(line, want) {
+			t.Errorf("line %d should start with %d-space margin: %q", i, sideMargin, line)
+		}
+	}
+}
+
 func TestRenderErrorIndicatorDistinct(t *testing.T) {
 	f := newFake(controller.Status{Name: "x", Type: "local", Local: "1", Remote: "r", State: controller.Error, Error: "listen fail"})
 	m := New(f, Options{Mode: "standalone"})

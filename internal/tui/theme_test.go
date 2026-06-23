@@ -3,6 +3,8 @@ package tui
 import (
 	"testing"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/kipkaev55/portato/internal/controller"
 )
 
@@ -90,5 +92,39 @@ func TestResolvePaletteAllKinds(t *testing.T) {
 	}
 	if lightPalette().surfaceBg == nil {
 		t.Errorf("light theme should paint a surface background")
+	}
+}
+
+// TestLightPaletteBakesBackground verifies the light theme's two readability
+// guarantees: every visible style carries the surface background (so styled
+// glyphs are self-covering and no default-bg leaks between runs), and no style
+// is faint (faint collapses to an unreadable pale grey on a light surface).
+func TestLightPaletteBakesBackground(t *testing.T) {
+	p := lightPalette()
+	styles := []struct {
+		name string
+		st   lipgloss.Style
+	}{
+		{"title", p.title}, {"mode", p.mode}, {"header", p.header},
+		{"selected", p.selected}, {"cursor", p.cursor}, {"dim", p.dim},
+		{"err", p.err}, {"warn", p.warn}, {"footer", p.footer},
+		{"helpTitle", p.helpTitle}, {"helpPanel", p.helpPanel}, {"modal", p.modal},
+		{"editorTitle", p.editorTitle}, {"editorLabel", p.editorLabel},
+	}
+	for _, s := range styles {
+		if s.st.GetBackground() == nil {
+			t.Errorf("light style %q should carry the surface background", s.name)
+		}
+		if s.st.GetFaint() {
+			t.Errorf("light style %q must not be faint (unreadable on light bg)", s.name)
+		}
+	}
+	for state, st := range p.state {
+		if st.GetBackground() == nil {
+			t.Errorf("light state %v style should carry the surface background", state)
+		}
+	}
+	if p.dim.GetForeground() == nil {
+		t.Errorf("light dim should have an explicit foreground, not faint")
 	}
 }

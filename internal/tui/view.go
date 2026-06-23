@@ -18,6 +18,7 @@ const (
 	colEndpoint = 48
 	colStatus   = 14
 	gutter      = "  "
+	sideMargin  = 1
 )
 
 func (m Model) View() tea.View {
@@ -35,11 +36,57 @@ func (m Model) View() tea.View {
 // the light theme into a real "light mode" (a light page) instead of just
 // recoloured glyphs on the terminal's own background. A no-op when bg is nil
 // or the dimensions are unknown (before the first WindowSizeMsg).
+//
+// The implementation is reset-aware: a styled run ends with an ANSI reset, and
+// the raw cells after it (spaces glued between segments, plain log text, the
+// viewport's own padding) would otherwise fall back to the terminal's default
+// background. fillBg re-asserts the background after every reset and paints the
+// width/height padding, so no default-bg cells leak through.
 func fillBg(content string, bg color.Color, width, height int) string {
 	if bg == nil || width <= 0 || height <= 0 {
 		return content
 	}
-	return lipgloss.NewStyle().Background(bg).Width(width).Height(height).Render(content)
+	bgSeq := bgSequence(bg)
+	lines := strings.Split(content, "\n")
+	if len(lines) > height {
+		lines = lines[:height]
+	}
+	for i, line := range lines {
+		painted := paintLine(line, bgSeq)
+		if pad := width - lipgloss.Width(painted); pad > 0 {
+			painted += bgSeq + strings.Repeat(" ", pad)
+		}
+		lines[i] = painted
+	}
+	for len(lines) < height {
+		lines = append(lines, bgSeq+strings.Repeat(" ", width))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// bgSequence returns the profiled SGR string that sets bg as the background,
+// with no trailing reset. It is obtained by rendering a single marker through a
+// bg-only lipgloss style and taking the prefix in front of the marker, so the
+// emitted sequence matches the active colour profile (truecolor/256/ansi).
+func bgSequence(bg color.Color) string {
+	const marker = "Z"
+	out := lipgloss.NewStyle().Background(bg).Render(marker)
+	i := strings.Index(out, marker)
+	if i <= 0 {
+		return ""
+	}
+	return strings.TrimPrefix(out[:i], "\x1b[0m")
+}
+
+// paintLine prepends the background SGR and re-asserts it after every reset in
+// the line, so cells that follow a styled run keep the surface background.
+func paintLine(line, bgSeq string) string {
+	if bgSeq == "" {
+		return line
+	}
+	line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+bgSeq)
+	line = strings.ReplaceAll(line, "\x1b[m", "\x1b[m"+bgSeq)
+	return bgSeq + line
 }
 
 func (m Model) render() string {
@@ -71,7 +118,7 @@ func (m Model) render() string {
 		b.WriteString("\n\n")
 		b.WriteString(m.helpBlock())
 	}
-	return b.String()
+	return insetLines(b.String(), sideMargin)
 }
 
 // centered overlays a single block in the middle of the screen. Width/height
@@ -87,7 +134,7 @@ func (m Model) centered(block string) string {
 func (m Model) header() string {
 	left := titleStyle.Render("Portato") + " " + dimStyle.Render("— Port Forwarding")
 	right := modeStyle.Render("mode: " + m.mode)
-	return joinRight(left, right, m.width)
+	return joinRight(left, right, m.width-2*sideMargin)
 }
 
 func (m Model) table() string {
@@ -279,6 +326,22 @@ func joinRight(left, right string, width int) string {
 		return left + "  " + right
 	}
 	return left + strings.Repeat(" ", gap) + right
+}
+
+// insetLines prefixes every line with margin cells, giving the TUI a small left
+// edge so the content does not hug the terminal border. The matching right edge
+// comes from the header right-aligning into width-2*margin and, for the light
+// theme, fillBg painting the trailing columns.
+func insetLines(content string, margin int) string {
+	if margin <= 0 {
+		return content
+	}
+	pad := strings.Repeat(" ", margin)
+	lines := strings.Split(content, "\n")
+	for i, l := range lines {
+		lines[i] = pad + l
+	}
+	return strings.Join(lines, "\n")
 }
 
 func pad(s string, n int) string {

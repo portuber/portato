@@ -46,10 +46,10 @@ func newLogsView(ctrl controller.Controller, name string, width, height int) *lo
 }
 
 func logsWidth(w int) int {
-	if w < 20 {
+	if w-2*sideMargin < 20 {
 		return 20
 	}
-	return w
+	return w - 2*sideMargin
 }
 
 // logsHeight reserves room for the title (2 lines) and the footer (1 line).
@@ -176,7 +176,7 @@ func (l *logsView) view() string {
 	b.WriteString(l.vp.View())
 	b.WriteString("\n")
 	b.WriteString(footerStyle.Render("↑↓/jk scroll · pgup/pgdn · g/G top/bottom · L level · l/esc close"))
-	return b.String()
+	return insetLines(b.String(), sideMargin)
 }
 
 // lipglossWidth returns the visible width of s, exported for tests.

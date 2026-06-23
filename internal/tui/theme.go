@@ -115,24 +115,29 @@ func darkPalette() palette {
 	}
 }
 
-// lightPalette uses darker foregrounds that stay readable on a light terminal
-// background (deeper green/red/orange, a blue title, a blue cursor).
+// lightPalette uses darker foregrounds that stay readable on a light surface
+// (deeper green/red/orange, a blue title/cursor, a dark grey for dim text).
+// Faint is avoided: on a light background it collapses to an unreadable pale
+// grey. withBackground bakes the surface colour into every style so each
+// styled glyph carries its own background regardless of any outer wrapper —
+// the raw cells between styled runs are then covered by fillBg.
 func lightPalette() palette {
-	return palette{
+	bg := lipgloss.Color("#FAFAFA")
+	p := palette{
 		title:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("26")),
-		mode:        lipgloss.NewStyle().Faint(true),
-		header:      lipgloss.NewStyle().Bold(true).Faint(true),
-		selected:    lipgloss.NewStyle().Bold(true),
+		mode:        lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		header:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("240")),
+		selected:    lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("235")),
 		cursor:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("26")),
-		dim:         lipgloss.NewStyle().Faint(true),
+		dim:         lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 		err:         lipgloss.NewStyle().Foreground(lipgloss.Color("124")),
 		warn:        lipgloss.NewStyle().Foreground(lipgloss.Color("130")),
-		footer:      lipgloss.NewStyle().Faint(true),
-		helpTitle:   lipgloss.NewStyle().Bold(true).Underline(true),
-		helpPanel:   lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 2),
-		modal:       lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(1, 3).Bold(true),
+		footer:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		helpTitle:   lipgloss.NewStyle().Bold(true).Underline(true).Foreground(lipgloss.Color("235")),
+		helpPanel:   lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(0, 2).Foreground(lipgloss.Color("235")),
+		modal:       lipgloss.NewStyle().BorderStyle(lipgloss.RoundedBorder()).Padding(1, 3).Bold(true).Foreground(lipgloss.Color("235")),
 		editorTitle: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("26")),
-		editorLabel: lipgloss.NewStyle().Bold(true),
+		editorLabel: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("235")),
 		state: map[controller.State]lipgloss.Style{
 			controller.Off:          lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 			controller.Connecting:   lipgloss.NewStyle().Foreground(lipgloss.Color("130")),
@@ -140,8 +145,38 @@ func lightPalette() palette {
 			controller.Reconnecting: lipgloss.NewStyle().Foreground(lipgloss.Color("130")),
 			controller.Error:        lipgloss.NewStyle().Foreground(lipgloss.Color("124")),
 		},
-		surfaceBg: lipgloss.Color("230"),
+		surfaceBg: bg,
 	}
+	return p.withBackground(bg)
+}
+
+// withBackground returns a copy of the palette with bg set as the background of
+// every style (including the per-state styles). Only the light theme uses it;
+// dark/mono stay transparent and rely on the terminal's own background.
+func (p palette) withBackground(bg color.Color) palette {
+	if bg == nil {
+		return p
+	}
+	p.title = p.title.Background(bg)
+	p.mode = p.mode.Background(bg)
+	p.header = p.header.Background(bg)
+	p.selected = p.selected.Background(bg)
+	p.cursor = p.cursor.Background(bg)
+	p.dim = p.dim.Background(bg)
+	p.err = p.err.Background(bg)
+	p.warn = p.warn.Background(bg)
+	p.footer = p.footer.Background(bg)
+	p.helpTitle = p.helpTitle.Background(bg)
+	p.helpPanel = p.helpPanel.Background(bg)
+	p.modal = p.modal.Background(bg)
+	p.editorTitle = p.editorTitle.Background(bg)
+	p.editorLabel = p.editorLabel.Background(bg)
+	states := make(map[controller.State]lipgloss.Style, len(p.state))
+	for k, v := range p.state {
+		states[k] = v.Background(bg)
+	}
+	p.state = states
+	return p
 }
 
 // monoPalette keeps the layout but drops all foreground colours (NO_COLOR).
