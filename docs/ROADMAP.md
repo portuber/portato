@@ -108,6 +108,13 @@ and `make cover`, and a refreshed README. Total coverage ≈ 69%.
 
 Phases 1–6 are the detailed MVP plan; 7–14 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design. Phase 13 (Polish 2) picks up the three items deferred from phase 11: log rotation, the `/` list filter, and goreleaser. Phase 14 adds a "duplicate the selected tunnel" action (`Shift+C`) to the TUI, reusing the Phase 10 editor.
 
+**Behavior change (`feat(config)`, alongside Phase 13):** a `type: remote`
+tunnel's bare port or `:port` in `remote` now normalises to `*:port` (all
+interfaces) instead of loopback — the common "expose a local service through
+the server" case. Loopback-only is now opt-in via `127.0.0.1:port`; a
+non-loopback bind still needs `GatewayPorts yes|clientspecified` on the server.
+See SPEC §7/§8.
+
 ## Phase summary
 
 - **Phase 0** — `go.mod`, the cobra skeleton of all subcommands (stubs), the directory tree, the Makefile.
