@@ -19,12 +19,13 @@ tunnels:
     enabled: false                # off by default; the daemon persists toggles here
 
   # Remote (-R): listen on the ssh server, forward back to this machine.
-  # `remote` is listened on the server (a bare port binds loopback; a non-
-  # loopback host needs `GatewayPorts yes` in sshd_config); `local` is where
-  # connections are forwarded here.
+  # `remote` is listened on the server. A bare port (or ":port") binds all
+  # interfaces ("*:port", the default — needs `GatewayPorts yes|clientspecified`
+  # in sshd_config); for loopback-only use an explicit host like
+  # `127.0.0.1:16379`. `local` is where connections are forwarded here.
   - name: pull-redis
     type: remote
-    remote: 16379                # listened on the server -> 127.0.0.1:16379
+    remote: 16379                # listened on the server -> *:16379 (all interfaces)
     local: 6379                  # forwarded to the local redis
     ssh: user@bastion.example.com:22
     enabled: false

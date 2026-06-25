@@ -265,10 +265,16 @@ func TestRemoteListenAddr(t *testing.T) {
 		remote string
 		want   string
 	}{
-		{"5432", "127.0.0.1:5432"},
+		// A bare port or ":port" binds all interfaces via the "*" wildcard
+		// (needs GatewayPorts on the server), not loopback.
+		{"5432", "*:5432"},
+		{":8080", "*:8080"},
+		{"*:9000", "*:9000"},
+		// Explicit hosts are preserved verbatim.
 		{"127.0.0.1:5432", "127.0.0.1:5432"},
-		{":8080", "127.0.0.1:8080"},
 		{"0.0.0.0:9000", "0.0.0.0:9000"},
+		{"[::]:9090", "[::]:9090"},
+		{"185.191.126.49:9090", "185.191.126.49:9090"},
 		{"", ""},
 	}
 	for _, tc := range cases {

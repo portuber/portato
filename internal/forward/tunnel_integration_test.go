@@ -700,15 +700,17 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 	srv.start()
 	defer srv.stop()
 
-	// The port the remote tunnel will bind on the server side (loopback).
+	// The port the remote tunnel will bind on the server side (loopback): the
+	// test sshd is a Go listener that cannot bind the "*" wildcard a bare port
+	// now expands to, so the test requests loopback explicitly.
 	remotePort := freePort(t)
 	remoteBind := fmt.Sprintf("127.0.0.1:%d", remotePort)
 
 	cfg := config.Tunnel{
 		Name:     "r-test",
 		Type:     "remote",
-		Local:    echoAddr,                 // forward server-side conns to the local echo
-		Remote:   strconv.Itoa(remotePort), // server-side listen (bare port -> 127.0.0.1)
+		Local:    echoAddr,                                // forward server-side conns to the local echo
+		Remote:   fmt.Sprintf("127.0.0.1:%d", remotePort), // server-side listen (explicit loopback)
 		SSH:      "u@" + srv.addr(),
 		Identity: idPath,
 		User:     "u",

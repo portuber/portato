@@ -240,9 +240,13 @@ The meaning of `local`/`remote` depends on `type`:
 
 - **`local` (`-L`)**: `local` is listened on this machine; `remote` is the
   destination dialed **on the host**.
-- **`remote` (`-R`)**: `remote` is listened **on the host** (a bare port binds
-  loopback, the OpenSSH default; a non-loopback host needs `GatewayPorts yes` in
-  `sshd_config`); `local` is the address connections are forwarded to here.
+- **`remote` (`-R`)**: `remote` is listened **on the host**. A bare port or
+  `:port` binds all interfaces via the `"*"` wildcard (`*:port`, the default —
+  the common "expose my local service through the server" case); an explicit
+  host is used as written (`127.0.0.1:port` for loopback-only, `0.0.0.0:port`,
+  `[::]:port`, a public IP). Any non-loopback bind requires
+  `GatewayPorts yes|clientspecified` in `sshd_config`; `local` is the address
+  connections are forwarded to here.
 - **`dynamic` (`-D`)**: `local` is a SOCKS5 proxy listen address; `remote` is
   unused (ignored). Each connection's destination is taken from the SOCKS
   request and dialed on the host via `ssh.Client.Dial`. No SOCKS auth (loopback
@@ -266,7 +270,9 @@ The local implementation in the MVP: `net.Listen(local)` -> `ssh.Client.Dial("tc
 The remote implementation (Phase 7): `ssh.Client.Listen("tcp", remote)` -> accept
 -> `net.Dial("tcp", local)` -> bidirectional `io.Copy`. The remote listener is
 tied to the SSH client's lifetime, so it is re-established on every reconnect;
-the dial/backoff/keepalive scaffolding is shared with the local path.
+the dial/backoff/keepalive scaffolding is shared with the local path. A bare
+port or `:port` in `remote` is normalised to `*:port` (all interfaces); a
+non-loopback bind needs `GatewayPorts yes|clientspecified` on the server.
 The dynamic implementation (Phase 8): the local listener and accept-loop are
 shared with the local path; each accepted connection is handed to a SOCKS5
 server (`armon/go-socks5`) whose `Dial` is routed through the current

@@ -78,22 +78,26 @@ Each tunnel has a `type`:
 | `remote`  | `-R`     | listen **on the host**, forward back here (`←` in UI).         |
 | `dynamic` | `-D`     | a SOCKS5 proxy on `local`, all traffic via the host (`⇄ *`).  |
 
-For a `remote` tunnel, `remote` is the address listened on the SSH server (a
-bare port binds loopback, the OpenSSH default), and `local` is the address
-connections are forwarded to on this machine:
+For a `remote` tunnel, `remote` is the address listened on the SSH server, and
+`local` is the address connections are forwarded to on this machine. A bare
+port (or `:port`) binds **all interfaces** on the host (`*:port`) — the default,
+so a reverse forward exposes your local service through the server. Use an
+explicit host for loopback-only (`127.0.0.1:port`) or a specific interface:
 
 ```yaml
 tunnels:
   - name: pull-redis
     type: remote
-    remote: 16379        # listened on the server (127.0.0.1:16379)
+    remote: 16379        # listened on the server on all interfaces (*:16379)
     local: 6379          # forwarded to the local redis
     ssh: user@bastion.example.com
 ```
 
-**Binding a non-loopback address on the host** (e.g. `remote: 0.0.0.0:16379`)
-requires `GatewayPorts yes` in the server's `sshd_config`. Otherwise the server
-refuses the bind and the tunnel reports a `GatewayPorts` error.
+**A non-loopback bind on the host** — which now includes the bare-port default
+— requires `GatewayPorts yes` (or `clientspecified`) in the server's
+`sshd_config`, plus the port open in the host firewall. Otherwise sshd silently
+binds loopback and the public address won't be reachable. For a server-internal
+forward only, set `remote: 127.0.0.1:16379` explicitly.
 
 ### Dynamic (SOCKS5) tunnels
 

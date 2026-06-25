@@ -16,6 +16,14 @@ import (
 const (
 	defaultSSHPort = 22
 	defaultHost    = "127.0.0.1"
+	// remoteWildcard is the host a type=remote tunnel requests on the SSH
+	// server when `remote` has no explicit host (a bare port or ":port"). It
+	// binds all interfaces (so a reverse forward is publicly reachable by
+	// default, the common "expose my local service through the server" case)
+	// rather than loopback. An explicit host still wins: `127.0.0.1:port` for
+	// loopback-only, `0.0.0.0:port`/`[::]:port` for other wildcards. A non-
+	// loopback bind requires `GatewayPorts yes|clientspecified` in sshd_config.
+	remoteWildcard = "*"
 	configDir      = "portato"
 	configFile     = "config.yaml"
 )
@@ -184,10 +192,35 @@ func (t Tunnel) ListenAddr() string {
 }
 
 // RemoteListenAddr is the address a type=remote tunnel listens on, on the SSH
-// server side. A bare port binds loopback (the OpenSSH -R default); a non-
-// loopback host requires GatewayPorts yes in sshd_config.
+// server side. A bare port or ":port" binds all interfaces via remoteWildcard
+// ("*:port"); an explicit host (127.0.0.1, 0.0.0.0, [::], a public IP, …) is
+// used as written. A non-loopback bind requires GatewayPorts
+// yes|clientspecified in sshd_config.
 func (t Tunnel) RemoteListenAddr() string {
-	return normalizeAddrPort(t.Remote, defaultHost)
+	return normalizeRemoteAddr(t.Remote)
+}
+
+// normalizeRemoteAddr expands a remote bind address. Unlike the local listen
+// address, a missing host (bare port or ":port") defaults to remoteWildcard
+// rather than loopback, so a reverse forward exposes on all interfaces by
+// default. An explicit host is preserved verbatim.
+func normalizeRemoteAddr(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	// Bare port, or ":port" (no host) → wildcard.
+	if !strings.Contains(s, ":") || strings.HasPrefix(s, ":") {
+		return net.JoinHostPort(remoteWildcard, strings.TrimPrefix(s, ":"))
+	}
+	host, port, err := net.SplitHostPort(s)
+	if err != nil {
+		return s
+	}
+	if host == "" || host == "*" {
+		host = remoteWildcard
+	}
+	return net.JoinHostPort(host, port)
 }
 
 // normalizeAddrPort expands a bare port (or host:port) into a dial/listen

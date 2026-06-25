@@ -116,7 +116,7 @@ func (e *tunnelEditor) typeNote() string {
 	case "local":
 		return "local: listened here · remote: destination dialed on the host"
 	case "remote":
-		return "remote: listened on the host — bare port binds loopback; non-loopback needs GatewayPorts"
+		return "remote: listened on the host — bare port binds all interfaces (*:port, needs GatewayPorts); loopback-only: 127.0.0.1:port"
 	case "dynamic":
 		return "local: SOCKS5 proxy here · remote unused (destination from the SOCKS request)"
 	}
