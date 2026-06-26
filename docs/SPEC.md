@@ -334,6 +334,26 @@ server (`armon/go-socks5`) whose `Dial` is routed through the current
 
 The header shows the mode: `standalone` or `attach @ <socket>`.
 
+### Sub-screen keys
+
+The `e`/`n`/`C` editor, the `l` logs screen, and the `/` filter each take over
+key handling while open; `esc` returns to the list (the filter's `esc` also
+clears the query).
+
+| Screen         | Keys                         | Action                          |
+|----------------|------------------------------|---------------------------------|
+| Editor (`e`/`n`/`C`) | `tab` / `enter`, `shift+tab` | next / previous field     |
+|                | `←` / `→` (on the Type field)| change the tunnel type          |
+|                | `ctrl+s`                     | save                            |
+|                | `esc`                        | cancel                          |
+| Logs (`l`)     | `↑`/`↓`, `j`/`k`, `pgup`/`pgdn` | scroll                       |
+|                | `g` / `G`                    | jump to top / bottom            |
+|                | `L`                          | toggle the debug level          |
+|                | `esc` / `l` / `q`            | close                           |
+| Filter (`/`)   | type to filter live; `backspace` edits the query |               |
+|                | `enter`                      | close the input, keep the filter |
+|                | `esc`                        | clear the filter and close      |
+
 ## 12. The "leave in the background" hand-off
 
 When quitting standalone mode (`q`):
