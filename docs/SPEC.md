@@ -329,8 +329,8 @@ server (`armon/go-socks5`) whose `Dial` is routed through the current
 | `l`            | view the selected tunnel's logs                       |
 | `/`            | substring filter over name/type/endpoint; `esc` clears |
 | `R`            | reload the config from disk                           |
-| `?`            | help                                                  |
-| `q`            | quit (with the "background?" modal in standalone when there are live tunnels) |
+| `?` / `esc`    | toggle help (`esc` also clears an active filter and cancels a confirm modal) |
+| `q` / `ctrl+c` | quit (with the "background?" modal in standalone when there are live tunnels) |
 
 The header shows the mode: `standalone` or `attach @ <socket>`.
 
