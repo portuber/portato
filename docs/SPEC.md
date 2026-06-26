@@ -316,22 +316,23 @@ server (`armon/go-socks5`) whose `Dial` is routed through the current
 └─────────────────────────────────────────────────────────┘
 ```
 
-### Hotkeys (MVP, Phase 3)
+### Hotkeys
 
 | Key            | Action                                                |
 |----------------|-------------------------------------------------------|
 | `↑`/`↓`, `j`/`k` | navigate the list                                   |
 | `space`        | toggle the selected tunnel on/off                     |
 | `r`            | restart the selected tunnel                           |
-| `a`            | enable all                                            |
-| `x`            | disable all                                           |
+| `a` / `x`      | enable all / disable all                              |
+| `e` / `n` / `d`| edit / create / delete the selected tunnel            |
+| `C`            | duplicate the selected tunnel (under `<name>-copy`)   |
+| `l`            | view the selected tunnel's logs                       |
+| `/`            | substring filter over name/type/endpoint; `esc` clears |
 | `R`            | reload the config from disk                           |
 | `?`            | help                                                  |
 | `q`            | quit (with the "background?" modal in standalone when there are live tunnels) |
 
 The header shows the mode: `standalone` or `attach @ <socket>`.
-
-Post-MVP hotkeys: `e/n/d` (Phase 10 — editor), `l` (Phase 11 — logs), `/` (Phase 13 — substring filter over name/type/endpoint; `esc` clears).
 
 ## 12. The "leave in the background" hand-off
 

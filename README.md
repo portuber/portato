@@ -57,14 +57,15 @@ The version baked into the binary comes from the git tag at build time.
 
 ## Status
 
-Phases 0–11 are done. The single binary runs the smart launcher, a background
+Phases 0–15 are done. The single binary runs the smart launcher, a background
 daemon with HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands,
 and system autostart (`portato install` / `uninstall`) for macOS (launchd) and
 Linux (systemd --user). It supports `local` (`-L`), `remote` (`-R`) and
 `dynamic` (`-D`, SOCKS5) tunnels, push-based status events, an in-TUI tunnel
-editor (`e`/`n`/`d`), a per-tunnel log screen (`l`), an interactive unknown-host
-(TOFU) prompt, automatic light/dark theming, and a `portato doctor` diagnostics
-command.
+editor (`e`/`n`/`d`) and duplication (`Shift+C`), a per-tunnel log screen (`l`),
+an interactive unknown-host (TOFU) prompt, automatic light/dark theming, a
+`portato doctor` diagnostics command, robust IPC socket discovery, size-rotated
+logs with a `/` list filter, and goreleaser release tooling.
 
 See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase status.
 

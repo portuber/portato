@@ -18,7 +18,7 @@
 | 5   | CLI commands + smart launcher + hand-off | `[x]`  | [phase-5-cli-smart-launcher.md](./phases/phase-5-cli-smart-launcher.md) |
 | 6   | Autostart (launchd/systemd) + E2E     | `[x]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
 
-### Post-MVP (phases 7–14, outline — detailed when reached)
+### Post-MVP (phases 7–15)
 
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
@@ -40,80 +40,42 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) are described in detail; phases 7–14 (post-MVP) are outline only, filled in when reached.
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are all described in detail above and complete (`[x]`).
 
 ## Current focus
 
-**MVP complete (Phases 0–6).** All six MVP phases are `[x]`: config, native-SSH
-forwarding, standalone TUI, the daemon with HTTP-over-unix-socket IPC, the CLI
-+ smart launcher + background hand-off, and system autostart
-(`portato install/uninstall` via launchd / systemd --user).
+**All phases 0–15 are `[x]`.** The single binary runs the smart launcher
+(attaches to a running daemon or starts standalone), a background daemon with
+HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
+autostart (`install`/`uninstall` via launchd / systemd --user). It supports
+`local` (`-L`), `remote` (`-R`) and `dynamic` (`-D`, SOCKS5) tunnels, push-based
+status events, an in-TUI editor (`e`/`n`/`d`) and tunnel duplication
+(`Shift+C`), a per-tunnel log screen (`l`), an interactive unknown-host (TOFU)
+prompt, automatic light/dark theming, `portato doctor`, robust IPC socket
+discovery, size-rotated logs, a `/` list filter, and goreleaser release tooling.
 
-Phase 6 was closed by an explicit maintainer decision; the runtime-verified
-parts are `install`/`list`/`uninstall` on macOS, idempotency, tunnels-off by
-default, and clean vet/gofmt/cross-compilation. The reboot/relogin survival,
-Linux lingering, and the full live-traffic/auto-reconnect MVP E2E were **not**
-exercised and are recorded as a deferred-verification deviation in
-[phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) — recommended
-manual checks before relying on autostart in production.
+### Caveats / deviations
+- **Phase 6 autostart — deferred runtime verification.** Closed as done by a
+  maintainer decision, but reboot/relogin survival, Linux lingering, and the
+  full live-traffic/auto-reconnect E2E were **not** exercised; see
+  [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) for the
+  recommended manual checks before relying on autostart in production.
+- **Behavior change (`feat(config)`, alongside Phase 13):** a `type: remote`
+  tunnel's bare port or `:port` in `remote` normalises to `*:port` (all
+  interfaces) instead of loopback; loopback-only is now opt-in via
+  `127.0.0.1:port`, and a non-loopback bind still needs `GatewayPorts` on the
+  server. See SPEC §7/§8.
 
-**Phase 7 — Remote (`-R`) tunnels — done.** `type: remote` tunnels now work: the
-port is listened on the SSH server via `ssh.Client.Listen` and forwarded back to
-a local address, with the shared dial/backoff/keepalive scaffolding reused and
-the listener re-established on every reconnect. Direction is shown in the TUI and
-`portato list` (`←` for remote), and a forbidden server-side bind surfaces a
-`GatewayPorts` hint.
-
-**Phase 8 — Dynamic (`-D`) SOCKS5 — done.** A `type: dynamic` tunnel runs a
-SOCKS5 proxy on `local` whose per-connection dial is routed through
-`ssh.Client.Dial`, reusing the Phase 2 listener/accept-loop scaffolding. The
-local listener and accept-loop are shared with the `-L` path; the only
-divergence is the per-connection handler (a `armon/go-socks5` server).
-Direction shows as `⇄ *` in the TUI and `portato list`; reconnect is covered by
-an integration test (drop/restart sshd → proxy works again).
-
-**Phase 9 — Push events — done.** The 1s polling on both `localController`
-and `remoteController` is gone. The Engine now fans every tunnel state change
-to subscribers via a drop-old broker; `localController.Changes()` forwards it,
-and the daemon's new `GET /events` SSE stream forwards it to attached clients
-(`remoteController` reads the stream and reconnects with exponential backoff).
-The Controller interface is unchanged, so the TUI redraws instantly on
-`space`, on reconnect, and across two concurrent `attach` sessions — with zero
-idle load. Also landed two follow-ups during the phase: `fix(daemon)` made the
-macOS socket path deterministic (a build-tagged `~/Library/Application
-Support/portato/` location, no longer depending on `XDG_RUNTIME_DIR`), and
-`fix(tui)` gave errored tunnels a distinct `✗` indicator.
-
-Next up: **Phase 10 — TUI tunnel editor** (`e`/`n`/`d`) — **done.** Create,
-edit, and delete tunnels from the TUI without touching YAML. The daemon owns
-all config I/O (new `GET /config` + per-tunnel `POST/PUT/DELETE /tunnels`
-endpoints, comment-preserving via `yaml.Node` AST patching), so standalone and
-attach behave identically. Manual testing also surfaced and fixed several
-pre-existing bugs: `engine.Reload` now reconfigures tunnels in place (status
-reflects edits; an off tunnel is no longer started by editing it), `local` is
-required for all tunnel types, the host-key error reads clearly, columns align
-when a value fills its width, uptime ticks via a local redraw tick, and
-bracketed-paste works in the editor. **Phase 12 — Robust IPC socket discovery**
-is planned to replace the phase-9 `fix(daemon)` patch with a discovery-file +
-runtime-socket design.
-
-**Phase 11 — Polish — done.** The TUI gained a per-tunnel log screen (`l`,
-backed by an in-memory ring-buffer slog handler served standalone and over
-`GET /logs`), automatic light/dark/monochrome theming (`NO_COLOR` /
-`COLORFGBG`), and an interactive unknown-host (TOFU) accept prompt (the key
-is captured at rejection and accepted via `Controller.AcceptHost` /
-`POST /tunnels/{name}/accept-host`). Plus `portato doctor` diagnostics, a
-GitHub Actions CI (vet / fmt / test `-race` / cross-compile), `make build-all`
-and `make cover`, and a refreshed README. Total coverage ≈ 69%.
-
-Phases 1–6 are the detailed MVP plan; 7–14 are outline (goal + DoD), refined as we approach them. Phase 12 (Robust IPC socket discovery) is planned to replace the phase-9 `fix(daemon)` socket-path patch with a discovery-file + runtime-socket design. Phase 13 (Polish 2) picks up the three items deferred from phase 11: log rotation, the `/` list filter, and goreleaser. Phase 14 adds a "duplicate the selected tunnel" action (`Shift+C`) to the TUI, reusing the Phase 10 editor.
-
-**Behavior change (`feat(config)`, alongside Phase 13):** a `type: remote`
-tunnel's bare port or `:port` in `remote` now normalises to `*:port` (all
-interfaces) instead of loopback — the common "expose a local service through
-the server" case. Loopback-only is now opt-in via `127.0.0.1:port`; a
-non-loopback bind still needs `GatewayPorts yes|clientspecified` on the server.
-See SPEC §7/§8.
+### Post-MVP backlog (candidates, not yet phased)
+- Windows support (named pipe + the registry Run key).
+- Seamless standalone→daemon hand-off via FD-passing (no port-availability gap).
+- IPC authorization token (currently 0600 filesystem perms only).
+- Identity passphrase storage when ssh-agent is unavailable.
+- `--log-level` flag; `portato list --json`; SOCKS5 user/pass auth.
+- Fuzzy (`fzf`-style) list filter; Homebrew/scoop/deb-rpm packaging;
+  config-driven log-rotation knobs.
+- launchd/systemd socket activation; concurrent-start hardening (flock on the
+  discovery marker).
 
 ## Phase summary
 

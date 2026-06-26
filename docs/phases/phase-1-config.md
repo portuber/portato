@@ -17,7 +17,7 @@ coverage.
 - `Config`, `Defaults`, `Tunnel` structs with yaml tags.
 - Loading from an XDG path with `~` expansion (`identity`, `known_hosts`).
 - Defaults: `local` without a host → `127.0.0.1:<port>`; `known_hosts` → `~/.ssh/known_hosts`; `enabled` → `false`; ssh port → `22`; ssh `user` → `$USER`.
-- `Save()` — writing the config back while preserving structure (without saving comments — acceptable for MVP, post-MVP via `yaml.Node` AST).
+- `Save()` — writing the config back while preserving structure (without saving comments — acceptable for MVP, post-MVP via `yaml.Node` AST). _Update: comment-preserving AST patching landed in Phase 10 (`internal/config/patch.go`), so edits made via the TUI/daemon keep comments._
 - If the config is missing — create a default one with an example tunnel (`enabled: false`).
 - Validation: uniqueness of `name`, non-empty `remote`/`ssh`, valid port (1–65535), `type == "local"` in MVP.
 - Parsing the `ssh: user@host:port` field → separate `User`, `Host`, `Port`.
@@ -82,7 +82,7 @@ ls -la "$(go run ./cmd/portato config-path 2>/dev/null || true)"  # optional: ad
 
 ## Technical details
 
-- **yaml.v3 and comments:** `yaml.Marshal` from a struct drops comments. This is acceptable for MVP (tunnels are edited via the TUI in Phase 10). Post-MVP, switch to `yaml.Node` AST if needed.
+- **yaml.v3 and comments:** `yaml.Marshal` from a struct drops comments. This is acceptable for MVP (tunnels are edited via the TUI in Phase 10). Post-MVP, switch to `yaml.Node` AST if needed. _Resolved in Phase 10: `internal/config/patch.go` edits the YAML via a `yaml.Node` AST so comments survive daemon/TUI edits._
 - **Persistance invariant:** every `enable/disable` in the daemon/TUI must call `Save()` (see Phase 4, 5). The config = the source of truth about the desired state.
 - **`0600` permissions** on the config — it may contain paths to private keys.
 - **The `SSH` string** — the only input field for the server address, parsed into `User/Host/Port` (not serialized back, to avoid spawning multiple sources of truth).
