@@ -585,6 +585,14 @@ func (t *Tunnel) setStateErr(s State, msg string) {
 	t.state = s
 	t.errMsg = msg
 	t.mu.Unlock()
+	// Surface the failure in the logs so it is reachable from the TUI's `l`
+	// screen and the rotated log file — otherwise the truncated Status.Error in
+	// the list row is the only place the message appears, and a remote-listen
+	// failure (e.g. "listen 0.0.0.0:9090 on server: …") is invisible. A nil log
+	// is tolerated for tests that build a Tunnel literal without a logger.
+	if t.log != nil {
+		t.log.Error(msg)
+	}
 	t.notifyChange()
 }
 
