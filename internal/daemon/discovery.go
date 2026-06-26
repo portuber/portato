@@ -1,13 +1,18 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"syscall"
+	"time"
 
 	"github.com/adrg/xdg"
 )
@@ -144,10 +149,24 @@ func SocketOverride() string {
 	return os.Getenv("PORTATO_SOCKET")
 }
 
-// ResolveSocket returns the socket path a client should dial: the override if
-// set, otherwise the path advertised in the discovery marker (when the owning
-// PID is still alive). Returns "" when no live daemon is discoverable; a stale
-// marker is cleaned up so the next caller is not misled.
+// probeTimeout caps a discovery healthz probe: a live local daemon answers in
+// well under this.
+const probeTimeout = 300 * time.Millisecond
+
+// ResolveSocket returns the socket path a client should dial. The override
+// (--socket / PORTATO_SOCKET) wins outright. Otherwise discovery is, in order:
+//
+//  1. The discovery marker — if the socket it advertises answers /healthz, use
+//     it. A marker whose socket is silent is stale; when its owning PID is also
+//     gone, the marker and the leftover socket file are removed, while a
+//     still-living PID (a wedged daemon) is left untouched.
+//  2. A fallback probe of the canonical runtime socket path (RuntimeSocketPath)
+//     — a daemon that lost its marker (a misled client deleted it, a schema
+//     drift, a crash) is still listening there and must stay reachable.
+//
+// healthz is the source of truth for liveness throughout; pidAlive only
+// informs cleanup, so a reused PID never causes a live daemon's socket to be
+// deleted. Returns "" when no live daemon is discoverable.
 func ResolveSocket() (string, error) {
 	if ov := SocketOverride(); ov != "" {
 		return ov, nil
@@ -156,23 +175,55 @@ func ResolveSocket() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return resolveFromMarker(markerPath)
+
+	if m, rerr := ReadMarker(markerPath); rerr == nil {
+		if probeSocket(m.Socket) {
+			return m.Socket, nil
+		}
+		// The advertised socket is silent. If the owning PID is gone this is a
+		// stale marker -> clean up marker + leftover socket and fall through to
+		// the runtime-path fallback. A live PID (wedged daemon) is left as-is.
+		if !pidAlive(m.PID) {
+			_ = RemoveMarker(markerPath)
+			_ = os.Remove(m.Socket)
+		}
+	} else if !os.IsNotExist(rerr) {
+		// Corrupt/invalid marker — remove it so it stops misleading, then fall
+		// through to the runtime-path fallback.
+		_ = RemoveMarker(markerPath)
+	}
+
+	// Fallback: a live daemon may have lost its marker. Probe the canonical
+	// runtime socket directly before declaring "not running".
+	if rp, rerr := RuntimeSocketPath(); rerr == nil && probeSocket(rp) {
+		return rp, nil
+	}
+	return "", nil
 }
 
-func resolveFromMarker(markerPath string) (string, error) {
-	m, err := ReadMarker(markerPath)
+// probeSocket reports whether a portato daemon answers GET /healthz at the
+// given unix socket path. It is the authoritative liveness check for discovery:
+// a socket that answers is alive regardless of what any marker/PID claims, and
+// a silent socket is never trusted to be alive just because a PID exists.
+func probeSocket(path string) bool {
+	client := &http.Client{
+		Timeout: probeTimeout,
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", path)
+			},
+		},
+	}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://portato/healthz", nil)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return "", nil
-		}
-		// A corrupt marker is stale — clean it and behave as "not running".
-		_ = RemoveMarker(markerPath)
-		return "", nil
+		return false
 	}
-	if !pidAlive(m.PID) {
-		_ = RemoveMarker(markerPath)
-		_ = os.Remove(m.Socket)
-		return "", nil
+	resp, err := client.Do(req)
+	if err != nil {
+		return false
 	}
-	return m.Socket, nil
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	return resp.StatusCode == http.StatusOK
 }

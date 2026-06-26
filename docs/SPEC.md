@@ -160,9 +160,17 @@ Implementations:
       varies across terminal/tmux sessions), which is exactly why the marker is
       needed — the socket path differs per session but the marker always points
       at the live one.
-  - **Liveness:** a client reads the marker and checks the owning PID is alive
-    before dialing; a stale marker (e.g. the daemon was `kill -9`'d) is removed
-    on the first contact, so clients report "not running" instead of hanging.
+  - **Liveness:** the source of truth is a `GET /healthz` probe, not the PID.
+    A client reads the marker and probes the socket it advertises; if it
+    answers, that path is used. A marker whose socket is silent is stale: when
+    the owning PID is also gone (e.g. the daemon was `kill -9`'d) the marker
+    and the leftover socket are removed, while a still-living PID (a wedged
+    daemon) is left untouched. If the marker is absent or corrupt, the client
+    falls back to probing the canonical runtime socket path directly — so a
+    daemon that lost its marker (a misled client deleted it, schema drift, a
+    crash) stays reachable instead of being reported "not running". Stale
+    cleanup never deletes a socket that still answers, so a reused PID cannot
+    evict a live daemon.
 - **Override:** `--socket <path>` (or the `PORTATO_SOCKET` env var) bypasses
   discovery — the daemon binds the given path and clients dial it directly.
   Intended for tests and CI.

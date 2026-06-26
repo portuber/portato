@@ -1,10 +1,14 @@
 package daemon
 
 import (
+	"context"
 	"encoding/json"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestDiscoveryPathUnderConfigHome(t *testing.T) {
@@ -99,54 +103,99 @@ func TestRemoveMarkerIdempotent(t *testing.T) {
 	}
 }
 
-func TestResolveSocketNoMarker(t *testing.T) {
+// withIsolatedDiscovery points discovery at fresh temp dirs so a test neither
+// sees the user's real marker nor the host's real runtime socket (e.g. a daemon
+// left running outside the test). Returns the marker path and the runtime
+// socket path discovery will consult.
+func withIsolatedDiscovery(t *testing.T) (markerPath, runtimePath string) {
+	t.Helper()
 	t.Setenv("PORTATO_SOCKET", "")
-	socketOverride = "" // override cleared via SetSocketOverride in prod
-	// Point discovery at a temp dir by setting XDG_CONFIG_HOME.
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	got, err := ResolveSocket()
+	socketOverride = ""
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// RuntimeSocketPath uses os.TempDir() on darwin; redirect it to a short
+	// dir under /tmp so (a) a host daemon's socket is not picked up by the
+	// fallback probe, and (b) the runtime path stays under sockaddr_un's
+	// sun_path limit (104 on macOS) — t.TempDir() is too long once the test
+	// name is in it.
+	shortTmp, err := os.MkdirTemp("/tmp", "pt-")
 	if err != nil {
-		t.Fatalf("ResolveSocket: %v", err)
+		t.Fatalf("MkdirTemp: %v", err)
 	}
-	if got != "" {
-		t.Fatalf("want empty socket when no marker, got %q", got)
+	t.Cleanup(func() { os.RemoveAll(shortTmp) })
+	t.Setenv("TMPDIR", shortTmp)
+	mp, err := DiscoveryPath()
+	if err != nil {
+		t.Fatalf("DiscoveryPath: %v", err)
+	}
+	rp, err := RuntimeSocketPath()
+	if err != nil {
+		t.Fatalf("RuntimeSocketPath: %v", err)
+	}
+	return mp, rp
+}
+
+// shortSocketPath returns a unique unix-socket path short enough to fit in a
+// sockaddr_un (macOS sun_path limit is 104). t.TempDir() is too long once the
+// test name is included, so the dir goes under /tmp.
+func shortSocketPath(t *testing.T) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("/tmp", "pt-")
+	if err != nil {
+		t.Fatalf("MkdirTemp: %v", err)
+	}
+	t.Cleanup(func() { os.RemoveAll(dir) })
+	return filepath.Join(dir, "s.sock")
+}
+
+// startHealthzServer serves 200 OK at GET /healthz on a unix socket at path and
+// returns a stop function. A stand-in for a live daemon, for probeSocket /
+// ResolveSocket / ensureNotRunning tests.
+func startHealthzServer(t *testing.T, path string) func() {
+	t.Helper()
+	_ = os.Remove(path)
+	ln, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatalf("listen %s: %v", path, err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(http.ResponseWriter, *http.Request) {})
+	srv := &http.Server{Handler: mux}
+	done := make(chan struct{})
+	go func() { _ = srv.Serve(ln); close(done) }()
+	// Wait until the server actually answers so tests don't race the accept
+	// loop (a connection accepted into the kernel backlog but not yet Accept()ed
+	// would time out the healthz probe).
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if probeSocket(path) {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return func() {
+		_ = srv.Shutdown(context.Background())
+		<-done
+		_ = ln.Close()
+		_ = os.Remove(path)
 	}
 }
 
-func TestResolveSocketStaleMarkerCleaned(t *testing.T) {
-	t.Setenv("PORTATO_SOCKET", "")
-	socketOverride = ""
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	mp, _ := DiscoveryPath()
-	deadSocket := filepath.Join(dir, "dead.sock")
-	_ = os.WriteFile(deadSocket, []byte{}, 0o600)
-	if err := WriteMarker(mp, deadSocket, 999999); err != nil {
-		t.Fatal(err)
-	}
+func TestResolveSocketNoMarker(t *testing.T) {
+	withIsolatedDiscovery(t)
 	got, err := ResolveSocket()
 	if err != nil {
 		t.Fatalf("ResolveSocket: %v", err)
 	}
 	if got != "" {
-		t.Fatalf("want empty for stale marker, got %q", got)
-	}
-	if _, err := os.Stat(mp); !os.IsNotExist(err) {
-		t.Fatalf("stale marker not removed by ResolveSocket")
-	}
-	if _, err := os.Stat(deadSocket); !os.IsNotExist(err) {
-		t.Fatalf("stale socket pointed at by marker not removed")
+		t.Fatalf("want empty when no marker and nothing listening, got %q", got)
 	}
 }
 
 func TestResolveSocketLiveMarker(t *testing.T) {
-	t.Setenv("PORTATO_SOCKET", "")
-	socketOverride = ""
-	dir := t.TempDir()
-	t.Setenv("XDG_CONFIG_HOME", dir)
-	mp, _ := DiscoveryPath()
-	liveSocket := filepath.Join(dir, "live.sock")
+	mp, _ := withIsolatedDiscovery(t)
+	liveSocket := shortSocketPath(t)
+	stop := startHealthzServer(t, liveSocket)
+	defer stop()
 	if err := WriteMarker(mp, liveSocket, os.Getpid()); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +204,162 @@ func TestResolveSocketLiveMarker(t *testing.T) {
 		t.Fatalf("ResolveSocket: %v", err)
 	}
 	if got != liveSocket {
-		t.Fatalf("ResolveSocket = %q, want %q", got, liveSocket)
+		t.Fatalf("ResolveSocket = %q, want live marker socket %q", got, liveSocket)
+	}
+}
+
+func TestResolveSocketStaleMarkerCleaned(t *testing.T) {
+	mp, _ := withIsolatedDiscovery(t)
+	// A leftover socket file nothing is listening on, pointed at by a marker
+	// whose owning PID is dead.
+	deadSocket := filepath.Join(filepath.Dir(mp), "dead.sock")
+	if err := os.WriteFile(deadSocket, []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteMarker(mp, deadSocket, 999999); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ResolveSocket()
+	if err != nil {
+		t.Fatalf("ResolveSocket: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("want empty for a stale marker with nothing live, got %q", got)
+	}
+	if _, err := os.Stat(mp); !os.IsNotExist(err) {
+		t.Fatalf("stale marker not removed by ResolveSocket")
+	}
+	if _, err := os.Stat(deadSocket); !os.IsNotExist(err) {
+		t.Fatalf("stale socket pointed at by the marker not removed")
+	}
+}
+
+// TestResolveSocketFallbackToRuntimePath covers the fix's target case: no
+// marker at all (a misled client deleted it, or schema drift), yet a live
+// daemon is still listening on the canonical runtime socket. Discovery must
+// reach it via the healthz fallback instead of declaring "not running".
+func TestResolveSocketFallbackToRuntimePath(t *testing.T) {
+	_, rp := withIsolatedDiscovery(t)
+	stop := startHealthzServer(t, rp)
+	defer stop()
+	got, err := ResolveSocket()
+	if err != nil {
+		t.Fatalf("ResolveSocket: %v", err)
+	}
+	if got != rp {
+		t.Fatalf("ResolveSocket = %q, want runtime fallback %q", got, rp)
+	}
+}
+
+// TestResolveSocketCorruptMarkerRemovedThenFallback: a corrupt marker is
+// removed and discovery falls through to the runtime probe.
+func TestResolveSocketCorruptMarkerRemovedThenFallback(t *testing.T) {
+	mp, _ := withIsolatedDiscovery(t)
+	if err := os.WriteFile(mp, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ResolveSocket()
+	if err != nil {
+		t.Fatalf("ResolveSocket: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("want empty (corrupt marker, nothing live), got %q", got)
+	}
+	if _, err := os.Stat(mp); !os.IsNotExist(err) {
+		t.Fatalf("corrupt marker not removed")
+	}
+}
+
+// TestResolveSocketWedgedDaemonMarkerKept: the marker points at a silent socket
+// but its owning PID is alive (a wedged/hung daemon). Discovery must NOT delete
+// the marker (the daemon may recover) and falls through to the runtime probe.
+func TestResolveSocketWedgedDaemonMarkerKept(t *testing.T) {
+	mp, _ := withIsolatedDiscovery(t)
+	silentSocket := filepath.Join(filepath.Dir(mp), "wedged.sock")
+	if err := os.WriteFile(silentSocket, []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteMarker(mp, silentSocket, os.Getpid()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := ResolveSocket()
+	if err != nil {
+		t.Fatalf("ResolveSocket: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("want empty (no live socket), got %q", got)
+	}
+	if _, err := os.Stat(mp); os.IsNotExist(err) {
+		t.Fatalf("marker must NOT be removed when the owning PID is still alive")
+	}
+}
+
+func TestProbeSocketLiveAndSilent(t *testing.T) {
+	path := shortSocketPath(t)
+	if probeSocket(path) {
+		t.Fatal("probeSocket on a missing path should be false")
+	}
+	stop := startHealthzServer(t, path)
+	defer stop()
+	if !probeSocket(path) {
+		t.Fatal("probeSocket on a live /healthz server should be true")
+	}
+}
+
+// TestEnsureNotRunning_StaleMarkerButLiveSocketBlocksStart: the marker's PID is
+// dead but the socket still answers (PID reused, or a kill -0 hiccup). A second
+// daemon start must NOT clobber the live daemon's marker/socket.
+func TestEnsureNotRunning_StaleMarkerButLiveSocketBlocksStart(t *testing.T) {
+	dir := t.TempDir()
+	mp := filepath.Join(dir, "daemon.socket")
+	liveSocket := shortSocketPath(t)
+	stop := startHealthzServer(t, liveSocket)
+	defer stop()
+	if err := WriteMarker(mp, liveSocket, 999999); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureNotRunning(mp, liveSocket); err == nil {
+		t.Fatal("ensureNotRunning must block when the socket answers despite a dead marker PID")
+	}
+	if _, err := os.Stat(mp); err != nil {
+		t.Errorf("live daemon's marker must be left in place: %v", err)
+	}
+}
+
+// TestEnsureNotRunning_DeadMarkerDeadSocketCleansUp: a genuinely stale marker
+// (dead PID, silent socket) is removed so a fresh daemon can start.
+func TestEnsureNotRunning_DeadMarkerDeadSocketCleansUp(t *testing.T) {
+	dir := t.TempDir()
+	mp := filepath.Join(dir, "daemon.socket")
+	deadSocket := filepath.Join(dir, "dead.sock")
+	if err := os.WriteFile(deadSocket, []byte{}, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteMarker(mp, deadSocket, 999999); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureNotRunning(mp, filepath.Join(dir, "new.sock")); err != nil {
+		t.Fatalf("ensureNotRunning should allow a fresh start, got %v", err)
+	}
+	if _, err := os.Stat(mp); !os.IsNotExist(err) {
+		t.Errorf("stale marker not removed")
+	}
+	if _, err := os.Stat(deadSocket); !os.IsNotExist(err) {
+		t.Errorf("stale socket not removed")
+	}
+}
+
+// TestEnsureNotRunning_LivePIDBlocksStart: an alive marker PID blocks a second
+// start outright (no probe needed).
+func TestEnsureNotRunning_LivePIDBlocksStart(t *testing.T) {
+	dir := t.TempDir()
+	mp := filepath.Join(dir, "daemon.socket")
+	sock := shortSocketPath(t)
+	if err := WriteMarker(mp, sock, os.Getpid()); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureNotRunning(mp, sock); err == nil {
+		t.Fatal("ensureNotRunning must block when the marker PID is alive")
 	}
 }
 

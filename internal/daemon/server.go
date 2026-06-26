@@ -530,7 +530,14 @@ func ensureNotRunning(markerPath, socketPath string) error {
 	if pidAlive(m.PID) {
 		return fmt.Errorf("daemon already running (pid %d) at %s", m.PID, m.Socket)
 	}
-	// Stale marker (dead PID): remove it and any leftover socket it pointed at.
+	// The marker's PID looks dead, but the socket may still answer (a reused
+	// PID, or a kill -0 hiccup). Probe before deleting so a live daemon is
+	// never clobbered by a second start.
+	if probeSocket(m.Socket) {
+		return fmt.Errorf("daemon already running at %s (marker pid %d not alive but the socket still answers)", m.Socket, m.PID)
+	}
+	// Stale marker (dead PID, silent socket): remove it and any leftover
+	// socket it pointed at, then let a fresh daemon start.
 	_ = RemoveMarker(markerPath)
 	_ = os.Remove(m.Socket)
 	_ = os.Remove(socketPath)
