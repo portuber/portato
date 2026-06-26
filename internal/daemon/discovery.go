@@ -41,6 +41,15 @@ type Marker struct {
 // DiscoveryPath returns the path of the stable discovery marker under the
 // config home. This is the pointer clients read, not the socket itself.
 func DiscoveryPath() (string, error) {
+	return discoveryPathFn()
+}
+
+// discoveryPathFn resolves the marker path. It is a variable so tests can
+// redirect it to a temp dir: adrg/xdg caches xdg.ConfigHome at package init,
+// so t.Setenv("XDG_CONFIG_HOME", ...) does not affect DiscoveryPath — without
+// this seam the ResolveSocket tests would read (and clobber) the host's real
+// marker whenever a daemon happens to be running.
+var discoveryPathFn = func() (string, error) {
 	return filepath.Join(xdg.ConfigHome, "portato", markerFile), nil
 }
 

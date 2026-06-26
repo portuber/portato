@@ -111,22 +111,23 @@ func withIsolatedDiscovery(t *testing.T) (markerPath, runtimePath string) {
 	t.Helper()
 	t.Setenv("PORTATO_SOCKET", "")
 	socketOverride = ""
-	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	// Isolate the marker path via the discoveryPathFn seam. xdg.ConfigHome is
+	// cached at package init, so t.Setenv("XDG_CONFIG_HOME") would NOT redirect
+	// DiscoveryPath, and the tests would read/clobber the host's real marker.
+	mp := filepath.Join(t.TempDir(), "daemon.socket")
+	saved := discoveryPathFn
+	discoveryPathFn = func() (string, error) { return mp, nil }
+	t.Cleanup(func() { discoveryPathFn = saved })
 	// RuntimeSocketPath uses os.TempDir() on darwin; redirect it to a short
 	// dir under /tmp so (a) a host daemon's socket is not picked up by the
 	// fallback probe, and (b) the runtime path stays under sockaddr_un's
-	// sun_path limit (104 on macOS) — t.TempDir() is too long once the test
-	// name is in it.
+	// sun_path limit (104 on macOS).
 	shortTmp, err := os.MkdirTemp("/tmp", "pt-")
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)
 	}
 	t.Cleanup(func() { os.RemoveAll(shortTmp) })
 	t.Setenv("TMPDIR", shortTmp)
-	mp, err := DiscoveryPath()
-	if err != nil {
-		t.Fatalf("DiscoveryPath: %v", err)
-	}
 	rp, err := RuntimeSocketPath()
 	if err != nil {
 		t.Fatalf("RuntimeSocketPath: %v", err)
