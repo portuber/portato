@@ -1,7 +1,7 @@
 ---
 phase: 23
 title: TUI list column alignment (dynamic NAME width)
-status: todo
+status: in-progress
 depends_on: [15]
 ---
 
