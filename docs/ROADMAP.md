@@ -38,7 +38,7 @@
 | 20  | CLI/UX polish                     | `[ ]`  | [phase-20-cli-ux-polish.md](./phases/phase-20-cli-ux-polish.md) |
 | 21  | Packaging and releases            | `[ ]`  | [phase-21-packaging.md](./phases/phase-21-packaging.md) |
 | 22  | Robustness (socket activation…)   | `[ ]`  | [phase-22-robustness.md](./phases/phase-22-robustness.md) |
-| 23  | TUI list column alignment         | `[~]`  | [phase-23-tui-list-column-alignment.md](./phases/phase-23-tui-list-column-alignment.md) |
+| 23  | TUI list column alignment         | `[x]`  | [phase-23-tui-list-column-alignment.md](./phases/phase-23-tui-list-column-alignment.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
