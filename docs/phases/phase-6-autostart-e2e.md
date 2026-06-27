@@ -120,22 +120,23 @@ verification of the entire MVP.
 - [x] README contains an «Autostart» section for both OSes.
 - [x] `go vet ./...`, `gofmt -l .` are clean; cross-compilation for darwin/linux × amd64/arm64 succeeds (build tags are correct).
 
-> **Deferred runtime verification (maintainer override).** Phase 6 was closed
-> as **done** by an explicit maintainer decision, but several DoD items above
-> were **not** exercised at runtime and remain recommended manual checks. The
-> mechanisms are implemented; only the human-driven E2E was skipped:
-> - **Reboot/relogin survival** (`portato list` after a reboot) — not tested.
-> - **Linux lingering** — N/A (verification was darwin-only).
-> - **Uninstall-after-reboot** — the uninstall itself was verified; the
->   "daemon does not come up after reboot" half was not.
-> - **Final MVP E2E** — live traffic (`space`→Connected→`nc -z`/data flow;
->   `space`→Disabled→port closed) and auto-reconnect after an sshd drop were
->   not run. This also needs a real, schema-valid tunnel in the config; the
->   shipped example points at a non-existent host.
+> **Runtime verification.** Phase 6 was closed as done by an explicit
+> maintainer decision and has since been exercised end-to-end:
+> - **macOS (launchd):** `install`/`list`/`uninstall`, idempotency, the launchd
+>   lifecycle (`KeepAlive` respawn after a kill, `launchctl kickstart -k`), and
+>   **real reboot/relogin survival** — after a macOS reboot the daemon came
+>   back on its own (`launchctl print` → `running`, `portato list` responded,
+>   fresh pid + low `etime`).
+> - **Linux/systemd (Debian 12 in Docker, `e2e/systemd-docker/`):** install +
+>   `active` service, lingering (`Linger=yes`), reboot survival
+>   (`docker restart` → `active`), uninstall-does-not-return, live-traffic
+>   (`nc -z` through the forward), and auto-reconnect after an sshd drop.
+> - clean `go vet`/`gofmt`/cross-compilation; tunnels off by default.
 >
-> Verified at runtime: `install`/`list`/`uninstall` on macOS, idempotency,
-> tunnels-off by default, the README autostart section, and clean
-> `go vet`/`gofmt`/cross-compilation.
+> Not literally exercised: `[117]`-macOS — "after `portato uninstall` + a real
+> macOS reboot the daemon does NOT come back". The uninstall and the
+> reboot-start path are each verified separately; the combined negative case
+> rests on symmetry (no plist → nothing for launchd to load).
 
 ## Verification (including the final E2E MVP)
 

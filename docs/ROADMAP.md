@@ -55,11 +55,12 @@ prompt, automatic light/dark theming, `portato doctor`, robust IPC socket
 discovery, size-rotated logs, a `/` list filter, and goreleaser release tooling.
 
 ### Caveats / deviations
-- **Phase 6 autostart — deferred runtime verification.** Closed as done by a
-  maintainer decision, but reboot/relogin survival, Linux lingering, and the
-  full live-traffic/auto-reconnect E2E were **not** exercised; see
-  [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) for the
-  recommended manual checks before relying on autostart in production.
+- **Phase 6 autostart — runtime-verified.** macOS launchd: `install`/`list`/
+  `uninstall`, idempotency, `KeepAlive` respawn, and **real reboot/relogin
+  survival** (after a macOS reboot the daemon was back up). Linux/systemd
+  (Debian 12 in Docker, `e2e/systemd-docker/`): lingering, `docker restart`
+  survival, uninstall-does-not-return, live-traffic, auto-reconnect. See
+  [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md).
 - **Behavior change (`feat(config)`, alongside Phase 13):** a `type: remote`
   tunnel's bare port or `:port` in `remote` normalises to `*:port` (all
   interfaces) instead of loopback; loopback-only is now opt-in via
