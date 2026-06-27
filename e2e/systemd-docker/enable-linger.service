@@ -1,0 +1,12 @@
+[Unit]
+Description=Enable lingering for appuser
+After=systemd-logind.service
+Requires=systemd-logind.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/loginctl enable-linger appuser
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

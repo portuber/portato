@@ -1,0 +1,11 @@
+[Unit]
+Description=test sshd (portato E2E)
+After=network.target
+
+[Service]
+ExecStartPre=/bin/mkdir -p /run/sshd
+ExecStart=/usr/sbin/sshd -D
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

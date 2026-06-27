@@ -1,0 +1,10 @@
+[Unit]
+Description=echo target on 127.0.0.1:28080
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -m http.server 28080 --bind 127.0.0.1
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

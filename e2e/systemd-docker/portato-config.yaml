@@ -1,0 +1,11 @@
+defaults:
+  identity: /home/appuser/.ssh/id_ed25519
+  known_hosts: /home/appuser/.ssh/known_hosts
+  accept_new_hosts: true
+tunnels:
+  - name: echo
+    type: local
+    local: "18080"
+    remote: "127.0.0.1:28080"
+    ssh: "appuser@127.0.0.1:22"
+    enabled: false
