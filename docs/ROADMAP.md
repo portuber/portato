@@ -18,7 +18,7 @@
 | 5   | CLI commands + smart launcher + hand-off | `[x]`  | [phase-5-cli-smart-launcher.md](./phases/phase-5-cli-smart-launcher.md) |
 | 6   | Autostart (launchd/systemd) + E2E     | `[x]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
 
-### Post-MVP (phases 7–15)
+### Post-MVP (phases 7–22)
 
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
@@ -31,6 +31,13 @@
 | 13  | Polish 2 (log rotation, `/` filter, goreleaser) | `[x]`  | [phase-13-polish-2.md](./phases/phase-13-polish-2.md) |
 | 14  | TUI: duplicate tunnel (Shift+C)   | `[x]`  | [phase-14-tui-duplicate.md](./phases/phase-14-tui-duplicate.md) |
 | 15  | Light-theme color tuning          | `[x]`  | [phase-15-light-theme-colors.md](./phases/phase-15-light-theme-colors.md) |
+| 16  | Seamless hand-off (FD-passing)    | `[ ]`  | [phase-16-fd-passing-handoff.md](./phases/phase-16-fd-passing-handoff.md) |
+| 17  | Windows support                   | `[ ]`  | [phase-17-windows.md](./phases/phase-17-windows.md) |
+| 18  | IPC authorization token           | `[ ]`  | [phase-18-ipc-token.md](./phases/phase-18-ipc-token.md) |
+| 19  | Identity passphrase storage       | `[ ]`  | [phase-19-identity-passphrase.md](./phases/phase-19-identity-passphrase.md) |
+| 20  | CLI/UX polish                     | `[ ]`  | [phase-20-cli-ux-polish.md](./phases/phase-20-cli-ux-polish.md) |
+| 21  | Packaging and releases            | `[ ]`  | [phase-21-packaging.md](./phases/phase-21-packaging.md) |
+| 22  | Robustness (socket activation…)   | `[ ]`  | [phase-22-robustness.md](./phases/phase-22-robustness.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -40,11 +47,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are all described in detail above and complete (`[x]`).
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22 (post-MVP backlog) are planned in detail and pending (`[ ]`), to be started on an explicit command.
 
 ## Current focus
 
-**All phases 0–15 are `[x]`.** The single binary runs the smart launcher
+**All phases 0–15 are `[x]`; phases 16–22 (the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -67,16 +74,12 @@ discovery, size-rotated logs, a `/` list filter, and goreleaser release tooling.
   `127.0.0.1:port`, and a non-loopback bind still needs `GatewayPorts` on the
   server. See SPEC §7/§8.
 
-### Post-MVP backlog (candidates, not yet phased)
-- Windows support (named pipe + the registry Run key).
-- Seamless standalone→daemon hand-off via FD-passing (no port-availability gap).
-- IPC authorization token (currently 0600 filesystem perms only).
-- Identity passphrase storage when ssh-agent is unavailable.
-- `--log-level` flag; `portato list --json`; SOCKS5 user/pass auth.
-- Fuzzy (`fzf`-style) list filter; Homebrew/scoop/deb-rpm packaging;
-  config-driven log-rotation knobs.
-- launchd/systemd socket activation; concurrent-start hardening (flock on the
-  discovery marker).
+### Post-MVP backlog
+All previously-backlogged items now have detailed phase plans (todo) — see
+phases 16–22 in the table above and in [`docs/phases/`](./phases/). Items not
+yet covered anywhere: seamless hand-off FD-passing on Windows (Phase 17 will
+need a Windows-specific mechanism or skip), and time-based (not just
+size-based) log rotation.
 
 ## Phase summary
 
