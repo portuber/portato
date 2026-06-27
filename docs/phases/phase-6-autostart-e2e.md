@@ -103,7 +103,7 @@ verification of the entire MVP.
 
 ### Final E2E MVP
 
-- [ ] Run the entire checklist below on both OSes (or at least on one).
+- [x] Run the entire checklist below on both OSes (or at least on one).
 
 ## Definition of Done
 
@@ -133,10 +133,11 @@ verification of the entire MVP.
 >   (`nc -z` through the forward), and auto-reconnect after an sshd drop.
 > - clean `go vet`/`gofmt`/cross-compilation; tunnels off by default.
 >
-> Not literally exercised: `[117]`-macOS — "after `portato uninstall` + a real
-> macOS reboot the daemon does NOT come back". The uninstall and the
-> reboot-start path are each verified separately; the combined negative case
-> rests on symmetry (no plist → nothing for launchd to load).
+> `[117]`-macOS verified: after `portato uninstall` and a real macOS reboot,
+> launchd had no service (`launchctl print` → "Could not find service"), the
+> plist was gone, and `portato list` reported "daemon is not running". Every
+> Phase 6 DoD item is now runtime-verified on both platforms — no remaining
+> gaps.
 
 ## Verification (including the final E2E MVP)
 

@@ -18,7 +18,7 @@
 | 5   | CLI commands + smart launcher + hand-off | `[x]`  | [phase-5-cli-smart-launcher.md](./phases/phase-5-cli-smart-launcher.md) |
 | 6   | Autostart (launchd/systemd) + E2E     | `[x]`  | [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md) |
 
-### Post-MVP (phases 7–22)
+### Post-MVP (phases 7–23)
 
 | #   | Name                              | Status | File                                                  |
 |-----|-----------------------------------|--------|-------------------------------------------------------|
@@ -38,6 +38,7 @@
 | 20  | CLI/UX polish                     | `[ ]`  | [phase-20-cli-ux-polish.md](./phases/phase-20-cli-ux-polish.md) |
 | 21  | Packaging and releases            | `[ ]`  | [phase-21-packaging.md](./phases/phase-21-packaging.md) |
 | 22  | Robustness (socket activation…)   | `[ ]`  | [phase-22-robustness.md](./phases/phase-22-robustness.md) |
+| 23  | TUI list column alignment         | `[ ]`  | [phase-23-tui-list-column-alignment.md](./phases/phase-23-tui-list-column-alignment.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -62,12 +63,6 @@ prompt, automatic light/dark theming, `portato doctor`, robust IPC socket
 discovery, size-rotated logs, a `/` list filter, and goreleaser release tooling.
 
 ### Caveats / deviations
-- **Phase 6 autostart — runtime-verified.** macOS launchd: `install`/`list`/
-  `uninstall`, idempotency, `KeepAlive` respawn, and **real reboot/relogin
-  survival** (after a macOS reboot the daemon was back up). Linux/systemd
-  (Debian 12 in Docker, `e2e/systemd-docker/`): lingering, `docker restart`
-  survival, uninstall-does-not-return, live-traffic, auto-reconnect. See
-  [phase-6-autostart-e2e.md](./phases/phase-6-autostart-e2e.md).
 - **Behavior change (`feat(config)`, alongside Phase 13):** a `type: remote`
   tunnel's bare port or `:port` in `remote` normalises to `*:port` (all
   interfaces) instead of loopback; loopback-only is now opt-in via
