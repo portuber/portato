@@ -60,52 +60,52 @@ Truncation style: **middle** (`pntr-sberh…wser`), consistent with
 
 ## Tasks
 
-- [ ] `view.go` — add constants `minName = 12`, `maxName = 40`,
+- [x] `view.go` — add constants `minName = 12`, `maxName = 40`,
       `uptimeBudget = 7` next to the existing column constants; keep `colName`
       as the `width==0` fallback.
-- [ ] `view.go` — add `func (m Model) nameWidth() int`: iterate **all** of
+- [x] `view.go` — add `func (m Model) nameWidth() int`: iterate **all** of
       `m.list`, take the longest `lipgloss.Width(s.Name)`, clamp to
       `[minName, maxName]`, then (when `m.width > 0`) cap by the terminal
       budget
       `avail = m.width - sideMargin - 4 - 4*len(gutter) - colType - colEndpoint - colStatus - uptimeBudget`
       (`4` = cursor + sp + indicator + sp); return `colName` when `m.width == 0`.
-- [ ] `view.go` — add `func fitName(s string, max int) string` returning
+- [x] `view.go` — add `func fitName(s string, max int) string` returning
       `middleTruncate(s, max)` (place near `fitEndpoint`, ~line 414).
-- [ ] `view.go` — change `columnHeader()` → `columnHeader(nameW int)`; use
+- [x] `view.go` — change `columnHeader()` → `columnHeader(nameW int)`; use
       `pad("NAME", nameW)`.
-- [ ] `view.go` — change `Model.row(i, s)` → `Model.row(i, s, nameW int)`;
+- [x] `view.go` — change `Model.row(i, s)` → `Model.row(i, s, nameW int)`;
       compute `name := fitName(s.Name, nameW)` and pad with `pad(name, nameW)`.
-- [ ] `view.go` — in `table()`: `nameW := m.nameWidth()`; pass to
+- [x] `view.go` — in `table()`: `nameW := m.nameWidth()`; pass to
       `columnHeader(nameW)` and `m.row(i, m.list[i], nameW)`.
-- [ ] `model_test.go` — add `TestFitName` (short name unchanged; long name
+- [x] `model_test.go` — add `TestFitName` (short name unchanged; long name
       middle-truncated to exactly `n` cells).
-- [ ] `model_test.go` — add `TestNameWidth`:
+- [x] `model_test.go` — add `TestNameWidth`:
       `width==0` → `colName`; wide terminal → `min(longest, maxName)`; names
       longer than `maxName` → `maxName`; all names short → `minName`; narrow
       terminal → capped by `avail` but not below `minName`.
-- [ ] `model_test.go` — add a regression test for column alignment: with a mix
+- [x] `model_test.go` — add a regression test for column alignment: with a mix
       of short and long names and a wide `m.width`, render `View()` and assert
       that the TYPE column starts at the same display column on every row
       (measure with `lipgloss.Width` on the segment before `TYPE`).
-- [ ] `ROADMAP.md` — add the phase-23 row to the post-MVP table, status `[ ]`.
+- [x] `ROADMAP.md` — add the phase-23 row to the post-MVP table, status `[ ]`.
 
 ## Definition of Done
 
-- [ ] With long tunnel names present, every row's TYPE / ENDPOINT / STATUS /
+- [x] With long tunnel names present, every row's TYPE / ENDPOINT / STATUS /
       UPTIME columns line up with the header and with each other (no rightward
       drift on long-name rows).
-- [ ] On a wide terminal, names up to `maxName` (40) cells are shown in full
+- [x] On a wide terminal, names up to `maxName` (40) cells are shown in full
       (no ellipsis); only names longer than `maxName` are middle-truncated.
-- [ ] On a narrow terminal, NAME shrinks (down to `minName`, 12) and long names
+- [x] On a narrow terminal, NAME shrinks (down to `minName`, 12) and long names
       are middle-truncated (`prefix…suffix`); the row does not push past the
       terminal width more than before.
-- [ ] Changing the `/` filter does not change the NAME column width (computed
+- [x] Changing the `/` filter does not change the NAME column width (computed
       over all tunnels, not only visible).
-- [ ] `m.width == 0` (pre-`WindowSizeMsg`, unit tests) renders identically to
+- [x] `m.width == 0` (pre-`WindowSizeMsg`, unit tests) renders identically to
       the previous fixed-`colName` layout.
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean.
-- [ ] ROADMAP.md has the phase-23 row, status `[ ]`, matching the file's
-      frontmatter.
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean.
+- [x] ROADMAP.md has the phase-23 row, with its status marker matching the
+      file's frontmatter.
 
 ## Verification
 

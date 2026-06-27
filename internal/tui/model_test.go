@@ -419,6 +419,140 @@ func TestFitEndpoint(t *testing.T) {
 	}
 }
 
+func TestFitName(t *testing.T) {
+	t.Run("fits unchanged", func(t *testing.T) {
+		cases := []struct {
+			in  string
+			max int
+		}{
+			{"db", 20},
+			{"abcdefghij", 10},
+			{"abcde", 6},
+			{"", 5},
+		}
+		for _, c := range cases {
+			if got := fitName(c.in, c.max); got != c.in {
+				t.Errorf("fitName(%q,%d) = %q, want unchanged", c.in, c.max, got)
+			}
+		}
+	})
+	t.Run("overflow middle-truncates to exactly max", func(t *testing.T) {
+		const in = "pntr-sberhealth-browser"
+		for _, max := range []int{20, 16, 12} {
+			got := fitName(in, max)
+			if w := lipgloss.Width(got); w != max {
+				t.Errorf("max=%d: width=%d want %d (%q)", max, w, max, got)
+			}
+			if !strings.Contains(got, "…") {
+				t.Errorf("max=%d: expected a middle ellipsis, got %q", max, got)
+			}
+		}
+	})
+	t.Run("overflow keeps prefix and suffix", func(t *testing.T) {
+		got := fitName("pntr-sberhealth-browser", 20)
+		if !strings.HasPrefix(got, "pntr") {
+			t.Errorf("expected prefix preserved, got %q", got)
+		}
+		if !strings.HasSuffix(got, "ser") {
+			t.Errorf("expected suffix preserved, got %q", got)
+		}
+	})
+	t.Run("max=1 yields ellipsis", func(t *testing.T) {
+		if got := fitName("pntr-sberhealth-browser", 1); got != "…" {
+			t.Errorf("fitName(...,1) = %q, want …", got)
+		}
+	})
+}
+
+func TestNameWidth(t *testing.T) {
+	mixed := []controller.Status{
+		{Name: "db"},
+		{Name: "pntr-sberhealth-browser"},
+	}
+	avail := func(termWidth int) int {
+		return termWidth - (sideMargin + 4) - 4*len(gutter) - colType - colEndpoint - colStatus - uptimeBudget
+	}
+	t.Run("width=0 falls back to colName", func(t *testing.T) {
+		m := New(newFake(mixed...), Options{Mode: "standalone"})
+		m.width = 0
+		if got := m.nameWidth(); got != colName {
+			t.Errorf("width=0: nameWidth=%d want colName=%d", got, colName)
+		}
+	})
+	t.Run("short names clamp to minName", func(t *testing.T) {
+		m := New(newFake(controller.Status{Name: "db"}, controller.Status{Name: "x"}), Options{Mode: "standalone"})
+		m.width = 200
+		if got := m.nameWidth(); got != minName {
+			t.Errorf("short names: nameWidth=%d want minName=%d", got, minName)
+		}
+	})
+	t.Run("long name fits on wide terminal", func(t *testing.T) {
+		m := New(newFake(mixed...), Options{Mode: "standalone"})
+		m.width = 200
+		want := lipgloss.Width("pntr-sberhealth-browser")
+		if got := m.nameWidth(); got != want {
+			t.Errorf("wide: nameWidth=%d want %d", got, want)
+		}
+	})
+	t.Run("name longer than maxName clamps to maxName", func(t *testing.T) {
+		m := New(newFake(controller.Status{Name: strings.Repeat("x", 60)}), Options{Mode: "standalone"})
+		m.width = 200
+		if got := m.nameWidth(); got != maxName {
+			t.Errorf("very long: nameWidth=%d want maxName=%d", got, maxName)
+		}
+	})
+	t.Run("narrow terminal caps by avail", func(t *testing.T) {
+		m := New(newFake(mixed...), Options{Mode: "standalone"})
+		m.width = 110
+		want := avail(110)
+		if got := m.nameWidth(); got != want {
+			t.Errorf("narrow: nameWidth=%d want avail=%d", got, want)
+		}
+	})
+	t.Run("very narrow terminal floors at minName", func(t *testing.T) {
+		m := New(newFake(mixed...), Options{Mode: "standalone"})
+		m.width = 60
+		if got := m.nameWidth(); got != minName {
+			t.Errorf("very narrow: nameWidth=%d want minName=%d", got, minName)
+		}
+	})
+	t.Run("filter does not change width", func(t *testing.T) {
+		m := New(newFake(mixed...), Options{Mode: "standalone"})
+		m.width = 200
+		m.filter.SetValue("db")
+		want := lipgloss.Width("pntr-sberhealth-browser")
+		if got := m.nameWidth(); got != want {
+			t.Errorf("with filter: nameWidth=%d want %d (must consider the hidden long name)", got, want)
+		}
+	})
+}
+
+func TestRowColumnNameAlignment(t *testing.T) {
+	statuses := []controller.Status{
+		{Name: "db", Type: "local", Local: "1", Remote: "r"},
+		{Name: "pntr-sberhealth-browser", Type: "dynamic", Local: "1080"},
+		{Name: "tv-socks", Type: "remote", Local: "2", Remote: "r"},
+		{Name: "x", Type: "local", Local: "3", Remote: "r"},
+	}
+	for _, termWidth := range []int{200, 110} {
+		m := New(newFake(statuses...), Options{Mode: "standalone"})
+		m.width = termWidth
+		nameW := m.nameWidth()
+		want := nameW + 6
+		for i, s := range m.list {
+			rowStr := m.row(i, s, nameW)
+			idx := strings.Index(rowStr, s.Type)
+			if idx < 0 {
+				t.Fatalf("width=%d row %d: type %q not found in row %q", termWidth, i, s.Type, rowStr)
+			}
+			if w := lipgloss.Width(rowStr[:idx]); w != want {
+				t.Errorf("width=%d row %d (%q): TYPE starts at display col %d, want %d\nrow: %q",
+					termWidth, i, s.Name, w, want, rowStr)
+			}
+		}
+	}
+}
+
 func TestModel_QuitStandaloneLiveShowsModal(t *testing.T) {
 	f := newFake(controller.Status{Name: "a", State: controller.Connected})
 	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})

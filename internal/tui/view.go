@@ -13,12 +13,15 @@ import (
 )
 
 const (
-	colName     = 20
-	colType     = 7
-	colEndpoint = 48
-	colStatus   = 14
-	gutter      = "  "
-	sideMargin  = 1
+	colName      = 20
+	colType      = 7
+	colEndpoint  = 48
+	colStatus    = 14
+	gutter       = "  "
+	sideMargin   = 1
+	minName      = 12
+	maxName      = 40
+	uptimeBudget = 7
 )
 
 func (m Model) View() tea.View {
@@ -154,11 +157,12 @@ func (m Model) table() string {
 	if len(rows) == 0 {
 		return dimStyle.Render(fmt.Sprintf("no tunnels match %q — esc clears", m.filter.Value()))
 	}
+	nameW := m.nameWidth()
 	var b strings.Builder
-	b.WriteString(columnHeader())
+	b.WriteString(columnHeader(nameW))
 	b.WriteString("\n")
 	for _, i := range rows {
-		b.WriteString(m.row(i, m.list[i]))
+		b.WriteString(m.row(i, m.list[i], nameW))
 		b.WriteString("\n")
 	}
 	return b.String()
@@ -175,10 +179,29 @@ func (m Model) filterLine() string {
 	return dimStyle.Render(fmt.Sprintf("/ %s  %s  — esc clears", m.filter.Value(), count))
 }
 
-func columnHeader() string {
+func (m Model) nameWidth() int {
+	longest := 0
+	for _, s := range m.list {
+		if w := lipgloss.Width(s.Name); w > longest {
+			longest = w
+		}
+	}
+	nameW := longest
+	nameW = max(nameW, minName)
+	nameW = min(nameW, maxName)
+	if m.width == 0 {
+		return colName
+	}
+	leading := sideMargin + 4
+	avail := m.width - leading - 4*len(gutter) - colType - colEndpoint - colStatus - uptimeBudget
+	avail = max(avail, minName)
+	return min(nameW, avail)
+}
+
+func columnHeader(nameW int) string {
 	return headerStyle.Render(
 		"    " +
-			pad("NAME", colName) + gutter +
+			pad("NAME", nameW) + gutter +
 			pad("TYPE", colType) + gutter +
 			pad("ENDPOINT", colEndpoint) + gutter +
 			pad("STATUS", colStatus) + gutter +
@@ -186,7 +209,7 @@ func columnHeader() string {
 	)
 }
 
-func (m Model) row(i int, s controller.Status) string {
+func (m Model) row(i int, s controller.Status, nameW int) string {
 	selected := i == m.cursor
 	endpoint := fitEndpoint(s.Endpoint(), colEndpoint)
 	status := stateLabel(s.State)
@@ -194,7 +217,7 @@ func (m Model) row(i int, s controller.Status) string {
 		status += " " + dimStyle.Render(truncate(s.Error, 18))
 	}
 
-	name, typ, ep, up := s.Name, s.Type, endpoint, uptime(s)
+	name, typ, ep, up := fitName(s.Name, nameW), s.Type, endpoint, uptime(s)
 	if selected {
 		// Selection is marked by the ❯ cursor glyph; the plain text cells are
 		// bolded for emphasis. The cells are styled individually (not wrapped
@@ -217,7 +240,7 @@ func (m Model) row(i int, s controller.Status) string {
 	}
 
 	cells := indicator(s) + " " +
-		pad(name, colName) + gutter +
+		pad(name, nameW) + gutter +
 		pad(typ, colType) + gutter +
 		pad(ep, colEndpoint) + gutter +
 		pad(status, colStatus) + gutter +
@@ -411,6 +434,10 @@ func fitEndpoint(s string, max int) string {
 		}
 	}
 	return truncate(s, max)
+}
+
+func fitName(s string, max int) string {
+	return middleTruncate(s, max)
 }
 
 // fitHostPort fits a "host:port" (or bare host) into budget cells, preserving
