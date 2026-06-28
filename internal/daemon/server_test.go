@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -492,4 +494,145 @@ func waitFor(cond func() bool, timeout time.Duration) bool {
 		time.Sleep(10 * time.Millisecond)
 	}
 	return cond()
+}
+
+// unixHTTPDo sends a request over the unix socket at sock with an optional
+// Authorization header and returns the response. Used to exercise the auth
+// middleware without going through the client package (which attaches its own
+// header in a later commit).
+func unixHTTPDo(t *testing.T, sock, method, path, authHeader string) *http.Response {
+	t.Helper()
+	hc := &http.Client{
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
+				var d net.Dialer
+				return d.DialContext(ctx, "unix", sock)
+			},
+		},
+	}
+	req, err := http.NewRequestWithContext(context.Background(), method, "http://portato"+path, nil)
+	if err != nil {
+		t.Fatalf("NewRequest: %v", err)
+	}
+	if authHeader != "" {
+		req.Header.Set("Authorization", authHeader)
+	}
+	resp, err := hc.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	return resp
+}
+
+// startAuthServer boots a server with ipcToken enabled (so Start generates the
+// token and installs the middleware) and returns it plus the generated token.
+func startAuthServer(t *testing.T) (s *Server, sock, tok string) {
+	t.Helper()
+	dir := shortDir(t)
+	cfgPath := filepath.Join(dir, "config.yaml")
+	cfg := testConfig()
+	cfg.Save(cfgPath)
+	sock = filepath.Join(dir, "portato.sock")
+	fe := newFakeEngine(cfg)
+	s = newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "daemon.socket"), slog.Default(), nil)
+	s.ipcToken = true
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(func() {
+		cancel()
+		<-ctx.Done()
+	})
+	go s.Start(ctx)
+	if err := waitForFile(sock, 2*time.Second); err != nil {
+		t.Fatalf("socket not created: %v", err)
+	}
+	tok, err := ReadToken(TokenPath(sock))
+	if err != nil {
+		t.Fatalf("read token: %v", err)
+	}
+	return s, sock, tok
+}
+
+func TestServer_AuthMiddleware(t *testing.T) {
+	_, sock, tok := startAuthServer(t)
+
+	cases := []struct {
+		name   string
+		header string
+		want   int
+	}{
+		{"missing header", "", http.StatusUnauthorized},
+		{"wrong token", "Bearer deadbeef", http.StatusUnauthorized},
+		{"wrong scheme", tok, http.StatusUnauthorized},
+		{"correct", "Bearer " + tok, http.StatusOK},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			resp := unixHTTPDo(t, sock, http.MethodGet, "/healthz", c.header)
+			defer resp.Body.Close()
+			if resp.StatusCode != c.want {
+				t.Fatalf("status = %d, want %d", resp.StatusCode, c.want)
+			}
+		})
+	}
+}
+
+func TestServer_AuthProtectsEveryRoute(t *testing.T) {
+	_, sock, _ := startAuthServer(t)
+	// A few representative routes across methods — all must 401 without a token.
+	for _, p := range []string{"/tunnels", "/config", "/logs", "/reload"} {
+		method := http.MethodGet
+		if p == "/reload" {
+			method = http.MethodPost
+		}
+		resp := unixHTTPDo(t, sock, method, p, "")
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("%s %s without token = %d, want 401", method, p, resp.StatusCode)
+		}
+	}
+}
+
+func TestServer_AuthTokenFileRemovedOnShutdown(t *testing.T) {
+	s, sock, _ := startAuthServer(t)
+	tokenPath := TokenPath(sock)
+	if _, err := os.Stat(tokenPath); err != nil {
+		t.Fatalf("token file not present while running: %v", err)
+	}
+	s.Shutdown()
+	if err := waitForGone(tokenPath, 2*time.Second); err != nil {
+		t.Fatalf("token file not removed on shutdown: %v", err)
+	}
+	if err := waitForGone(sock, 2*time.Second); err != nil {
+		t.Fatalf("socket not removed on shutdown: %v", err)
+	}
+}
+
+// TestServer_AuthDisabledByDefault ensures the test helper path (ipcToken false)
+// serves unauthenticated, so existing handler tests are unaffected by the
+// middleware and a daemon built with --ipc-token off behaves openly.
+func TestServer_AuthDisabledByDefault(t *testing.T) {
+	dir := shortDir(t)
+	cfgPath := filepath.Join(dir, "config.yaml")
+	cfg := testConfig()
+	cfg.Save(cfgPath)
+	sock := filepath.Join(dir, "portato.sock")
+	fe := newFakeEngine(cfg)
+	s := newServer(fe, cfg, cfgPath, sock, filepath.Join(dir, "daemon.socket"), slog.Default(), nil)
+	// ipcToken stays false (newServer default) -> no token, no middleware.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.Start(ctx)
+	if err := waitForFile(sock, 2*time.Second); err != nil {
+		t.Fatalf("socket not created: %v", err)
+	}
+	// No token file must exist.
+	if _, err := os.Stat(TokenPath(sock)); !os.IsNotExist(err) {
+		t.Fatalf("token file should not exist when ipcToken is disabled")
+	}
+	resp := unixHTTPDo(t, sock, http.MethodGet, "/healthz", "")
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (auth disabled)", resp.StatusCode)
+	}
 }

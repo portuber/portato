@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,6 +20,16 @@ import (
 )
 
 const shutdownTimeout = 10 * time.Second
+
+// ipcTokenDisabled, when true, makes New build a server that does not generate
+// or enforce the IPC bearer token — the --ipc-token off escape hatch
+// (PORTATO_NO_IPC_TOKEN=1). Default false: production authenticates IPC. Set
+// once from the root command before New runs.
+var ipcTokenDisabled bool
+
+// SetIpcTokenDisabled toggles the escape hatch. Intended to be called once
+// from the root command's daemon run when --ipc-token off / the env var is set.
+func SetIpcTokenDisabled(disabled bool) { ipcTokenDisabled = disabled }
 
 // tunneler is the subset of *forward.Engine the server depends on. Kept
 // unexported so the concrete Engine stays the production type while tests
@@ -46,6 +57,16 @@ type Server struct {
 	markerPath string
 	log        *slog.Logger
 	logs       *routelog.Ring
+
+	// ipcToken controls whether Start generates and enforces a bearer token.
+	// Set on the production server from the escape-hatch flag; the test helper
+	// leaves it false so existing handler tests run without auth.
+	ipcToken bool
+	// token is the bearer token once Start has generated it; "" means no auth
+	// (routes wraps in authmw only when non-empty).
+	token string
+	// tokenPath is where the token file is written/removed, next to the socket.
+	tokenPath string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -78,6 +99,7 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ri
 	}
 	s := newServer(nil, cfg, cfgPath, socketPath, markerPath, log, ring)
 	s.engine = forward.NewEngine(s.ctx, cfg, log)
+	s.ipcToken = !ipcTokenDisabled
 	return s, nil
 }
 
@@ -129,6 +151,22 @@ func (s *Server) Start(ctx context.Context) error {
 		s.cleanup()
 		return fmt.Errorf("write discovery marker: %w", err)
 	}
+	if s.ipcToken {
+		s.tokenPath = TokenPath(s.socketPath)
+		tok, err := GenerateToken()
+		if err != nil {
+			_ = ln.Close()
+			s.cleanup()
+			return fmt.Errorf("generate ipc token: %w", err)
+		}
+		if err := WriteToken(s.tokenPath, tok); err != nil {
+			_ = ln.Close()
+			s.cleanup()
+			return fmt.Errorf("write ipc token: %w", err)
+		}
+		s.token = tok
+		s.log.Info("ipc token written", "path", s.tokenPath)
+	}
 	s.listener = ln
 	s.srv = &http.Server{Handler: s.routes()}
 	s.engine.StartEnabled()
@@ -167,6 +205,9 @@ func (s *Server) Shutdown() error {
 func (s *Server) cleanup() {
 	_ = os.Remove(s.socketPath)
 	_ = RemoveMarker(s.markerPath)
+	if s.tokenPath != "" {
+		_ = os.Remove(s.tokenPath)
+	}
 }
 
 func (s *Server) routes() http.Handler {
@@ -184,7 +225,25 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /tunnels", s.handleAddTunnel)
 	mux.HandleFunc("PUT /tunnels/{name}", s.handleUpdateTunnel)
 	mux.HandleFunc("DELETE /tunnels/{name}", s.handleDeleteTunnel)
-	return mux
+	if s.token == "" {
+		return mux
+	}
+	return s.authmw(mux)
+}
+
+// authmw rejects any request whose Authorization header is not the bearer token
+// the daemon generated at startup. Constant-time comparison avoids leaking the
+// token via timing. Only installed when s.token != "" (a daemon started with
+// --ipc-token off, or a test server, serves unauthenticated).
+func (s *Server) authmw(next http.Handler) http.Handler {
+	want := "Bearer " + s.token
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(want)) != 1 {
+			writeError(w, http.StatusUnauthorized, "unauthorized")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
