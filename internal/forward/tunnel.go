@@ -332,11 +332,14 @@ func (t *Tunnel) handleConn(client *ssh.Client, conn net.Conn) {
 
 // handleDynamicConn serves a type=dynamic (-D) connection: the inbound conn is a
 // SOCKS5 client, and each requested destination is dialed through the SSH client
-// on the server side. No auth (loopback bind only).
+// on the server side. When socks5_user/socks5_password are configured (tunnel
+// or defaults), the proxy requires user/pass authentication; otherwise NoAuth
+// (loopback bind only) — preserving the pre-Phase-20 behaviour (Phase 20).
 func (t *Tunnel) handleDynamicConn(client *ssh.Client, conn net.Conn) {
 	srv, err := socks5.New(&socks5.Config{
-		Logger:   socks5SilencedLogger,
-		Resolver: loggingResolver{inner: socks5.DNSResolver{}, log: t.log},
+		Logger:      socks5SilencedLogger,
+		Resolver:    loggingResolver{inner: socks5.DNSResolver{}, log: t.log},
+		Credentials: socks5Credentials(t.cfg.ResolvedSocks5User(t.defaults), t.cfg.ResolvedSocks5Password(t.defaults)),
 		Dial: func(_ context.Context, network, addr string) (net.Conn, error) {
 			c, derr := client.Dial(network, addr)
 			if derr != nil {
@@ -355,6 +358,18 @@ func (t *Tunnel) handleDynamicConn(client *ssh.Client, conn net.Conn) {
 	if err := srv.ServeConn(conn); err != nil {
 		t.log.Debug("socks5 connection ended", "err", err)
 	}
+}
+
+// socks5Credentials returns a StaticCredentials store when BOTH user and pass
+// are non-empty, otherwise nil — so armon/go-socks5 falls back to NoAuth
+// (len(AuthMethods)==0 + Credentials==nil → NoAuthAuthenticator). Returning nil
+// on a partial pair (user without pass or vice-versa) keeps the proxy open
+// rather than silently requiring an unwinnable half-credential.
+func socks5Credentials(user, pass string) socks5.CredentialStore {
+	if user == "" || pass == "" {
+		return nil
+	}
+	return socks5.StaticCredentials{user: pass}
 }
 
 // loggingResolver wraps go-socks5's name resolver so SOCKS destination

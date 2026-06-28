@@ -37,6 +37,13 @@ type Defaults struct {
 	Identity       string `yaml:"identity" json:"identity"`
 	KnownHosts     string `yaml:"known_hosts" json:"known_hosts"`
 	AcceptNewHosts bool   `yaml:"accept_new_hosts" json:"accept_new_hosts"`
+
+	// Socks5User/Socks5Password are the default SOCKS5 user/pass authentication
+	// for type=dynamic tunnels (Phase 20). A tunnel may override per-name. When
+	// both are empty the SOCKS proxy stays open (NoAuth) — preserving the
+	// pre-Phase-20 behaviour. Only honoured by type=dynamic tunnels.
+	Socks5User     string `yaml:"socks5_user" json:"socks5_user"`
+	Socks5Password string `yaml:"socks5_password" json:"socks5_password"`
 }
 
 type Tunnel struct {
@@ -47,6 +54,12 @@ type Tunnel struct {
 	SSH      string `yaml:"ssh" json:"ssh"`
 	Identity string `yaml:"identity" json:"identity"`
 	Enabled  bool   `yaml:"enabled" json:"enabled"`
+
+	// Socks5User/Socks5Password override Defaults for type=dynamic tunnels
+	// (Phase 20). A tunnel-level pair wins over the defaults pair; an empty
+	// tunnel-level value falls back to defaults. NoAuth when both resolve empty.
+	Socks5User     string `yaml:"socks5_user" json:"socks5_user"`
+	Socks5Password string `yaml:"socks5_password" json:"socks5_password"`
 
 	// User/Host/Port are derived from SSH via prepare() and never persisted.
 	// Excluded from JSON so they are not echoed over IPC.
@@ -253,6 +266,25 @@ func (t Tunnel) ResolvedIdentity(d Defaults) string {
 	return ""
 }
 
+// ResolvedSocks5User returns the SOCKS5 username a type=dynamic tunnel should
+// authenticate with: the tunnel-level value wins, otherwise the defaults value
+// (Phase 20). Empty means no auth (a password alone is meaningless — see
+// ResolvedSocks5Creds).
+func (t Tunnel) ResolvedSocks5User(d Defaults) string {
+	if strings.TrimSpace(t.Socks5User) != "" {
+		return t.Socks5User
+	}
+	return d.Socks5User
+}
+
+// ResolvedSocks5Password mirrors ResolvedSocks5User for the password half.
+func (t Tunnel) ResolvedSocks5Password(d Defaults) string {
+	if strings.TrimSpace(t.Socks5Password) != "" {
+		return t.Socks5Password
+	}
+	return d.Socks5Password
+}
+
 func (d Defaults) ResolvedKnownHosts() string {
 	if strings.TrimSpace(d.KnownHosts) == "" {
 		home, err := os.UserHomeDir()
@@ -339,13 +371,15 @@ func expandTilde(p string) string {
 }
 
 type tunnelRaw struct {
-	Name     string `yaml:"name"`
-	Type     string `yaml:"type"`
-	Local    any    `yaml:"local"`
-	Remote   string `yaml:"remote"`
-	SSH      string `yaml:"ssh"`
-	Identity string `yaml:"identity"`
-	Enabled  bool   `yaml:"enabled"`
+	Name           string `yaml:"name"`
+	Type           string `yaml:"type"`
+	Local          any    `yaml:"local"`
+	Remote         string `yaml:"remote"`
+	SSH            string `yaml:"ssh"`
+	Identity       string `yaml:"identity"`
+	Enabled        bool   `yaml:"enabled"`
+	Socks5User     string `yaml:"socks5_user"`
+	Socks5Password string `yaml:"socks5_password"`
 }
 
 func (t *Tunnel) UnmarshalYAML(value *yaml.Node) error {
@@ -359,6 +393,8 @@ func (t *Tunnel) UnmarshalYAML(value *yaml.Node) error {
 	t.SSH = raw.SSH
 	t.Identity = raw.Identity
 	t.Enabled = raw.Enabled
+	t.Socks5User = raw.Socks5User
+	t.Socks5Password = raw.Socks5Password
 	switch v := raw.Local.(type) {
 	case nil:
 		t.Local = ""
