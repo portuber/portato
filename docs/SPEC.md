@@ -49,6 +49,7 @@ portato daemon         -> background process: Engine + HTTP-over-unix-socket
 portato attach         -> explicit TUI client to the daemon (error if the daemon is not running)
 
 portato list           -> CLI: a table of every tunnel's status (stdout)
+                          `--json`: one JSON document (machine-readable, Phase 20)
 portato enable <name>  -> CLI: enable a tunnel on the daemon
 portato disable <name> -> CLI: disable a tunnel on the daemon
 portato restart <name> -> CLI: restart a tunnel
@@ -56,6 +57,8 @@ portato restart <name> -> CLI: restart a tunnel
 portato install        -> install system autostart (launchd / systemd --user)
 portato uninstall      -> remove autostart
 portato --config <path> -> custom config path (global flag)
+portato --log-level <l> -> debug|info|warn|error (global, Phase 20; default info)
+portato --socket <path> -> override the daemon IPC socket (global)
 portato --help
 ```
 
@@ -246,6 +249,8 @@ defaults:
   identity: ~/.ssh/id_ed25519     # optional; empty -> ssh-agent
   known_hosts: ~/.ssh/known_hosts
   accept_new_hosts: false         # TOFU: when true, new hosts are appended to known_hosts
+  socks5_user: alice              # optional (Phase 20): default SOCKS5 user/pass
+  socks5_password: $secret        # for type=dynamic tunnels; empty -> NoAuth
 
 tunnels:
   - name: db-stage                # unique, required
@@ -255,6 +260,8 @@ tunnels:
     ssh: user@bastion.example.com:22   # required; user and port are optional
     identity: ~/.ssh/id_ed25519   # optional; overrides defaults
     enabled: false                # off by default; the daemon persists toggles here
+    # socks5_user / socks5_password (Phase 20): per-tunnel override of defaults,
+    # honoured only by type=dynamic. Both empty (after fallback) -> NoAuth.
 ```
 
 The meaning of `local`/`remote` depends on `type`:
@@ -270,8 +277,10 @@ The meaning of `local`/`remote` depends on `type`:
   connections are forwarded to here.
 - **`dynamic` (`-D`)**: `local` is a SOCKS5 proxy listen address; `remote` is
   unused (ignored). Each connection's destination is taken from the SOCKS
-  request and dialed on the host via `ssh.Client.Dial`. No SOCKS auth (loopback
-  bind only).
+  request and dialed on the host via `ssh.Client.Dial`. Optional SOCKS5
+  user/pass authentication (Phase 20): `socks5_user`/`socks5_password` (tunnel
+  or defaults) make the proxy require `UserPass`; when both resolve empty the
+  proxy is open (NoAuth, loopback bind only).
 
 ### Authentication
 
@@ -298,6 +307,10 @@ The dynamic implementation (Phase 8): the local listener and accept-loop are
 shared with the local path; each accepted connection is handed to a SOCKS5
 server (`armon/go-socks5`) whose `Dial` is routed through the current
 `ssh.Client`. No `remote` — the destination comes from the SOCKS request.
+Phase 20 adds optional SOCKS5 user/pass auth: a resolved
+(`tunnels[].socks5_*` over `defaults.socks5_*`) non-empty user+pass pair is
+installed as a `StaticCredentials` store, switching the proxy to `UserPass`;
+otherwise NoAuth (the pre-Phase-20 behaviour).
 
 ## 9. SSH client (native)
 
@@ -340,7 +353,7 @@ server (`armon/go-socks5`) whose `Dial` is routed through the current
 | `e` / `n` / `d`| edit / create / delete the selected tunnel            |
 | `C`            | duplicate the selected tunnel (under `<name>-copy`)   |
 | `l`            | view the selected tunnel's logs                       |
-| `/`            | substring filter over name/type/endpoint; `esc` clears |
+| `/`            | fuzzy (subsequence) filter over name/type/endpoint; `esc` clears (Phase 20; substring fallback) |
 | `R`            | reload the config from disk                           |
 | `?` / `esc`    | toggle help (`esc` also clears an active filter and cancels a confirm modal) |
 | `q` / `ctrl+c` | quit (with the "background?" modal in standalone when there are live tunnels) |
@@ -390,7 +403,11 @@ Since tunnels are `enabled: false` by default, at system boot **only** the contr
 
 ## 14. Logging
 
-- `log/slog`, level `Info` (configurable via a `--log-level` flag post-MVP).
+- `log/slog`, level `Info` by default. The root persistent flag `--log-level
+  debug|info|warn|error` (Phase 20) sets the file handler's threshold, so
+  `--log-level debug` surfaces debug lines in the log file and `error` silences
+  info. The in-memory ring (see below) keeps capturing at Debug independently,
+  so the TUI logs screen's debug toggle works regardless of the flag.
 - Handler: text, writes to `xdg.StateHome/portato/portato.log` + stderr (in daemon mode, only the file + a separate `daemon.log`, in the `StandardOutPath`/`StandardErrorPath` of launchd/systemd).
 - Each tunnel gets a sub-logger `log.With("tunnel", name)`.
 - The slog handler also feeds an in-memory ring buffer (Phase 11) so the TUI
