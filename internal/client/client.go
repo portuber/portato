@@ -13,6 +13,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	"github.com/kipkaev55/portato/internal/ipctoken"
 	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
@@ -27,7 +28,12 @@ type Client struct {
 	socketPath string
 }
 
-// New builds a client that dials the daemon at socketPath.
+// New builds a client that dials the daemon at socketPath. It best-effort reads
+// the daemon's IPC bearer token from TokenPath(socketPath) (next to the socket)
+// and attaches it to every request via a RoundTripper — so callers are
+// authenticated automatically with no API change. A missing token file
+// (old daemon, or --ipc-token off) yields no header and an open daemon answers
+// 200, keeping the client backward compatible.
 func New(socketPath string) *Client {
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
@@ -35,11 +41,29 @@ func New(socketPath string) *Client {
 			return d.DialContext(ctx, "unix", socketPath)
 		},
 	}
+	token, _ := ipctoken.ReadToken(ipctoken.TokenPath(socketPath))
+	authed := &tokenTransport{base: transport, token: token}
 	return &Client{
-		http:       &http.Client{Transport: transport, Timeout: defaultTimeout},
-		stream:     &http.Client{Transport: transport}, // no overall timeout: SSE is long-lived
+		http:       &http.Client{Transport: authed, Timeout: defaultTimeout},
+		stream:     &http.Client{Transport: authed}, // no overall timeout: SSE is long-lived
 		socketPath: socketPath,
 	}
+}
+
+// tokenTransport injects the daemon IPC bearer token into every request when
+// the client was built with one. No-op when token is "" (old daemon, or escape
+// hatch off) so the client stays backward compatible. The same header value is
+// set on every call, so the mutation is idempotent across retries.
+type tokenTransport struct {
+	base  http.RoundTripper
+	token string
+}
+
+func (t *tokenTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if t.token != "" {
+		req.Header.Set("Authorization", "Bearer "+t.token)
+	}
+	return t.base.RoundTrip(req)
 }
 
 // Socket returns the socket path this client dials.

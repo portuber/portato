@@ -1,4 +1,15 @@
-package daemon
+// Package ipctoken holds the IPC bearer-token primitives shared between the
+// daemon (which generates and writes the token) and its clients (which read it
+// best-effort and attach it as an Authorization header). It is a leaf package
+// so the daemon and client packages can both depend on it without forming an
+// import cycle.
+//
+// The token is generated at daemon startup, written next to the unix socket
+// the daemon binds (<dir(socket)>/portato.token), and read best-effort by
+// clients + the discovery probe. A missing file means "old daemon or
+// --ipc-token off": clients send no header and an unauthenticated daemon
+// answers 200. See SPEC §6/§16.
+package ipctoken
 
 import (
 	"crypto/rand"
@@ -7,16 +18,6 @@ import (
 	"os"
 	"path/filepath"
 )
-
-// Phase 18 — IPC authorization token.
-//
-// The daemon authenticates every IPC request with a bearer token, layered on
-// top of the socket's 0600 permission. The token is generated at daemon
-// startup, written next to the unix socket (so its location derives trivially
-// from the socket path the client already dials), and read best-effort by
-// clients + the discovery probe. A missing token file means "old daemon or
-// escape-hatch off": clients send no header and an unauthenticated daemon
-// answers 200. See SPEC §6/§16.
 
 // tokenFile is the filename of the IPC bearer token, placed in the same
 // directory as the unix socket the daemon listens on.
@@ -41,8 +42,8 @@ func GenerateToken() (string, error) {
 }
 
 // WriteToken atomically writes the token at path with mode 0600: tmp-file +
-// rename, mirroring WriteMarker, so a partial write never leaves a corrupt
-// credential. An existing file is replaced.
+// rename, so a partial write never leaves a corrupt credential. An existing
+// file is replaced.
 func WriteToken(path, token string) error {
 	if dir := filepath.Dir(path); dir != "" {
 		if err := os.MkdirAll(dir, 0o700); err != nil {

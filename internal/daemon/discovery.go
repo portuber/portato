@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/adrg/xdg"
+
+	"github.com/kipkaev55/portato/internal/ipctoken"
 )
 
 // Phase 12 — robust IPC socket discovery.
@@ -233,7 +235,7 @@ func probeSocket(path string) bool {
 	// authenticated daemon. The token sits next to the socket being probed.
 	// A missing token file (old daemon / --ipc-token off) means no header, and
 	// an open daemon answers 200 regardless.
-	if tok, terr := ReadToken(TokenPath(path)); terr == nil && tok != "" {
+	if tok, terr := ipctoken.ReadToken(ipctoken.TokenPath(path)); terr == nil && tok != "" {
 		req.Header.Set("Authorization", "Bearer "+tok)
 	}
 	resp, err := client.Do(req)

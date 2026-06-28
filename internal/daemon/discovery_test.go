@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 	"time"
+
+	"github.com/kipkaev55/portato/internal/ipctoken"
 )
 
 func TestDiscoveryPathUnderConfigHome(t *testing.T) {
@@ -350,14 +352,14 @@ func startAuthHealthzServer(t *testing.T, path, token string) func() {
 // gone, no header is sent and the authed server's 401 makes the probe false.
 func TestProbeSocketAttachesToken(t *testing.T) {
 	path := shortSocketPath(t)
-	tok, err := GenerateToken()
+	tok, err := ipctoken.GenerateToken()
 	if err != nil {
 		t.Fatalf("GenerateToken: %v", err)
 	}
-	if err := WriteToken(TokenPath(path), tok); err != nil {
+	if err := ipctoken.WriteToken(ipctoken.TokenPath(path), tok); err != nil {
 		t.Fatalf("WriteToken: %v", err)
 	}
-	t.Cleanup(func() { _ = RemoveToken(TokenPath(path)) })
+	t.Cleanup(func() { _ = ipctoken.RemoveToken(ipctoken.TokenPath(path)) })
 
 	stop := startAuthHealthzServer(t, path, tok)
 	defer stop()
@@ -365,7 +367,7 @@ func TestProbeSocketAttachesToken(t *testing.T) {
 	if !probeSocket(path) {
 		t.Fatal("probeSocket should succeed when the token file matches")
 	}
-	if err := RemoveToken(TokenPath(path)); err != nil {
+	if err := ipctoken.RemoveToken(ipctoken.TokenPath(path)); err != nil {
 		t.Fatalf("RemoveToken: %v", err)
 	}
 	if probeSocket(path) {

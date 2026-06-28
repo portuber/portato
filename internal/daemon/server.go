@@ -16,6 +16,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	"github.com/kipkaev55/portato/internal/ipctoken"
 	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
@@ -152,14 +153,14 @@ func (s *Server) Start(ctx context.Context) error {
 		return fmt.Errorf("write discovery marker: %w", err)
 	}
 	if s.ipcToken {
-		s.tokenPath = TokenPath(s.socketPath)
-		tok, err := GenerateToken()
+		s.tokenPath = ipctoken.TokenPath(s.socketPath)
+		tok, err := ipctoken.GenerateToken()
 		if err != nil {
 			_ = ln.Close()
 			s.cleanup()
 			return fmt.Errorf("generate ipc token: %w", err)
 		}
-		if err := WriteToken(s.tokenPath, tok); err != nil {
+		if err := ipctoken.WriteToken(s.tokenPath, tok); err != nil {
 			_ = ln.Close()
 			s.cleanup()
 			return fmt.Errorf("write ipc token: %w", err)

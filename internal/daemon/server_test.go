@@ -17,6 +17,7 @@ import (
 	"github.com/kipkaev55/portato/internal/client"
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
+	"github.com/kipkaev55/portato/internal/ipctoken"
 	routelog "github.com/kipkaev55/portato/internal/log"
 )
 
@@ -546,7 +547,7 @@ func startAuthServer(t *testing.T) (s *Server, sock, tok string) {
 	if err := waitForFile(sock, 2*time.Second); err != nil {
 		t.Fatalf("socket not created: %v", err)
 	}
-	tok, err := ReadToken(TokenPath(sock))
+	tok, err := ipctoken.ReadToken(ipctoken.TokenPath(sock))
 	if err != nil {
 		t.Fatalf("read token: %v", err)
 	}
@@ -595,7 +596,7 @@ func TestServer_AuthProtectsEveryRoute(t *testing.T) {
 
 func TestServer_AuthTokenFileRemovedOnShutdown(t *testing.T) {
 	s, sock, _ := startAuthServer(t)
-	tokenPath := TokenPath(sock)
+	tokenPath := ipctoken.TokenPath(sock)
 	if _, err := os.Stat(tokenPath); err != nil {
 		t.Fatalf("token file not present while running: %v", err)
 	}
@@ -627,7 +628,7 @@ func TestServer_AuthDisabledByDefault(t *testing.T) {
 		t.Fatalf("socket not created: %v", err)
 	}
 	// No token file must exist.
-	if _, err := os.Stat(TokenPath(sock)); !os.IsNotExist(err) {
+	if _, err := os.Stat(ipctoken.TokenPath(sock)); !os.IsNotExist(err) {
 		t.Fatalf("token file should not exist when ipcToken is disabled")
 	}
 	resp := unixHTTPDo(t, sock, http.MethodGet, "/healthz", "")

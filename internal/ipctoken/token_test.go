@@ -1,4 +1,4 @@
-package daemon
+package ipctoken
 
 import (
 	"os"
@@ -25,7 +25,7 @@ func TestGenerateToken(t *testing.T) {
 
 func TestTokenPath(t *testing.T) {
 	got := TokenPath("/tmp/portato-1000.sock")
-	want := filepath.Join("/tmp", tokenFile)
+	want := filepath.Join("/tmp", "portato.token")
 	if got != want {
 		t.Fatalf("TokenPath = %q, want %q", got, want)
 	}
@@ -33,7 +33,7 @@ func TestTokenPath(t *testing.T) {
 
 func TestWriteReadTokenRoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, tokenFile)
+	path := filepath.Join(dir, "portato.token")
 
 	tok, err := GenerateToken()
 	if err != nil {
@@ -54,7 +54,7 @@ func TestWriteReadTokenRoundTrip(t *testing.T) {
 
 func TestWriteTokenIsMode0600(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, tokenFile)
+	path := filepath.Join(dir, "portato.token")
 	if err := WriteToken(path, "abc"); err != nil {
 		t.Fatalf("WriteToken: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestWriteTokenIsMode0600(t *testing.T) {
 
 func TestReadTokenMissingFile(t *testing.T) {
 	dir := t.TempDir()
-	_, err := ReadToken(filepath.Join(dir, tokenFile))
+	_, err := ReadToken(filepath.Join(dir, "portato.token"))
 	if err == nil {
 		t.Fatal("expected an error for a missing token file")
 	}
@@ -80,7 +80,7 @@ func TestReadTokenMissingFile(t *testing.T) {
 
 func TestReadTokenOverwriteOldFile(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, tokenFile)
+	path := filepath.Join(dir, "portato.token")
 	if err := WriteToken(path, "first"); err != nil {
 		t.Fatalf("WriteToken first: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestReadTokenOverwriteOldFile(t *testing.T) {
 
 func TestRemoveToken(t *testing.T) {
 	dir := t.TempDir()
-	path := filepath.Join(dir, tokenFile)
+	path := filepath.Join(dir, "portato.token")
 	if err := WriteToken(path, "x"); err != nil {
 		t.Fatalf("WriteToken: %v", err)
 	}
