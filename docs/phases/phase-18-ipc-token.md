@@ -1,7 +1,7 @@
 ---
 phase: 18
 title: IPC authorization token
-status: todo
+status: in-progress
 depends_on: [4]
 ---
 

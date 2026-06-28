@@ -33,7 +33,7 @@
 | 15  | Light-theme color tuning          | `[x]`  | [phase-15-light-theme-colors.md](./phases/phase-15-light-theme-colors.md) |
 | 16  | Seamless hand-off (FD-passing)    | `[ ]`  | [phase-16-fd-passing-handoff.md](./phases/phase-16-fd-passing-handoff.md) |
 | 17  | Windows support                   | `[ ]`  | [phase-17-windows.md](./phases/phase-17-windows.md) |
-| 18  | IPC authorization token           | `[ ]`  | [phase-18-ipc-token.md](./phases/phase-18-ipc-token.md) |
+| 18  | IPC authorization token           | `[~]`  | [phase-18-ipc-token.md](./phases/phase-18-ipc-token.md) |
 | 19  | Identity passphrase storage       | `[ ]`  | [phase-19-identity-passphrase.md](./phases/phase-19-identity-passphrase.md) |
 | 20  | CLI/UX polish                     | `[ ]`  | [phase-20-cli-ux-polish.md](./phases/phase-20-cli-ux-polish.md) |
 | 21  | Packaging and releases            | `[ ]`  | [phase-21-packaging.md](./phases/phase-21-packaging.md) |
