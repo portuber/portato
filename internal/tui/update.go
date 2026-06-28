@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/controller"
@@ -368,13 +369,23 @@ func (m Model) hasLiveTunnels() bool {
 	return false
 }
 
-// matches reports whether a tunnel passes the `/` filter (case-insensitive
-// substring over name / type / endpoint). An empty query matches everything.
+// matches reports whether a tunnel passes the `/` filter. The query is matched
+// fzf-style (case-insensitive subsequence via fuzzysearch) against the name,
+// type and endpoint; an exact substring still hits as a fallback so an
+// unfuzzy-but-contiguous token keeps matching (Phase 20). An empty query
+// matches everything.
 func (m Model) matches(s controller.Status) bool {
 	q := strings.ToLower(m.filter.Value())
 	if q == "" {
 		return true
 	}
+	if fuzzy.MatchFold(q, s.Name) || fuzzy.MatchFold(q, s.Type) || fuzzy.MatchFold(q, s.Endpoint()) {
+		return true
+	}
+	// Substring fallback: every contiguous match is also a subsequence, so in
+	// practice fuzzy.MatchFold already covers it — kept defensively so the
+	// filter degrades to the pre-Phase-20 behaviour if the matcher ever
+	// surprises us (e.g. on Unicode case-folding edge cases).
 	return strings.Contains(strings.ToLower(s.Name), q) ||
 		strings.Contains(strings.ToLower(s.Type), q) ||
 		strings.Contains(strings.ToLower(s.Endpoint()), q)
