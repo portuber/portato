@@ -228,6 +228,14 @@ func probeSocket(path string) bool {
 	if err != nil {
 		return false
 	}
+	// healthz is protected like every other route once the daemon generates a
+	// token (Phase 18); attach it best-effort so discovery still probes a live
+	// authenticated daemon. The token sits next to the socket being probed.
+	// A missing token file (old daemon / --ipc-token off) means no header, and
+	// an open daemon answers 200 regardless.
+	if tok, terr := ReadToken(TokenPath(path)); terr == nil && tok != "" {
+		req.Header.Set("Authorization", "Bearer "+tok)
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return false

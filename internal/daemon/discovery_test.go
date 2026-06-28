@@ -307,6 +307,72 @@ func TestProbeSocketLiveAndSilent(t *testing.T) {
 	}
 }
 
+// startAuthHealthzServer serves /healthz at path but requires the bearer token,
+// standing in for an authenticated daemon so probeSocket's token handling can
+// be exercised without a full Server.
+func startAuthHealthzServer(t *testing.T, path, token string) func() {
+	t.Helper()
+	_ = os.Remove(path)
+	ln, err := net.Listen("unix", path)
+	if err != nil {
+		t.Fatalf("listen %s: %v", path, err)
+	}
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "Bearer "+token {
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := &http.Server{Handler: mux}
+	done := make(chan struct{})
+	go func() { _ = srv.Serve(ln); close(done) }()
+	// Wait until the server accepts connections (dial-only, no auth yet).
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if c, derr := net.Dial("unix", path); derr == nil {
+			_ = c.Close()
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	return func() {
+		_ = srv.Shutdown(context.Background())
+		<-done
+		_ = ln.Close()
+		_ = os.Remove(path)
+	}
+}
+
+// TestProbeSocketAttachesToken: with a token file next to the socket, the probe
+// reads it and sends the header, so a 200 reaches the caller; with the file
+// gone, no header is sent and the authed server's 401 makes the probe false.
+func TestProbeSocketAttachesToken(t *testing.T) {
+	path := shortSocketPath(t)
+	tok, err := GenerateToken()
+	if err != nil {
+		t.Fatalf("GenerateToken: %v", err)
+	}
+	if err := WriteToken(TokenPath(path), tok); err != nil {
+		t.Fatalf("WriteToken: %v", err)
+	}
+	t.Cleanup(func() { _ = RemoveToken(TokenPath(path)) })
+
+	stop := startAuthHealthzServer(t, path, tok)
+	defer stop()
+
+	if !probeSocket(path) {
+		t.Fatal("probeSocket should succeed when the token file matches")
+	}
+	if err := RemoveToken(TokenPath(path)); err != nil {
+		t.Fatalf("RemoveToken: %v", err)
+	}
+	if probeSocket(path) {
+		t.Fatal("probeSocket should fail when the token file is missing and the server requires auth")
+	}
+}
+
 // TestEnsureNotRunning_StaleMarkerButLiveSocketBlocksStart: the marker's PID is
 // dead but the socket still answers (PID reused, or a kill -0 hiccup). A second
 // daemon start must NOT clobber the live daemon's marker/socket.
