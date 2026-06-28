@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"text/tabwriter"
@@ -11,12 +12,18 @@ import (
 	"github.com/kipkaev55/portato/internal/forward"
 )
 
+var listJSON bool
+
 var listCmd = &cobra.Command{
 	Use:           "list",
 	Short:         "List the status of all tunnels (stdout)",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE:          listRunE,
+}
+
+func init() {
+	listCmd.Flags().BoolVar(&listJSON, "json", false, "emit status as a single JSON document (machine-readable)")
 }
 
 func listRunE(cmd *cobra.Command, _ []string) error {
@@ -29,8 +36,22 @@ func listRunE(cmd *cobra.Command, _ []string) error {
 		fmt.Fprintln(cmd.ErrOrStderr(), err)
 		return err
 	}
+	if listJSON {
+		return printJSON(cmd.OutOrStdout(), statuses)
+	}
 	printTable(cmd.OutOrStdout(), statuses)
 	return nil
+}
+
+// printJSON writes statuses as one JSON document. A nil/empty slice renders as
+// `[]` (not `null`) so `jq '.[0]'` is well-defined for the zero-tunnel case.
+func printJSON(out io.Writer, statuses []forward.Status) error {
+	if statuses == nil {
+		statuses = []forward.Status{}
+	}
+	enc := json.NewEncoder(out)
+	enc.SetIndent("", "  ")
+	return enc.Encode(statuses)
 }
 
 func printTable(out io.Writer, statuses []forward.Status) {
