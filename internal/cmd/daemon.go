@@ -20,7 +20,22 @@ var daemonCmd = &cobra.Command{
 	RunE:  daemonRunE,
 }
 
+// ipcTokenFlag mirrors the --ipc-token flag value (on|off). Default "on": the
+// daemon authenticates IPC. "off" (or PORTATO_NO_IPC_TOKEN=1) is the break-glass
+// escape hatch that disables the bearer token and serves openly over the 0600
+// socket (Phase 18).
+var ipcTokenFlag string
+
+func init() {
+	daemonCmd.Flags().StringVar(&ipcTokenFlag, "ipc-token", "on",
+		"enable/disable IPC bearer-token auth (on|off); PORTATO_NO_IPC_TOKEN=1 forces off")
+}
+
 func daemonRunE(_ *cobra.Command, _ []string) error {
+	if ipcTokenFlag == "off" || os.Getenv("PORTATO_NO_IPC_TOKEN") == "1" {
+		daemon.SetIpcTokenDisabled(true)
+	}
+
 	path := cfgFile
 	if path == "" {
 		path = config.DefaultPath()

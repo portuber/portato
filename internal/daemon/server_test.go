@@ -637,3 +637,42 @@ func TestServer_AuthDisabledByDefault(t *testing.T) {
 		t.Fatalf("status = %d, want 200 (auth disabled)", resp.StatusCode)
 	}
 }
+
+// TestNew_HonorsEscapeHatch: production New enables the IPC token by default,
+// and SetIpcTokenDisabled(true) (the --ipc-token off / PORTATO_NO_IPC_TOKEN=1
+// escape hatch) flips it off so no token is generated or enforced.
+func TestNew_HonorsEscapeHatch(t *testing.T) {
+	// Isolate discovery + socket so New does not touch the host's real marker.
+	withIsolatedDiscovery(t)
+	dir := shortDir(t)
+	sock := filepath.Join(dir, "portato.sock")
+	SetSocketOverride(sock)
+	t.Cleanup(func() { SetSocketOverride("") })
+
+	cfgPath := filepath.Join(dir, "config.yaml")
+	cfg := testConfig()
+	if err := cfg.Save(cfgPath); err != nil {
+		t.Fatalf("save cfg: %v", err)
+	}
+
+	SetIpcTokenDisabled(false)
+	s, err := New(cfg, cfgPath, slog.Default(), nil)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if !s.ipcToken {
+		t.Fatal("s.ipcToken = false, want true by default")
+	}
+	_ = s.Shutdown()
+
+	SetIpcTokenDisabled(true)
+	t.Cleanup(func() { SetIpcTokenDisabled(false) })
+	s2, err := New(cfg, cfgPath, slog.Default(), nil)
+	if err != nil {
+		t.Fatalf("New under escape hatch: %v", err)
+	}
+	if s2.ipcToken {
+		t.Fatal("s.ipcToken = true under escape hatch, want false")
+	}
+	_ = s2.Shutdown()
+}
