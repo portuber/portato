@@ -176,6 +176,19 @@ Implementations:
   Intended for tests and CI.
 - **Protocol:** HTTP over the unix socket (`net.Listen("unix", path)` + `http.Serve`). JSON in request/response bodies.
 - **Permissions:** the socket is created with mode `0600`, accessible only to the owner.
+- **Authorization (Phase 18):** layered on top of the `0600` socket, the daemon
+  authenticates every IPC request with a bearer token. At startup it generates
+  a 32-byte (`crypto/rand`) token, writes it hex-encoded to
+  `<socketDir>/portato.token` (mode `0600`, atomically next to the unix socket
+  it binds), and rejects any request whose `Authorization: Bearer <token>`
+  header does not match with `401` (constant-time compare, `healthz` included).
+  Clients read the token best-effort from that path and attach the header
+  automatically (one `RoundTripper`); the discovery `healthz` probe does too, so
+  liveness checks still reach an authenticated daemon. A missing token file
+  (an older daemon, or the escape hatch) means no header and an open daemon
+  answers `200` — backward compatible on both ends. `--ipc-token off`
+  (or `PORTATO_NO_IPC_TOKEN=1`) is the break-glass hatch: no token is
+  generated and the daemon serves openly over the `0600` socket.
 - **Endpoints:**
 
 | Method   | Path                              | Action                            |
@@ -398,7 +411,7 @@ Since tunnels are `enabled: false` by default, at system boot **only** the contr
 
 ## 16. Open questions (to resolve as we go)
 
-- IPC authorization: only filesystem permissions (0600) or a token? -> 0600 for now.
+- IPC authorization: only filesystem permissions (0600) or a token? -> **resolved (Phase 18)**: a 32-byte bearer token in `<socketDir>/portato.token`, layered on the `0600` socket; `--ipc-token off` disables it. See §6.
 - Where to store a passphrase for an identity when the agent is unavailable? (for now: agent only).
 - Passing live SSH FDs to the new daemon during hand-off (a seamless transition) — post-MVP.
 - Windows support — post-MVP (named pipe + the registry Run key).
