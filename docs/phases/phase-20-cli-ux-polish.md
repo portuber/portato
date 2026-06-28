@@ -1,7 +1,7 @@
 ---
 phase: 20
 title: CLI/UX polish (--log-level, list --json, SOCKS5 auth, fuzzy filter)
-status: todo
+status: in-progress
 depends_on: [8, 11, 13]
 ---
 
