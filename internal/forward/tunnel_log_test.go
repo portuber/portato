@@ -16,7 +16,7 @@ import (
 // The motivating case was a remote-listen error ("listen 0.0.0.0:9090 on
 // server: …") that was unreachable from the TUI.
 func TestSetStateErrLogsToRing(t *testing.T) {
-	logger, ring, closer, err := routelog.Setup(filepath.Join(t.TempDir(), "t.log"))
+	logger, ring, closer, err := routelog.Setup(filepath.Join(t.TempDir(), "t.log"), slog.LevelInfo)
 	if err != nil {
 		t.Fatalf("setup logger: %v", err)
 	}

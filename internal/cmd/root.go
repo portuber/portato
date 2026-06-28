@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -19,6 +20,10 @@ var (
 	cfgFile         string
 	forceStandalone bool
 	socketFlag      string
+	logLevelFlag    string
+	// logLevel is parsed from --log-level in PersistentPreRunE and consumed by
+	// the daemon / standalone TUI when they set up their file logger.
+	logLevel = slog.LevelInfo
 )
 
 // probeTimeout caps the smart-launcher daemon probe: a live daemon (or
@@ -71,7 +76,7 @@ func runStandalone() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger, ring, closer, err := routelog.Setup("")
+	logger, ring, closer, err := routelog.Setup("", logLevel)
 	if err != nil {
 		return fmt.Errorf("setup logger: %w", err)
 	}
@@ -96,11 +101,36 @@ func init() {
 	rootCmd.Flags().BoolVar(&forceStandalone, "force-standalone", false, "skip daemon auto-detection and run a standalone TUI")
 	rootCmd.PersistentFlags().StringVar(&socketFlag, "socket", "",
 		"override the daemon IPC socket path; the daemon binds it and clients dial it directly (also PORTATO_SOCKET)")
+	rootCmd.PersistentFlags().StringVar(&logLevelFlag, "log-level", "info",
+		"minimum log level for the log file (debug|info|warn|error)")
 	// Push the --socket flag (if any) into the daemon package before any
 	// subcommand runs, so both the daemon (bind) and clients (dial) honour it.
+	// Parse --log-level once here so every subcommand's logger uses it.
 	rootCmd.PersistentPreRunE = func(*cobra.Command, []string) error {
 		daemon.SetSocketOverride(socketFlag)
+		lvl, err := parseLogLevel(logLevelFlag)
+		if err != nil {
+			return err
+		}
+		logLevel = lvl
 		return nil
+	}
+}
+
+// parseLogLevel maps the --log-level flag value to a slog.Level. An empty value
+// defaults to info so the flag is optional even when explicitly cleared.
+func parseLogLevel(s string) (slog.Level, error) {
+	switch s {
+	case "", "info":
+		return slog.LevelInfo, nil
+	case "debug":
+		return slog.LevelDebug, nil
+	case "warn":
+		return slog.LevelWarn, nil
+	case "error":
+		return slog.LevelError, nil
+	default:
+		return 0, fmt.Errorf("invalid --log-level %q (want debug|info|warn|error)", s)
 	}
 }
 
