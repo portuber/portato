@@ -35,7 +35,7 @@
 | 17  | Windows support                   | `[ ]`  | [phase-17-windows.md](./phases/phase-17-windows.md) |
 | 18  | IPC authorization token           | `[x]`  | [phase-18-ipc-token.md](./phases/phase-18-ipc-token.md) |
 | 19  | Identity passphrase storage       | `[ ]`  | [phase-19-identity-passphrase.md](./phases/phase-19-identity-passphrase.md) |
-| 20  | CLI/UX polish                     | `[~]`  | [phase-20-cli-ux-polish.md](./phases/phase-20-cli-ux-polish.md) |
+| 20  | CLI/UX polish                     | `[x]`  | [phase-20-cli-ux-polish.md](./phases/phase-20-cli-ux-polish.md) |
 | 21  | Packaging and releases            | `[ ]`  | [phase-21-packaging.md](./phases/phase-21-packaging.md) |
 | 22  | Robustness (socket activation…)   | `[ ]`  | [phase-22-robustness.md](./phases/phase-22-robustness.md) |
 | 23  | TUI list column alignment         | `[x]`  | [phase-23-tui-list-column-alignment.md](./phases/phase-23-tui-list-column-alignment.md) |
@@ -48,11 +48,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22 (post-MVP backlog) are planned in detail — 18 is done, the rest are pending (`[ ]`), to be started on an explicit command.
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22 (post-MVP backlog) are planned in detail — 18 and 20 are done, the rest are pending (`[ ]`), to be started on an explicit command.
 
 ## Current focus
 
-**All phases 0–15 and 18 are `[x]`; phases 16, 17, 19–22 (the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
+**All phases 0–15, 18 and 20 are `[x]`; phases 16, 17, 19, 21, 22 (the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -61,7 +61,9 @@ status events, an in-TUI editor (`e`/`n`/`d`) and tunnel duplication
 (`Shift+C`), a per-tunnel log screen (`l`), an interactive unknown-host (TOFU)
 prompt, automatic light/dark theming, `portato doctor`, robust IPC socket
 discovery, size-rotated logs, a `/` list filter, goreleaser release tooling,
-and IPC bearer-token auth (Phase 18) layered on the `0600` socket.
+IPC bearer-token auth (Phase 18) layered on the `0600` socket, and the Phase 20
+CLI/UX polish: `--log-level`, `portato list --json`, SOCKS5 user/pass auth for
+`type=dynamic`, and a fuzzy (subsequence) `/` filter.
 
 ### Caveats / deviations
 - **Behavior change (`feat(config)`, alongside Phase 13):** a `type: remote`
