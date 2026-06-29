@@ -60,6 +60,7 @@ portato --config <path> -> custom config path (global flag)
 portato --log-level <l> -> debug|info|warn|error (global, Phase 20; default info)
 portato --socket <path> -> override the daemon IPC socket (global)
 portato --help
+portato --version       -> print the logo banner + version/commit/date and exit (pipe-safe)
 ```
 
 For `portato` (smart): the daemon's presence is detected by reading the discovery marker (§6) for its socket path and PID, then probing the socket.
@@ -379,6 +380,39 @@ clears the query).
 | Filter (`/`)   | type to filter live; `backspace` edits the query |               |
 |                | `enter`                      | close the input, keep the filter |
 |                | `esc`                        | clear the filter and close      |
+
+### Branding / logo
+
+The potato logo appears in three places — never on the working screen:
+
+- **empty-list splash** — when the tunnel list is empty and the terminal is
+  tall enough (≥ ~18 rows), the centered logo sits above the "no tunnels"
+  hint; a short terminal shows the hint only.
+- **help (`?`) overlay** — the compact logo is prepended above the hotkey list
+  (same height gate).
+- **`portato --version`** — the logo banner followed by a
+  `portato <version> (<commit>, <date>)` line. Pipe-safe: when stdout is not a
+  terminal the inline image and all ANSI are suppressed and the braille
+  variant is used, so `portato --version | head` stays clean.
+
+A small potato emoji 🥔 marks the header before the title, on `GOOS=darwin`
+only (where it renders cleanly at 2 cells); `PORTATO_LOGO_EMOJI=on|off`
+overrides it, and `PORTATO_LOGO=off` hides it too.
+
+Rendering picks the best the terminal supports (override with
+`PORTATO_LOGO=auto|image|braille|block|off`):
+
+| Mode    | When                                                               |
+|---------|--------------------------------------------------------------------|
+| image   | iTerm2 / WezTerm (`TERM_PROGRAM`) — inline PNG via OSC 1337.       |
+| braille | default on macOS (Terminal.app) and Linux — outline-braille ASCII. |
+| block   | `GOOS=windows` — solid block (robust on legacy conhost).           |
+| off     | no big logo anywhere, no header emoji.                             |
+
+All variants are 28×12 cells; the ASCII glyphs are tinted with the theme's
+title accent, except under the mono theme / `NO_COLOR` (plain glyphs). The
+assets are `go:embed`ded in `internal/logo/`, so the binary needs nothing on
+disk.
 
 ## 12. The "leave in the background" hand-off
 
