@@ -39,7 +39,7 @@
 | 21  | Packaging and releases            | `[ ]`  | [phase-21-packaging.md](./phases/phase-21-packaging.md) |
 | 22  | Robustness (socket activation…)   | `[ ]`  | [phase-22-robustness.md](./phases/phase-22-robustness.md) |
 | 23  | TUI list column alignment         | `[x]`  | [phase-23-tui-list-column-alignment.md](./phases/phase-23-tui-list-column-alignment.md) |
-| 24  | TUI branding / logo               | `[ ]`  | [phase-24-tui-logo.md](./phases/phase-24-tui-logo.md) |
+| 24  | TUI branding / logo               | `[~]`  | [phase-24-tui-logo.md](./phases/phase-24-tui-logo.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -53,7 +53,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**All phases 0–15, 18 and 20 are `[x]`; phases 16, 17, 19, 21, 22, 24 (the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
+**All phases 0–15, 18 and 20 are `[x]`; phase 24 (TUI branding / logo) is `[~]` in work; phases 16, 17, 19, 21, 22 (the rest of the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports

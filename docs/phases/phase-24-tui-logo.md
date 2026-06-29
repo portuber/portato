@@ -1,7 +1,7 @@
 ---
 phase: 24
 title: TUI branding / logo (empty-state splash, help, --version)
-status: todo
+status: in-progress
 depends_on: [3, 11]
 ---
 
