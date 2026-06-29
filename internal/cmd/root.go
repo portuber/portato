@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -51,7 +52,11 @@ See docs/SPEC.md for the full specification.`,
 	RunE: rootRunE,
 }
 
-func rootRunE(_ *cobra.Command, _ []string) error {
+func rootRunE(cmd *cobra.Command, _ []string) error {
+	if showVersion {
+		printVersion(cmd.OutOrStdout(), isTerminal(os.Stdout))
+		return nil
+	}
 	if !forceStandalone {
 		if socket, err := daemon.ResolveSocket(); err == nil && socket != "" && probeDaemon(socket) {
 			ctrl := controller.NewRemote(client.New(socket))
@@ -99,6 +104,7 @@ func probeDaemon(socket string) bool {
 func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to config file (default: XDG config home)")
 	rootCmd.Flags().BoolVar(&forceStandalone, "force-standalone", false, "skip daemon auto-detection and run a standalone TUI")
+	rootCmd.Flags().BoolVar(&showVersion, "version", false, "print the version banner and exit")
 	rootCmd.PersistentFlags().StringVar(&socketFlag, "socket", "",
 		"override the daemon IPC socket path; the daemon binds it and clients dial it directly (also PORTATO_SOCKET)")
 	rootCmd.PersistentFlags().StringVar(&logLevelFlag, "log-level", "info",
