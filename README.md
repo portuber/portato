@@ -1,3 +1,5 @@
+<img src="logo.svg" width="128" align="right" alt="Portato logo">
+
 # Portato
 
 [![CI](https://github.com/kipkaev55/portato/actions/workflows/ci.yml/badge.svg)](https://github.com/kipkaev55/portato/actions/workflows/ci.yml)

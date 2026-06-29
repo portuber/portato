@@ -17,17 +17,20 @@ consoles. A small potato emoji marks the header on macOS only. NO startup splash
 
 Researched facts (verified in the planning session — do not re-derive):
 
-- `assets/` (repo root) currently holds seven files (regenerated at **28x12**
-  during planning): `logo.braille.txt` (filled braille — NOT kept), 
-  `logo-outline.braille.txt` (outline braille — kept, -> `logo.braille.txt`),
+- `logo.svg` lives at the **repo root** (canonical project logo + README asset;
+  it is the source both ASCII variants regenerate from). `assets/` (repo root)
+  currently holds six files (regenerated at **28x12** during planning):
+  `logo.braille.txt` (filled braille — NOT kept), `logo-outline.braille.txt`
+  (outline braille — kept, -> `internal/logo/assets/logo.braille.txt`),
   `logo-block.txt` (outline-source block — NOT kept), `logo-solid-block.txt`
-  (solid block, Windows — kept, -> `logo-block.txt`), `logo.png` (1024x1024
-  RGBA, **alpha-transparent**, single brown fill #955e30 — composites cleanly on
-  dark AND light backgrounds, so no dark/light variants needed), `logo-solid.png`
-  (1 MB, the solid raster source — deleted in commit 2), `logo.svg` (source of
-  truth). See "Asset disposition" for the keep/rename/remove split.
-- The text logos were generated from the SVG/PNG via ImageMagick + chafa at
-  `--size 28x12` (see the regeneration commands in "Asset disposition").
+  (solid block, Windows — kept, -> `internal/logo/assets/logo-block.txt`),
+  `logo.png` (1024x1024 RGBA, **alpha-transparent**, single brown fill #955e30 —
+  composites cleanly on dark AND light backgrounds, so no dark/light variants
+  needed; -> `internal/logo/assets/logo.png`), `logo-solid.png` (1 MB, the solid
+  raster source — deleted in commit 2). See "Asset disposition" for the full
+  keep/rename/remove split.
+- The text logos were generated from `logo.svg`/the PNG via ImageMagick + chafa
+  at `--size 28x12` (see the regeneration commands in "Asset disposition").
 - TUI rendering (`internal/tui/view.go`): `header()` emits
   `"Portato — Port Forwarding"` left + `"mode: …"` right via `joinRight`;
   `table()` empty-state currently prints one dim hint line; `helpBlock()`
@@ -65,49 +68,54 @@ outline-braille reads as a lumpy potato (filled reads as a generic egg/oval);
 solid-block is robust on legacy Windows conhost (sparse outline-block looks
 fragmented there).
 
-- KEEP (4), renamed on the move:
-  - `logo-outline.braille.txt` -> `logo.braille.txt` (outline braille, primary
-    ASCII variant; from the SVG via erode+threshold).
-  - `logo-solid-block.txt` -> `logo-block.txt` (solid block, Windows/legacy
-    fallback; from the solid PNG).
-  - `logo.png` (inline PNG for iTerm2/WezTerm).
-  - `logo.svg` (source of truth, not embedded).
+- KEEP (4):
+  - `logo-outline.braille.txt` -> `internal/logo/assets/logo.braille.txt`
+    (outline braille, primary ASCII variant; from `logo.svg` via erode+threshold).
+  - `logo-solid-block.txt` -> `internal/logo/assets/logo-block.txt` (solid
+    block, Windows/legacy fallback; from the solid PNG).
+  - `assets/logo.png` -> `internal/logo/assets/logo.png` (inline PNG for
+    iTerm2/WezTerm; embedded in the binary).
+  - `logo.svg` stays at the **repo root** (canonical project logo + README
+    asset; NOT moved into `internal/logo/assets/`, NOT embedded — it is the
+    source both ASCII variants regenerate from).
 - REMOVE (3): `logo-solid.png` (1 MB; only the solid-block regen used it, see
       below), the filled `logo.braille.txt`, the outline-source `logo-block.txt`.
-- MOVE: `assets/*` -> `internal/logo/assets/` (`assets/` is untracked, so a
-      plain `mv` + `git add` is fine; `go:embed` is package-relative). After the
-      move `internal/logo/assets/` holds exactly `logo.braille.txt`,
-      `logo-block.txt`, `logo.png`, `logo.svg`.
+- MOVE: the txt files + `logo.png` -> `internal/logo/assets/` (`assets/` is
+      untracked, so a plain `mv` + `git add` is fine; `go:embed` is package-
+      relative). After the move `assets/` is empty and is removed; the repo
+      root keeps `logo.svg`.
 
 Regeneration commands (28x12), run from repo root. Both ASCII variants derive
-from `logo.svg` (the canonical source), so the repo needs no large PNG to
+from `logo.svg` at the repo root (the canonical project logo + README asset, so
+it lives outside `internal/logo/assets/`), and the repo needs no large PNG to
 reproduce them:
 ```
-# outline braille — primary ASCII variant (from SVG, eroded + thresholded)
-magick internal/logo/assets/logo.svg -background white -flatten -colorspace gray \
+# outline braille — primary ASCII variant (from logo.svg, eroded + thresholded)
+magick logo.svg -background white -flatten -colorspace gray \
   -morphology Erode Disk:7 -resize 88x88 -threshold 80% -depth 8 -type truecolor png:- \
   | chafa -f symbols --symbols braille --colors none --invert --size 28x12 - \
   > internal/logo/assets/logo.braille.txt
-# solid block — Windows / legacy fallback (from SVG, solid fill, no erode)
-magick internal/logo/assets/logo.svg -background white -flatten -resize 88x88 \
-  -depth 8 -type truecolor png:- \
+# solid block — Windows / legacy fallback (from logo.svg, solid fill, no erode)
+magick logo.svg -background white -flatten -resize 88x88 -depth 8 -type truecolor png:- \
   | chafa -f symbols --symbols block+space --colors none --invert --size 28x12 - \
   > internal/logo/assets/logo-block.txt
 ```
 (Adjust the magick/chafa flags to taste; the contract is just "28x12 cells,
 recognisable potato". The currently-committed `logo-block.txt` was generated
-from `logo-solid.png` before its deletion — the SVG path above is the
+from `logo-solid.png` before its deletion — the `logo.svg` path above is the
 reproducible equivalent and may differ slightly; tweak to match if needed.)
 
 ## Tasks
 
-- [ ] Move assets: `mv assets internal/logo/assets` (`assets/` is currently
-      untracked, so a plain `mv` + `git add` works; `git mv` needs tracked
-      files); rename `logo-outline.braille.txt` -> `logo.braille.txt` and
-      `logo-solid-block.txt` -> `logo-block.txt`; delete `logo-solid.png`, the
-      filled `logo.braille.txt`, and the outline-source `logo-block.txt`. The
-      two committed txt files are the source of truth — no regeneration needed
-      unless the art is being tweaked.
+- [ ] Move assets: `assets/` is currently untracked at the repo root (minus
+      `logo.svg`, which already moved to the repo root for the README). Move
+      `logo-outline.braille.txt` -> `internal/logo/assets/logo.braille.txt` and
+      `logo-solid-block.txt` -> `internal/logo/assets/logo-block.txt`, and
+      `logo.png` -> `internal/logo/assets/logo.png`; delete `logo-solid.png`,
+      the filled `logo.braille.txt`, and the outline-source `logo-block.txt`;
+      remove the now-empty `assets/` dir. `logo.svg` stays at the repo root.
+      The two committed txt files are the source of truth — no regeneration
+      needed unless the art is being tweaked.
 - [ ] `internal/logo/logo.go`: package `logo`.
   - `type Mode int { ModeImage, ModeBraille, ModeBlock, ModeOff }`.
   - `Detect() Mode` — read `PORTATO_LOGO` (auto/image/braille/block/off); auto
