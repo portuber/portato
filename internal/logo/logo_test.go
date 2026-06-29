@@ -86,6 +86,47 @@ func TestDetectMatrix(t *testing.T) {
 	}
 }
 
+// TestEmojiEnabledMatrix covers PORTATO_LOGO_EMOJI x GOOS, plus the rule that
+// PORTATO_LOGO=off forces the emoji off too.
+func TestEmojiEnabledMatrix(t *testing.T) {
+	prevGoos := goos
+	t.Cleanup(func() { goos = prevGoos })
+
+	cases := []struct {
+		name  string
+		logo  string
+		emoji string
+		goos  string
+		want  bool
+	}{
+		{"default darwin -> on", "", "", "darwin", true},
+		{"default linux -> off", "", "", "linux", false},
+		{"default windows -> off", "", "", "windows", false},
+
+		{"emoji=on forces on (linux)", "", "on", "linux", true},
+		{"emoji=off forces off (darwin)", "", "off", "darwin", false},
+		{"emoji=1 -> on", "", "1", "linux", true},
+		{"emoji=true -> on", "", "true", "linux", true},
+		{"emoji=0 -> off", "", "0", "darwin", false},
+		{"emoji=no -> off", "", "no", "darwin", false},
+		{"uppercase ON -> on", "", "ON", "linux", true},
+
+		{"PORTATO_LOGO=off forces emoji off (darwin, no emoji var)", "off", "", "darwin", false},
+		{"PORTATO_LOGO=off wins over EMOJI=on", "off", "on", "darwin", false},
+		{"PORTATO_LOGO=braille leaves emoji to its own default (darwin)", "braille", "", "darwin", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			t.Setenv("PORTATO_LOGO", c.logo)
+			t.Setenv("PORTATO_LOGO_EMOJI", c.emoji)
+			goos = c.goos
+			if got := EmojiEnabled(); got != c.want {
+				t.Errorf("EmojiEnabled() = %v, want %v", got, c.want)
+			}
+		})
+	}
+}
+
 // TestRenderPerMode checks Render returns non-empty for the renderable modes
 // and "" for Off.
 func TestRenderPerMode(t *testing.T) {

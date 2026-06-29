@@ -101,3 +101,42 @@ func TestNonEmptyListHasNoLogo(t *testing.T) {
 		t.Errorf("non-empty list must not render the logo\n%s", out)
 	}
 }
+
+// TestHeaderEmojiOverride verifies the potato emoji marks the header when
+// PORTATO_LOGO_EMOJI=on and is absent when off (platform-independent: the
+// override is checked directly so the test is deterministic on any host).
+func TestHeaderEmojiOverride(t *testing.T) {
+	check := func(t *testing.T, want bool) {
+		t.Helper()
+		m := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
+		m.width = 80
+		header := m.header()
+		_, has := containsEmoji(header)
+		if has != want {
+			t.Errorf("emoji present=%v, want %v\nheader: %q", has, want, header)
+		}
+	}
+	t.Run("on", func(t *testing.T) {
+		t.Setenv("PORTATO_LOGO_EMOJI", "on")
+		check(t, true)
+	})
+	t.Run("off", func(t *testing.T) {
+		t.Setenv("PORTATO_LOGO_EMOJI", "off")
+		check(t, false)
+	})
+	t.Run("PORTATO_LOGO=off hides emoji too", func(t *testing.T) {
+		t.Setenv("PORTATO_LOGO", "off")
+		t.Setenv("PORTATO_LOGO_EMOJI", "on")
+		check(t, false)
+	})
+}
+
+// containsEmoji reports whether s contains the potato emoji 🥔.
+func containsEmoji(s string) (rune, bool) {
+	for _, r := range s {
+		if r == '🥔' {
+			return r, true
+		}
+	}
+	return 0, false
+}

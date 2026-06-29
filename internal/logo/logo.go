@@ -100,6 +100,39 @@ func isImageTerm() bool {
 	return false
 }
 
+// EmojiEnabled reports whether the potato emoji (🥔) should mark the TUI
+// header before the "Portato" title. PORTATO_LOGO_EMOJI overrides
+// (on/off; truthy/falsy aliases map to on/off); otherwise the emoji is shown
+// only on GOOS=darwin (where it renders cleanly at 2 cells). It is forced off
+// when PORTATO_LOGO=off (branding fully suppressed). The emoji plus its
+// trailing space are 3 display cells on darwin, which the header's joinRight
+// accounts for via lipgloss.Width.
+func EmojiEnabled() bool {
+	if logoEnv() == "off" {
+		return false
+	}
+	switch emojiEnv() {
+	case "on":
+		return true
+	case "off":
+		return false
+	}
+	return goos == "darwin"
+}
+
+// emojiEnv reads and normalises PORTATO_LOGO_EMOJI to on/off (lower-cased,
+// trimmed). Truthy generic values map to "on", falsy ones to "off"; an empty
+// or unrecognised value falls through to the GOOS-based default.
+func emojiEnv() string {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("PORTATO_LOGO_EMOJI"))) {
+	case "on", "1", "true", "yes":
+		return "on"
+	case "off", "0", "false", "no":
+		return "off"
+	}
+	return ""
+}
+
 // Render returns the logo string for mode. The ASCII variants are tinted with
 // accent (the theme's title/accent foreground) unless mono is true (NO_COLOR
 // or a monochrome theme), in which case the glyphs render plain. ModeOff (and

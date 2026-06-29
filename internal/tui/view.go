@@ -147,7 +147,11 @@ func (m Model) centered(block string) string {
 }
 
 func (m Model) header() string {
-	left := titleStyle.Render("Portato") + " " + dimStyle.Render("— Port Forwarding")
+	left := titleStyle.Render("Portato")
+	if logo.EmojiEnabled() {
+		left = "🥔 " + left
+	}
+	left += " " + dimStyle.Render("— Port Forwarding")
 	right := modeStyle.Render("mode: " + m.mode)
 	return joinRight(left, right, m.width-2*sideMargin)
 }
