@@ -1,0 +1,103 @@
+package tui
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/kipkaev55/portato/internal/controller"
+)
+
+// hasBraille reports whether s contains a Unicode braille pattern
+// (U+2800..U+28FF), the tell-tale that the braille logo art was rendered. It
+// is independent of ANSI tinting, so it works under both dark and mono themes.
+func hasBraille(s string) bool {
+	for _, r := range s {
+		if r >= 0x2800 && r <= 0x28FF {
+			return true
+		}
+	}
+	return false
+}
+
+// TestEmptyListSplashShowsLogo verifies the empty-list state renders the
+// centered logo plus the hint line on a tall terminal.
+func TestEmptyListSplashShowsLogo(t *testing.T) {
+	t.Setenv("PORTATO_LOGO", "braille")
+	m := New(newFake(), Options{Mode: "standalone"})
+	m.width, m.height = 80, 24
+	out := m.render()
+	if !hasBraille(out) {
+		t.Errorf("empty list on a tall terminal should render the logo\n%s", out)
+	}
+	if !strings.Contains(out, "no tunnels") {
+		t.Errorf("splash should still show the hint line\n%s", out)
+	}
+}
+
+// TestHelpShowsLogo verifies the help (?) overlay prepends the logo above the
+// hotkey list on a tall terminal.
+func TestHelpShowsLogo(t *testing.T) {
+	t.Setenv("PORTATO_LOGO", "braille")
+	m := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
+	m.width, m.height = 80, 24
+	m.help = true
+	out := m.render()
+	if !hasBraille(out) {
+		t.Errorf("help on a tall terminal should render the logo\n%s", out)
+	}
+	if !strings.Contains(out, "move cursor up") {
+		t.Errorf("help should still list the hotkeys\n%s", out)
+	}
+}
+
+// TestLogoOffHidesBranding verifies PORTATO_LOGO=off suppresses the logo in
+// both the splash and the help overlay while leaving the hint/hotkeys intact.
+func TestLogoOffHidesBranding(t *testing.T) {
+	t.Setenv("PORTATO_LOGO", "off")
+
+	m := New(newFake(), Options{Mode: "standalone"})
+	m.width, m.height = 80, 24
+	if out := m.render(); hasBraille(out) {
+		t.Errorf("PORTATO_LOGO=off should hide the splash logo\n%s", out)
+	}
+
+	m2 := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
+	m2.width, m2.height = 80, 24
+	m2.help = true
+	out2 := m2.render()
+	if hasBraille(out2) {
+		t.Errorf("PORTATO_LOGO=off should hide the help logo\n%s", out2)
+	}
+	if !strings.Contains(out2, "move cursor up") {
+		t.Errorf("help hotkeys should still render with logo off\n%s", out2)
+	}
+}
+
+// TestSmallHeightOmitsLogo verifies the height gate: a short terminal shows
+// the hint only, with no logo and no layout breakage.
+func TestSmallHeightOmitsLogo(t *testing.T) {
+	t.Setenv("PORTATO_LOGO", "braille")
+	m := New(newFake(), Options{Mode: "standalone"})
+	m.width, m.height = 80, splashMinH-1
+	out := m.render()
+	if hasBraille(out) {
+		t.Errorf("short terminal should omit the logo\n%s", out)
+	}
+	if !strings.Contains(out, "no tunnels") {
+		t.Errorf("short terminal should still show the hint\n%s", out)
+	}
+}
+
+// TestNonEmptyListHasNoLogo guards the DoD: the working (non-empty) list must
+// not show the big logo anywhere — branding lives only in the empty/help/
+// version/header-mark placements.
+func TestNonEmptyListHasNoLogo(t *testing.T) {
+	t.Setenv("PORTATO_LOGO", "braille")
+	m := New(newFake(
+		controller.Status{Name: "db", Type: "local", Local: "5432", Remote: "db:5432", State: controller.Connected},
+	), Options{Mode: "standalone"})
+	m.width, m.height = 80, 24
+	if out := m.render(); hasBraille(out) {
+		t.Errorf("non-empty list must not render the logo\n%s", out)
+	}
+}

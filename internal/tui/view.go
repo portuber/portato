@@ -10,6 +10,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/kipkaev55/portato/internal/logo"
 )
 
 const (
@@ -22,6 +23,13 @@ const (
 	minName      = 12
 	maxName      = 40
 	uptimeBudget = 7
+	// splashMinH is the terminal-height gate for the big logo: below it the
+	// empty-list splash and the help overlay omit the logo and show text only,
+	// so a short terminal never breaks the layout.
+	splashMinH = 18
+	// splashLogoW is the cell width of the embedded logo art; it mirrors the
+	// 28x12 grid the ASCII variants (and the inline PNG) are generated at.
+	splashLogoW = 28
 )
 
 func (m Model) View() tea.View {
@@ -146,7 +154,11 @@ func (m Model) header() string {
 
 func (m Model) table() string {
 	if len(m.list) == 0 {
-		return dimStyle.Render("no tunnels — add one to config and press R to reload")
+		hint := dimStyle.Render("no tunnels — add one to config and press R to reload")
+		if m.height >= splashMinH {
+			return m.splash(hint)
+		}
+		return hint
 	}
 	var rows []int
 	for i, s := range m.list {
@@ -166,6 +178,19 @@ func (m Model) table() string {
 		b.WriteString("\n")
 	}
 	return b.String()
+}
+
+// splash renders the empty-list state: the centered potato logo with the hint
+// line beneath it. It is shown only when the terminal is tall enough
+// (table() gates on splashMinH); a short terminal gets the hint-only line.
+// The logo is tinted with the title accent unless the theme is monochrome.
+func (m Model) splash(hint string) string {
+	art := logo.Banner(titleStyle, detectKind() == themeMono)
+	avail := m.width - 2*sideMargin
+	if avail < splashLogoW {
+		avail = splashLogoW
+	}
+	return centerBlock(art, avail) + "\n\n" + centerBlock(hint, avail)
 }
 
 // filterLine renders the `/`-input line: a prompt, the query (with a cursor
@@ -314,9 +339,7 @@ func (m Model) footer() string {
 }
 
 func (m Model) helpBlock() string {
-	lines := []string{
-		helpTitle.Render("Help"),
-		"",
+	hotkeys := []string{
 		"↑ / k        move cursor up",
 		"↓ / j        move cursor down",
 		"space        toggle selected tunnel (on/off)",
@@ -333,6 +356,21 @@ func (m Model) helpBlock() string {
 		"? / esc      toggle this help",
 		"q / ctrl+c   quit (stops all tunnels)",
 	}
+	title := helpTitle.Render("Help")
+	contentW := lipgloss.Width(title)
+	for _, l := range hotkeys {
+		if w := lipgloss.Width(l); w > contentW {
+			contentW = w
+		}
+	}
+	lines := make([]string, 0, len(hotkeys)+4)
+	// Prepend the logo above the title when there is vertical room, centered
+	// within the hotkey block width. Same height gate as the empty-state splash.
+	if m.height >= splashMinH {
+		lines = append(lines, centerBlock(logo.Banner(titleStyle, detectKind() == themeMono), contentW), "")
+	}
+	lines = append(lines, title, "")
+	lines = append(lines, hotkeys...)
 	return helpPanel.Render(strings.Join(lines, "\n"))
 }
 
@@ -396,6 +434,24 @@ func insetLines(content string, margin int) string {
 	lines := strings.Split(content, "\n")
 	for i, l := range lines {
 		lines[i] = pad + l
+	}
+	return strings.Join(lines, "\n")
+}
+
+// centerBlock centers a (possibly multi-line, possibly ANSI-styled) block
+// within width display cells by left-padding every line equally. It is used to
+// place the logo art in the empty-state splash and at the top of the help
+// panel. lipgloss.Width strips ANSI when measuring, so a tinted logo still
+// centers on its visible glyph width.
+func centerBlock(block string, width int) string {
+	pad := (width - lipgloss.Width(block)) / 2
+	if pad < 0 {
+		pad = 0
+	}
+	indent := strings.Repeat(" ", pad)
+	lines := strings.Split(block, "\n")
+	for i, l := range lines {
+		lines[i] = indent + l
 	}
 	return strings.Join(lines, "\n")
 }
