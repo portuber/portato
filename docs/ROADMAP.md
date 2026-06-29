@@ -40,6 +40,7 @@
 | 22  | Robustness (socket activation…)   | `[ ]`  | [phase-22-robustness.md](./phases/phase-22-robustness.md) |
 | 23  | TUI list column alignment         | `[x]`  | [phase-23-tui-list-column-alignment.md](./phases/phase-23-tui-list-column-alignment.md) |
 | 24  | TUI branding / logo               | `[x]`  | [phase-24-tui-logo.md](./phases/phase-24-tui-logo.md) |
+| 25  | Easter egg — "portato bien" in --help | `[ ]`  | [phase-25-easter-egg-portate-bien.md](./phases/phase-25-easter-egg-portate-bien.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -49,11 +50,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24 (post-MVP backlog) are planned in detail — 18 and 20 are done, the rest are pending (`[ ]`), to be started on an explicit command.
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24 and 25 (post-MVP backlog) are planned in detail — 18, 20, 23 and 24 are done, the rest are pending (`[ ]`), to be started on an explicit command.
 
 ## Current focus
 
-**All phases 0–15, 18, 20 and 24 are `[x]`; phases 16, 17, 19, 21, 22 (the rest of the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
+**All phases 0–15, 18, 20 and 24 are `[x]`; phases 16, 17, 19, 21, 22, 25 (the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
