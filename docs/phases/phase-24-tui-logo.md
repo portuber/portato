@@ -1,7 +1,7 @@
 ---
 phase: 24
 title: TUI branding / logo (empty-state splash, help, --version)
-status: in-progress
+status: done
 depends_on: [3, 11]
 ---
 
@@ -107,7 +107,7 @@ reproducible equivalent and may differ slightly; tweak to match if needed.)
 
 ## Tasks
 
-- [ ] Move assets: `assets/` is currently untracked at the repo root (minus
+- [x] Move assets: `assets/` is currently untracked at the repo root (minus
       `logo.svg`, which already moved to the repo root for the README). Move
       `logo-outline.braille.txt` -> `internal/logo/assets/logo.braille.txt` and
       `logo-solid-block.txt` -> `internal/logo/assets/logo-block.txt`, and
@@ -116,7 +116,7 @@ reproducible equivalent and may differ slightly; tweak to match if needed.)
       remove the now-empty `assets/` dir. `logo.svg` stays at the repo root.
       The two committed txt files are the source of truth — no regeneration
       needed unless the art is being tweaked.
-- [ ] `internal/logo/logo.go`: package `logo`.
+- [x] `internal/logo/logo.go`: package `logo`.
   - `type Mode int { ModeImage, ModeBraille, ModeBlock, ModeOff }`.
   - `Detect() Mode` — read `PORTATO_LOGO` (auto/image/braille/block/off); auto
     = `TERM_PROGRAM in {iTerm.app, WezTerm}` -> Image, else `GOOS==windows` ->
@@ -131,11 +131,11 @@ reproducible equivalent and may differ slightly; tweak to match if needed.)
     TUI; plus `VersionBanner(version, commit, date)` for `--version` (the
     28x12 logo + a version line).
   - `go:embed` the two txt + `logo.png`.
-- [ ] OSC 1337 writer (in `logo.go` or `logo_image.go`): build
+- [x] OSC 1337 writer (in `logo.go` or `logo_image.go`): build
       `ESC ]1337;File=inline=1;width=28cells;height=12cells;preserveAspectRatio=1:<base64(png)> BEL`
       (base64 of the embedded PNG bytes; size in cells so the PNG occupies the
       same footprint as the ASCII variant).
-- [ ] `internal/tui/view.go`:
+- [x] `internal/tui/view.go`:
   - `header()`: when `logo.EmojiEnabled()`, prefix the title with the potato
     emoji + space (account for the 2-cell width in `joinRight` —
     `lipgloss.Width` already returns 2 on darwin).
@@ -144,11 +144,11 @@ reproducible equivalent and may differ slightly; tweak to match if needed.)
     hint-only line.
   - `helpBlock()`: prepend the 28x12 logo (same height gate) above the hotkey
     list, centered within the panel width.
-- [ ] `internal/cmd/version.go`: print `logo.VersionBanner(...)` (the 28x12
+- [x] `internal/cmd/version.go`: print `logo.VersionBanner(...)` (the 28x12
       logo via the detected mode) before the version line. Keep it usable in a
       pipe (no ANSI when stdout is not a TTY -> braille/emoji only, no colour,
       no inline image).
-- [ ] Tests:
+- [x] Tests:
   - `internal/logo/logo_test.go`: embed round-trip; `Detect()` matrix
     (PORTATO_LOGO each value x TERM_PROGRAM x GOOS); `Render` returns non-empty
     for Image/Braille/Block and "" for Off; OSC 1337 sequence well-formed
@@ -158,25 +158,25 @@ reproducible equivalent and may differ slightly; tweak to match if needed.)
     linux (gate via the logo pkg, tested directly); small height -> hint only.
   - `internal/cmd` test: `--version` output contains the version string and,
     on a TTY, the logo banner.
-- [ ] Docs: SPEC §11 (TUI) — add a "Branding / logo" subsection; §3 — note
+- [x] Docs: SPEC §11 (TUI) — add a "Branding / logo" subsection; §3 — note
       `--version` banner; ROADMAP post-MVP table — add phase 24 row.
 
 ## Definition of Done
 
-- [ ] Empty-list splash shows the potato (PNG in iTerm2 with `PORTATO_LOGO=image`,
+- [x] Empty-list splash shows the potato (PNG in iTerm2 with `PORTATO_LOGO=image`,
       braille in Terminal.app/Linux, block under `PORTATO_LOGO=block`).
-- [ ] Help (`?`) overlay shows the compact logo at the top.
-- [ ] `portato --version` prints the logo banner + version/commit/date.
-- [ ] Header shows the emoji 🥔 before "Portato" on darwin; plain text on
+- [x] Help (`?`) overlay shows the compact logo at the top.
+- [x] `portato --version` prints the logo banner + version/commit/date.
+- [x] Header shows the emoji 🥔 before "Portato" on darwin; plain text on
       linux/windows; `PORTATO_LOGO_EMOJI=off` hides it; `PORTATO_LOGO=off`
       hides everything.
-- [ ] Small terminal (height < ~18): big logo is omitted, hint still shows; no
+- [x] Small terminal (height < ~18): big logo is omitted, hint still shows; no
       layout breakage.
-- [ ] mono / `NO_COLOR`: ASCII logo renders without colour tint.
-- [ ] The non-empty working list renders identically to pre-phase (logo only in
+- [x] mono / `NO_COLOR`: ASCII logo renders without colour tint.
+- [x] The non-empty working list renders identically to pre-phase (logo only in
       empty/help/--version/header-mark — no regression on the main screen).
-- [ ] Binary works without `assets/` on disk (everything embedded).
-- [ ] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
+- [x] Binary works without `assets/` on disk (everything embedded).
+- [x] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
 
 ## Verification
 
