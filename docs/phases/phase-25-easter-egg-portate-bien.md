@@ -1,7 +1,7 @@
 ---
 phase: 25
 title: Easter egg — "portato bien" footer in --help
-status: in-progress
+status: done
 depends_on: [24]
 ---
 
@@ -44,23 +44,23 @@ emoji-capable, reusing the Phase 24 gate.
 
 ## Tasks
 
-- [ ] `internal/cmd/root.go`: add `easterEggFooter()`; in `init()` call
+- [x] `internal/cmd/root.go`: add `easterEggFooter()`; in `init()` call
       `rootCmd.SetHelpTemplate(...)` appending the footer to the default
       template.
-- [ ] Test `internal/cmd/help_easter_egg_test.go`:
+- [x] Test `internal/cmd/help_easter_egg_test.go`:
       - `easterEggFooter()` contains "portato bien"; with
         `PORTATO_LOGO_EMOJI=on` it contains 🥔, with `=off` it does not;
       - `portato --help` output contains "portato bien";
       - `portato list --help` does NOT contain the footer.
-- [ ] Docs: SPEC §3 note + ROADMAP post-MVP table — add phase 25 row.
+- [x] Docs: SPEC §3 note + ROADMAP post-MVP table — add phase 25 row.
 
 ## Definition of Done
 
-- [ ] `portato --help` and `portato help` end with "And please, portato bien".
-- [ ] 🥔 appears on darwin (and via `PORTATO_LOGO_EMOJI=on`); absent with
+- [x] `portato --help` and `portato help` end with "And please, portato bien".
+- [x] 🥔 appears on darwin (and via `PORTATO_LOGO_EMOJI=on`); absent with
       `=off` and on non-darwin.
-- [ ] Subcommand `--help` (e.g. `portato list --help`) is unchanged.
-- [ ] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
+- [x] Subcommand `--help` (e.g. `portato list --help`) is unchanged.
+- [x] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
 
 ## Verification
 
@@ -105,3 +105,26 @@ command (per docs/CONVENTIONS.md). The first action then is commit 1
 
 - Localizing the whole CLI (Spanish etc.) — this is a one-line easter egg.
 - Emoji detection beyond the darwin + override heuristic.
+
+## Deviation from plan (during implementation)
+
+The design table ("Mechanism") and the Technical-details bullet claimed that
+`SetHelpTemplate` on `rootCmd` affects only the root and that subcommands keep
+their own template, so "no runtime gate is needed". That is **incorrect**:
+cobra's `Command.HelpTemplate()` walks up to the parent when a command has no
+template of its own, so every subcommand inherited the root's footer-augmented
+template (verified: `portato list --help` showed the footer pre-fix).
+
+Actual mechanism implemented in `internal/cmd/root.go`:
+
+- The default help template is captured into `defaultHelpTemplate` *before*
+  the root is augmented (in `init()`).
+- `rootCmd.SetHelpTemplate(defaultHelpTemplate + "\n\n" + easterEggFooter() + "\n")`.
+- In `Execute()`, after `AddCommand`, every `rootCmd.Commands()` subcommand is
+  pinned to `defaultHelpTemplate`, breaking the inheritance. Grandchildren
+  inherit the (now-default) parent template, so they stay clean too.
+
+`TestSubcommandHelp_NoFooter` mirrors this (attach + pin) and
+`TestSubcommandHelp_NeedsPin` guards the inheritance so the pin is not
+silently dropped. All DoD items are met, including "Subcommand `--help` is
+unchanged" (0 occurrences of the footer across all subcommand helps).
