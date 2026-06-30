@@ -138,6 +138,32 @@ func (c *Client) SetPassphrase(name, passphrase string) error {
 		map[string]string{"passphrase": passphrase})
 }
 
+// AddIdentity tells the daemon to store a passphrase for an identity PATH (not a
+// tunnel), loading it into the cache and waking any dial blocked on it. Used by
+// `portato add-identity` after it has written the keyring out-of-band. Phase 19.
+func (c *Client) AddIdentity(path, passphrase string) error {
+	return c.sendBody(http.MethodPost, "/identities",
+		map[string]string{"path": path, "passphrase": passphrase})
+}
+
+// ForgetIdentity tells the daemon to drop the cached (and keyring) passphrase
+// for an identity path. Used by `portato forget-identity`. Phase 19.
+func (c *Client) ForgetIdentity(path string) error {
+	req, err := http.NewRequest(http.MethodDelete, url("/identities?path="+neturl.QueryEscape(path)), nil)
+	if err != nil {
+		return err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		return decodeError(resp)
+	}
+	return nil
+}
+
 // Reload makes the daemon re-read the config from disk.
 func (c *Client) Reload() error {
 	_, err := c.post("/reload")

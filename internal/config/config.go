@@ -377,6 +377,12 @@ func expandTilde(p string) string {
 	return p
 }
 
+// ExpandTilde is the exported form of expandTilde: it resolves a leading ~ to
+// the user's home directory (like ResolvedIdentity does) and leaves other paths
+// untouched. `portato add-identity` / `forget-identity` use it to key the
+// keyring exactly the way the dial does, so the two never disagree.
+func ExpandTilde(p string) string { return expandTilde(p) }
+
 type tunnelRaw struct {
 	Name           string `yaml:"name"`
 	Type           string `yaml:"type"`

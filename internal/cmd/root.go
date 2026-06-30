@@ -178,6 +178,8 @@ func Execute() error {
 		uninstallCmd,
 		forwardCmd,
 		doctorCmd,
+		addIdentityCmd,
+		forgetIdentityCmd,
 		versionCmd,
 	)
 	// Pin every subcommand to the default help template so the root's

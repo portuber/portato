@@ -235,6 +235,8 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /tunnels/{name}/restart", s.handleRestart)
 	mux.HandleFunc("POST /tunnels/{name}/accept-host", s.handleAcceptHost)
 	mux.HandleFunc("POST /tunnels/{name}/passphrase", s.handlePassphrase)
+	mux.HandleFunc("POST /identities", s.handleSetIdentity)
+	mux.HandleFunc("DELETE /identities", s.handleForgetIdentity)
 	mux.HandleFunc("POST /reload", s.handleReload)
 	mux.HandleFunc("GET /config", s.handleGetConfig)
 	mux.HandleFunc("POST /tunnels", s.handleAddTunnel)
@@ -478,6 +480,61 @@ func identityPathForTunnel(statuses []forward.Status, cfg *config.Config, name s
 		}
 	}
 	return ""
+}
+
+// handleSetIdentity stores a passphrase for an identity PATH (not a tunnel):
+// `portato add-identity <path>` writes the keyring out-of-band and then POSTs
+// here so the daemon loads it into its cache and wakes any dial blocked waiting
+// on it. No Restart: a blocked dial wakes on the store; a backoff dial reads the
+// cache on its next attempt. The path comes in the JSON body (it may contain
+// slashes, so it cannot be a URL path segment). Phase 19.
+func (s *Server) handleSetIdentity(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Path       string `json:"path"`
+		Passphrase string `json:"passphrase"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "decode body: %v", err)
+		return
+	}
+	if body.Path == "" {
+		writeError(w, http.StatusBadRequest, "missing path")
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.secrets == nil {
+		writeError(w, http.StatusInternalServerError, "passphrase storage unavailable")
+		return
+	}
+	if err := s.secrets.Set(body.Path, body.Passphrase); err != nil {
+		writeError(w, http.StatusInternalServerError, "store passphrase: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "stored", "path": body.Path})
+}
+
+// handleForgetIdentity drops the cached + keyring passphrase for an identity
+// path: `portato forget-identity <path>` deletes the keyring out-of-band then
+// DELETEs here so the daemon's cache is cleared too. The path is a query param
+// (DELETE bodies are unconventional). Phase 19.
+func (s *Server) handleForgetIdentity(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+	if path == "" {
+		writeError(w, http.StatusBadRequest, "missing path")
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.secrets == nil {
+		writeError(w, http.StatusInternalServerError, "passphrase storage unavailable")
+		return
+	}
+	if err := s.secrets.Delete(path); err != nil {
+		writeError(w, http.StatusInternalServerError, "forget passphrase: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "forgotten", "path": path})
 }
 
 func (s *Server) handleReload(w http.ResponseWriter, _ *http.Request) {

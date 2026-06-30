@@ -142,3 +142,27 @@ func TestPassphrase_StatusFieldSerializes(t *testing.T) {
 		t.Errorf("PendingPassphrase should be omitted when empty; got %s", got)
 	}
 }
+
+// TestIdentities_SetAndForget covers the path-keyed RPCs used by
+// `portato add-identity` / `forget-identity`: POST /identities loads the
+// passphrase into the store (waking any blocked dial) and DELETE /identities
+// drops it. The path is a query/body value, not a URL segment.
+func TestIdentities_SetAndForget(t *testing.T) {
+	cfg, _ := passphraseConfig(t)
+	c, store, _ := startPassphraseServer(t, cfg)
+	path := "/home/u/.ssh/id_ed25519"
+
+	if err := c.AddIdentity(path, "letmein"); err != nil {
+		t.Fatalf("AddIdentity: %v", err)
+	}
+	if v, ok := store.Get(path); !ok || v != "letmein" {
+		t.Errorf("store should hold the identity passphrase; got %q,%v", v, ok)
+	}
+
+	if err := c.ForgetIdentity(path); err != nil {
+		t.Fatalf("ForgetIdentity: %v", err)
+	}
+	if v, ok := store.Get(path); ok {
+		t.Errorf("store should be empty after forget; got %q", v)
+	}
+}
