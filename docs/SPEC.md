@@ -56,6 +56,8 @@ portato restart <name> -> CLI: restart a tunnel
 
 portato install        -> install system autostart (launchd / systemd --user)
 portato uninstall      -> remove autostart
+portato add-identity <path>     -> store an SSH identity passphrase in the OS keyring (Phase 19)
+portato forget-identity <path>  -> remove a stored identity passphrase (Phase 19)
 portato --config <path> -> custom config path (global flag)
 portato --log-level <l> -> debug|info|warn|error (global, Phase 20; default info)
 portato --socket <path> -> override the daemon IPC socket (global)
@@ -259,6 +261,7 @@ defaults:
   accept_new_hosts: false         # TOFU: when true, new hosts are appended to known_hosts
   socks5_user: alice              # optional (Phase 20): default SOCKS5 user/pass
   socks5_password: $secret        # for type=dynamic tunnels; empty -> NoAuth
+  identity_passphrase_store: false # opt-in (Phase 19): persist identity passphrases in the OS keyring
 
 tunnels:
   - name: db-stage                # unique, required
@@ -324,6 +327,7 @@ otherwise NoAuth (the pre-Phase-20 behaviour).
 
 - `ssh.Dial` to the server with an `ssh.ClientConfig`:
   - **Auth:** try `ssh.PublicKeysCallback` from the agent, then `ssh.PublicKeys` from the `identity`.
+  - **Passphrase-protected identity (Phase 19):** if `ssh.ParsePrivateKey` reports a missing passphrase, the dial obtains one from the passphrase store (`internal/secret` — an in-memory cache backed by the OS keyring) and retries with `ssh.ParsePrivateKeyWithPassphrase`. With none available it surfaces `Status.PendingPassphrase` and **blocks** (the store's `Wait`) until the TUI/CLI provides one, instead of spinning the reconnect backoff. A wrong passphrase is invalidated and re-prompted.
   - **HostKeyCallback:** `knownhosts.New(hostsFile)`; with `accept_new_hosts: true` — a wrapper that appends a new key (TOFU).
   - **Timeout:** an explicit connect timeout (5s).
 - Readable errors: `host key not in known_hosts` / `auth failed` / `connect refused` / `connect timeout`.
@@ -470,6 +474,6 @@ Since tunnels are `enabled: false` by default, at system boot **only** the contr
 ## 16. Open questions (to resolve as we go)
 
 - IPC authorization: only filesystem permissions (0600) or a token? -> **resolved (Phase 18)**: a 32-byte bearer token in `<socketDir>/portato.token`, layered on the `0600` socket; `--ipc-token off` disables it. See §6.
-- Where to store a passphrase for an identity when the agent is unavailable? (for now: agent only).
+- Where to store a passphrase for an identity when the agent is unavailable? -> **resolved (Phase 19)**: an in-memory cache (per process, so reconnects don't re-prompt) plus the OS keyring (macOS Keychain / Linux Secret Service / Windows Credential Manager via `zalando/go-keyring`) for cross-restart persistence. Opt-in keyring persistence via `defaults.identity_passphrase_store` (off by default); explicit `portato add-identity`/`forget-identity` always write/clear the keyring. Nothing is ever written to disk in plaintext. See §9.
 - Passing live SSH FDs to the new daemon during hand-off (a seamless transition) — post-MVP.
 - Windows support — post-MVP (named pipe + the registry Run key).
