@@ -40,7 +40,7 @@
 | 22  | Robustness (socket activation…)   | `[ ]`  | [phase-22-robustness.md](./phases/phase-22-robustness.md) |
 | 23  | TUI list column alignment         | `[x]`  | [phase-23-tui-list-column-alignment.md](./phases/phase-23-tui-list-column-alignment.md) |
 | 24  | TUI branding / logo               | `[x]`  | [phase-24-tui-logo.md](./phases/phase-24-tui-logo.md) |
-| 25  | Easter egg — "portato bien" in --help | `[ ]`  | [phase-25-easter-egg-portate-bien.md](./phases/phase-25-easter-egg-portate-bien.md) |
+| 25  | Easter egg — "portato bien" in --help | `[~]`  | [phase-25-easter-egg-portate-bien.md](./phases/phase-25-easter-egg-portate-bien.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 

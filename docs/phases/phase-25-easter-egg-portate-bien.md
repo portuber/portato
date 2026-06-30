@@ -1,7 +1,7 @@
 ---
 phase: 25
 title: Easter egg — "portato bien" footer in --help
-status: todo
+status: in-progress
 depends_on: [24]
 ---
 
