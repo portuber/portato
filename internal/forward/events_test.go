@@ -75,7 +75,7 @@ func TestEngineSubscribeUnsubscribeIdempotent(t *testing.T) {
 // SSH: a real Engine builds a real *Tunnel (its onChange is wired to e.notify),
 // and a state transition on that tunnel reaches a subscriber.
 func TestEngineFactoryWiresOnChange(t *testing.T) {
-	e := NewEngine(context.Background(), &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}}, slog.Default())
+	e := NewEngine(context.Background(), &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}}, slog.Default(), nil)
 	ch, unsub := e.Subscribe()
 	defer unsub()
 

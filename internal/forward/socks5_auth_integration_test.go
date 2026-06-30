@@ -170,7 +170,7 @@ func TestTunnelDynamicSocks5Auth(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}

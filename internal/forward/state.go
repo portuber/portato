@@ -76,6 +76,13 @@ type Status struct {
 	PendingHost        string `json:"pending_host,omitempty"`
 	PendingFingerprint string `json:"pending_fingerprint,omitempty"`
 	PendingHostLine    string `json:"pending_host_line,omitempty"`
+
+	// Passphrase (Phase 19): when the tunnel's identity key is
+	// passphrase-protected and no passphrase is available yet, this carries
+	// the identity path that needs one, so the TUI/CLI can prompt. The dial
+	// blocks (PassphraseProvider.Wait) until a passphrase arrives, rather than
+	// spinning the reconnect backoff. Empty when not applicable.
+	PendingPassphrase string `json:"pending_passphrase,omitempty"`
 }
 
 func (s Status) Uptime() time.Duration {

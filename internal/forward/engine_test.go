@@ -234,7 +234,7 @@ func TestEngineReloadDefaultsChangedRestarts(t *testing.T) {
 // bug: after editing a tunnel, Status() must show the new Local/Remote (the cfg
 // is swapped in place), and an off tunnel must not be started.
 func TestTunnelReconfigureUpdatesStatus(t *testing.T) {
-	tn := NewTunnel(context.Background(), tunnelCfg("a"), config.Defaults{}, slog.Default())
+	tn := NewTunnel(context.Background(), tunnelCfg("a"), config.Defaults{}, slog.Default(), nil)
 
 	newCfg := tunnelCfg("a")
 	newCfg.Remote = "changed:9"

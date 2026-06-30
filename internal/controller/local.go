@@ -35,7 +35,7 @@ func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routel
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Local{
-		engine:  forward.NewEngine(ctx, cfg, log),
+		engine:  forward.NewEngine(ctx, cfg, log, nil),
 		cfg:     cfg,
 		cfgPath: cfgPath,
 		log:     log,

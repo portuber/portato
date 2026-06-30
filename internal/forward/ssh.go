@@ -35,8 +35,11 @@ type hostKeySink func(host, fingerprint, line string)
 // dialSSH establishes an SSH client connection to the tunnel's server.
 // The TCP dial is context-aware so it can be interrupted by tunnel shutdown.
 // sink, when non-nil, receives any rejected unknown host key (TOFU prompt).
-func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger, sink hostKeySink) (*ssh.Client, error) {
-	auths, closeAgent, err := authMethods(cfg, def, log)
+// provider, when non-nil, lets a passphrase-protected identity load by
+// obtaining its passphrase (blocking until one is provided); passSink surfaces
+// the identity path that needs a passphrase via Status.PendingPassphrase.
+func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger, sink hostKeySink, provider PassphraseProvider, passSink passphraseSink) (*ssh.Client, error) {
+	auths, closeAgent, err := authMethods(ctx, cfg, def, log, provider, passSink)
 	if err != nil {
 		return nil, err
 	}
@@ -77,8 +80,9 @@ func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *s
 // authMethods builds the SSH auth-method chain. The returned closer must be
 // invoked once the SSH handshake is done; it keeps the ssh-agent connection
 // open for the lifetime of the agent-backed signers (which sign lazily during
-// the handshake) and is a no-op when no agent is used.
-func authMethods(cfg config.Tunnel, def config.Defaults, log *slog.Logger) ([]ssh.AuthMethod, func() error, error) {
+// the handshake) and is a no-op when no agent is used. provider/passSink enable
+// passphrase-protected identity loading (Phase 19); both may be nil.
+func authMethods(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger, provider PassphraseProvider, passSink passphraseSink) ([]ssh.AuthMethod, func() error, error) {
 	var (
 		methods []ssh.AuthMethod
 		closers []io.Closer
@@ -94,7 +98,7 @@ func authMethods(cfg config.Tunnel, def config.Defaults, log *slog.Logger) ([]ss
 		}
 	}
 	if idPath := cfg.ResolvedIdentity(def); idPath != "" {
-		signer, err := loadIdentity(idPath)
+		signer, err := loadIdentityWithPassphrase(ctx, idPath, provider, passSink)
 		if err == nil {
 			methods = append(methods, ssh.PublicKeys(signer))
 		} else {
@@ -111,18 +115,6 @@ func authMethods(cfg config.Tunnel, def config.Defaults, log *slog.Logger) ([]ss
 		return nil
 	}
 	return methods, closeAgent, nil
-}
-
-func loadIdentity(path string) (ssh.Signer, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read identity: %w", err)
-	}
-	signer, err := ssh.ParsePrivateKey(data)
-	if err != nil {
-		return nil, fmt.Errorf("parse identity: %w", err)
-	}
-	return signer, nil
 }
 
 func hostKeyCallback(def config.Defaults, log *slog.Logger, sink hostKeySink) (ssh.HostKeyCallback, error) {

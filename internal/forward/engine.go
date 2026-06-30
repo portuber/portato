@@ -30,6 +30,9 @@ type Engine struct {
 	tunnels  map[string]tunneler
 	configs  map[string]config.Tunnel
 	factory  func(config.Tunnel, config.Defaults, *slog.Logger) tunneler
+	// provider (Phase 19) supplies identity passphrases to every tunnel; nil
+	// disables passphrase support. Set once at construction.
+	provider PassphraseProvider
 
 	// Event broker (Phase 9): every tunnel state change fans out to
 	// subscribers as a non-blocking "something changed" signal. The local
@@ -81,7 +84,9 @@ func (e *Engine) notify() {
 }
 
 // NewEngine builds an Engine with all tunnels constructed but not started.
-func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger) *Engine {
+// provider (optional, Phase 19) supplies identity passphrases to the tunnels;
+// nil disables passphrase support (passphrase-protected keys need an agent).
+func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger, provider PassphraseProvider) *Engine {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -95,9 +100,10 @@ func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger) *Engin
 		defaults: cfg.Defaults,
 		tunnels:  make(map[string]tunneler),
 		configs:  make(map[string]config.Tunnel),
+		provider: provider,
 	}
 	e.factory = func(t config.Tunnel, d config.Defaults, l *slog.Logger) tunneler {
-		tn := NewTunnel(ctx, t, d, l)
+		tn := NewTunnel(ctx, t, d, l, e.provider)
 		tn.onChange = e.notify
 		return tn
 	}

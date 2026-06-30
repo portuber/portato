@@ -99,7 +99,7 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ri
 		return nil, err
 	}
 	s := newServer(nil, cfg, cfgPath, socketPath, markerPath, log, ring)
-	s.engine = forward.NewEngine(s.ctx, cfg, log)
+	s.engine = forward.NewEngine(s.ctx, cfg, log, nil)
 	s.ipcToken = !ipcTokenDisabled
 	return s, nil
 }

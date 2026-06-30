@@ -53,6 +53,14 @@ type Tunnel struct {
 	pendingFingerprint string
 	pendingHostLine    string
 
+	// Passphrase (Phase 19): the identity path currently awaiting a passphrase
+	// (set by passphraseSink while the dial blocks on PassphraseProvider.Wait),
+	// surfaced through Status.PendingPassphrase. Empty when none is needed.
+	pendingPassphrase string
+	// provider obtains the passphrase for a protected identity (nil in tests /
+	// the one-shot `portato forward` command → no passphrase support).
+	provider PassphraseProvider
+
 	// onChange is wired by the Engine (Phase 9) so every state transition
 	// fans out to event subscribers. Nil-safe: standalone tests / fakes
 	// leave it unset. Fires after the state mutex is released.
@@ -67,8 +75,9 @@ func (t *Tunnel) notifyChange() {
 	}
 }
 
-// NewTunnel constructs a tunnel. baseCtx is reused for manual Restart.
-func NewTunnel(baseCtx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger) *Tunnel {
+// NewTunnel constructs a tunnel. baseCtx is reused for manual Restart. provider
+// (optional) enables passphrase-protected identity loading (Phase 19).
+func NewTunnel(baseCtx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger, provider PassphraseProvider) *Tunnel {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -80,6 +89,7 @@ func NewTunnel(baseCtx context.Context, cfg config.Tunnel, def config.Defaults, 
 		cfg:      cfg,
 		defaults: def,
 		log:      log.With("tunnel", cfg.Name),
+		provider: provider,
 	}
 }
 
@@ -213,6 +223,7 @@ func (t *Tunnel) Status() Status {
 		PendingHost:        t.pendingHost,
 		PendingFingerprint: t.pendingFingerprint,
 		PendingHostLine:    t.pendingHostLine,
+		PendingPassphrase:  t.pendingPassphrase,
 	}
 }
 
@@ -238,6 +249,32 @@ func (t *Tunnel) clearPendingHost() {
 	t.mu.Unlock()
 }
 
+// passphraseSink is wired into dialSSH: it records the identity path awaiting a
+// passphrase (path != "") so Status.PendingPassphrase surfaces it for the UI to
+// prompt, or clears it (path == "") once the passphrase is accepted. Called
+// from the dial goroutine.
+func (t *Tunnel) passphraseSink(path string) {
+	t.mu.Lock()
+	t.pendingPassphrase = path
+	t.mu.Unlock()
+	t.notifyChange()
+}
+
+// clearPendingPassphrase forgets a recorded passphrase need. Called at the
+// start of each dial so a stale entry does not outlive the attempt that
+// produced it (e.g. the identity changed, or the dial failed for another
+// reason).
+func (t *Tunnel) clearPendingPassphrase() {
+	t.mu.Lock()
+	if t.pendingPassphrase == "" {
+		t.mu.Unlock()
+		return
+	}
+	t.pendingPassphrase = ""
+	t.mu.Unlock()
+	t.notifyChange()
+}
+
 // PendingHostLine returns the known_hosts line for the last rejected unknown
 // host (and ok=false when there is none). AcceptHost (controller) reads it.
 func (t *Tunnel) PendingHostLine() (line string, ok bool) {
@@ -257,7 +294,8 @@ func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{})
 		}
 		t.setState(Connecting)
 		t.clearPendingHost()
-		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost)
+		t.clearPendingPassphrase()
+		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink)
 		if err != nil {
 			t.setStateErr(Error, err.Error())
 			attempt++
@@ -405,7 +443,8 @@ func (t *Tunnel) runRemote(ctx context.Context, done chan<- struct{}) {
 		}
 		t.setState(Connecting)
 		t.clearPendingHost()
-		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost)
+		t.clearPendingPassphrase()
+		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink)
 		if err != nil {
 			t.setStateErr(Error, err.Error())
 			attempt++

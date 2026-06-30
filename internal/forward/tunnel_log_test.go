@@ -22,7 +22,7 @@ func TestSetStateErrLogsToRing(t *testing.T) {
 	}
 	defer closer.Close()
 
-	tn := NewTunnel(context.Background(), tunnelCfg("db"), config.Defaults{}, logger)
+	tn := NewTunnel(context.Background(), tunnelCfg("db"), config.Defaults{}, logger, nil)
 	const msg = "listen 0.0.0.0:9090 on server: boom"
 	tn.setStateErr(Error, msg)
 

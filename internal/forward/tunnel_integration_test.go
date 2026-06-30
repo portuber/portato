@@ -456,7 +456,7 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -569,7 +569,7 @@ func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -640,7 +640,7 @@ func TestTunnelAuthViaAgent(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -721,7 +721,7 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -893,7 +893,7 @@ func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default())
+	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
