@@ -113,6 +113,9 @@ func (m Model) render() string {
 	if m.confirmAccept {
 		return m.centered(m.confirmAcceptView())
 	}
+	if m.enteringPassphrase {
+		return m.centered(m.passphraseView())
+	}
 	if m.confirmQuit {
 		return m.centered(m.confirmQuitView())
 	}
@@ -244,6 +247,12 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 	status := stateLabel(s.State)
 	if s.Error != "" {
 		status += " " + dimStyle.Render(truncate(s.Error, 18))
+	}
+	// Phase 19: a dial blocked on a passphrase-protected identity is in
+	// Connecting with PendingPassphrase set; flag it so the user knows to
+	// press space and type the passphrase.
+	if s.PendingPassphrase != "" {
+		status += " " + dimStyle.Render("passphrase?")
 	}
 
 	name, typ, ep, up := fitName(s.Name, nameW), s.Type, endpoint, uptime(s)
@@ -414,6 +423,22 @@ func (m Model) confirmAcceptView() string {
 	line := fmt.Sprintf(
 		"Unknown host key for %s\nhost: %s\nfingerprint: %s\n[y] accept & restart  ·  [n/esc] cancel",
 		m.acceptTarget, host, fp,
+	)
+	return modalStyle.Render(line)
+}
+
+// passphraseView renders the Phase 19 identity-passphrase modal: the tunnel's
+// dial is blocked on a passphrase-protected identity, and the user types the
+// passphrase (masked) and submits it via Controller.AcceptPassphrase. After a
+// rejected attempt a hint line appears.
+func (m Model) passphraseView() string {
+	hint := ""
+	if m.passphraseAttempts > 0 {
+		hint = fmt.Sprintf("\nwrong passphrase, try again (attempt %d)", m.passphraseAttempts+1)
+	}
+	line := fmt.Sprintf(
+		"Passphrase for %s's identity\n%s[enter] submit  ·  [esc] cancel%s",
+		m.passphraseTarget, m.passphraseInput.View(), hint,
 	)
 	return modalStyle.Render(line)
 }

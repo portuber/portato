@@ -28,6 +28,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.list = m.ctrl.List()
 		m.clampCursor()
+		// Auto-close the passphrase modal once the dial accepts it
+		// (Status.PendingPassphrase clears). A wrong passphrase leaves it set,
+		// so the modal stays open for another attempt. Phase 19.
+		if m.enteringPassphrase && !pendingPassphraseFor(m.list, m.passphraseTarget) {
+			m.enteringPassphrase = false
+			m.passphraseTarget = ""
+			m.passphraseAttempts = 0
+			m.passphraseInput.SetValue("")
+		}
 		if m.logs != nil {
 			m.logs.refresh()
 		}
@@ -70,16 +79,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.confirmAccept {
 			return m.handleAcceptConfirm(msg)
 		}
+		if m.enteringPassphrase {
+			return m.handlePassphraseKey(msg)
+		}
 		return m.handleKey(msg)
 	case tea.PasteMsg:
-		// Bracketed-paste is only meaningful in the editor's text fields and
-		// the `/` filter; in the plain list view there is nothing to paste
-		// into, so it is a no-op.
+		// Bracketed-paste is only meaningful in the editor's text fields, the
+		// `/` filter, and the passphrase modal; in the plain list view there is
+		// nothing to paste into, so it is a no-op.
 		if m.editor != nil {
 			cmd := m.editor.update(msg)
 			if m.editor.done {
 				m.editor = nil
 			}
+			return m, cmd
+		}
+		if m.enteringPassphrase {
+			var cmd tea.Cmd
+			m.passphraseInput, cmd = m.passphraseInput.Update(msg)
 			return m, cmd
 		}
 		if m.filtering {
@@ -137,6 +154,13 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		(&m).moveCursor(1)
 	case "space":
+		if m.hasCurrent() && m.list[m.cursor].PendingPassphrase != "" {
+			m.enteringPassphrase = true
+			m.passphraseTarget = m.list[m.cursor].Name
+			m.passphraseAttempts = 0
+			m.passphraseInput.SetValue("")
+			return m, m.passphraseInput.Focus()
+		}
 		if m.hasCurrent() && m.list[m.cursor].PendingHost != "" {
 			m.confirmAccept = true
 			m.acceptTarget = m.list[m.cursor].Name
@@ -216,6 +240,46 @@ func (m Model) handleAcceptConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.acceptTarget = ""
 	}
 	return m, nil
+}
+
+// handlePassphraseKey owns the identity-passphrase modal (Phase 19): printable
+// keys edit the masked input; enter submits via Controller.AcceptPassphrase
+// (the blocked dial wakes on the store; the modal auto-closes once Status.
+// PendingPassphrase clears — see the tick handler — or stays open with a retry
+// hint on a wrong passphrase); esc cancels.
+func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "enter":
+		pass := m.passphraseInput.Value()
+		name := m.passphraseTarget
+		_ = m.ctrl.AcceptPassphrase(name, pass)
+		m.passphraseInput.SetValue("")
+		m.passphraseAttempts++
+		m.list = m.ctrl.List()
+		// Re-arm the cursor blink in case the dial rejects it and the modal
+		// stays open for another attempt.
+		return m, m.passphraseInput.Focus()
+	case "esc":
+		m.enteringPassphrase = false
+		m.passphraseTarget = ""
+		m.passphraseAttempts = 0
+		m.passphraseInput.SetValue("")
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.passphraseInput, cmd = m.passphraseInput.Update(k)
+	return m, cmd
+}
+
+// pendingPassphraseFor reports whether the tunnel named name currently has a
+// pending passphrase need in the status snapshot. Drives the modal auto-close.
+func pendingPassphraseFor(list []controller.Status, name string) bool {
+	for _, s := range list {
+		if s.Name == name {
+			return s.PendingPassphrase != ""
+		}
+	}
+	return false
 }
 
 // openEditor builds the tunnel editor form. For edit mode the current tunnel

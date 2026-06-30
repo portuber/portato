@@ -46,6 +46,16 @@ type Model struct {
 	confirmAccept bool
 	acceptTarget  string
 
+	// enteringPassphrase shows the identity-passphrase prompt modal (Phase 19).
+	// Raised by pressing space on a tunnel whose dial is blocked on a
+	// passphrase-protected identity (Status.PendingPassphrase). The input is
+	// masked; enter submits via Controller.AcceptPassphrase, esc cancels.
+	// passphraseAttempts counts submits so a wrong passphrase shows a retry hint.
+	enteringPassphrase bool
+	passphraseTarget   string
+	passphraseInput    textinput.Model
+	passphraseAttempts int
+
 	// logs is the Phase 11 per-tunnel log screen sub-model (nil when inactive).
 	logs *logsView
 
@@ -64,6 +74,7 @@ func New(ctrl controller.Controller, opt Options) Model {
 		cfgPath: opt.CfgPath,
 	}
 	m.filter = newFilterInput()
+	m.passphraseInput = newPassphraseInput()
 	m.clampCursor()
 	return m
 }
@@ -75,6 +86,18 @@ func newFilterInput() textinput.Model {
 	ti.Prompt = ""
 	ti.Placeholder = "filter name/type/endpoint…"
 	ti.CharLimit = 64
+	return ti
+}
+
+// newPassphraseInput builds the masked input for the identity-passphrase modal
+// (Phase 19). EchoPassword renders the EchoCharacter mask so the typed
+// passphrase is never shown in the clear.
+func newPassphraseInput() textinput.Model {
+	ti := textinput.New()
+	ti.Prompt = "passphrase: "
+	ti.EchoMode = textinput.EchoPassword
+	ti.EchoCharacter = '•'
+	ti.CharLimit = 256
 	return ti
 }
 

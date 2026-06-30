@@ -28,7 +28,9 @@ type fakeCtrl struct {
 	tunErr    error // returned by Add/Update/Delete when set
 	logs      []routelog.Entry
 	accepted  []string
-	changes   chan struct{}
+	// passphrases records AcceptPassphrase submissions (name -> passphrase).
+	passphrases map[string]string
+	changes     chan struct{}
 }
 
 func (f *fakeCtrl) List() []controller.Status {
@@ -128,6 +130,12 @@ func (f *fakeCtrl) AcceptHost(name string) error {
 }
 
 func (f *fakeCtrl) AcceptPassphrase(name, passphrase string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.passphrases == nil {
+		f.passphrases = map[string]string{}
+	}
+	f.passphrases[name] = passphrase
 	return f.tunErr
 }
 
