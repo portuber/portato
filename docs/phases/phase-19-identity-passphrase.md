@@ -1,7 +1,7 @@
 ---
 phase: 19
 title: Identity passphrase storage
-status: todo
+status: in-progress
 depends_on: [2]
 ---
 
