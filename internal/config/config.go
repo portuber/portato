@@ -44,6 +44,13 @@ type Defaults struct {
 	// pre-Phase-20 behaviour. Only honoured by type=dynamic tunnels.
 	Socks5User     string `yaml:"socks5_user" json:"socks5_user"`
 	Socks5Password string `yaml:"socks5_password" json:"socks5_password"`
+
+	// IdentityPassphraseStore (Phase 19) opts in to persisting SSH identity
+	// passphrases in the OS keyring so they survive a daemon restart. Default
+	// false: nothing is stored without explicit consent. A passphrase is still
+	// cached in memory for the process either way (so reconnects don't
+	// re-prompt); this flag only gates cross-restart persistence.
+	IdentityPassphraseStore bool `yaml:"identity_passphrase_store" json:"identity_passphrase_store"`
 }
 
 type Tunnel struct {
