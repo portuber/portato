@@ -14,6 +14,7 @@ import (
 	"github.com/kipkaev55/portato/internal/controller"
 	"github.com/kipkaev55/portato/internal/daemon"
 	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/kipkaev55/portato/internal/logo"
 	"github.com/kipkaev55/portato/internal/tui"
 )
 
@@ -121,6 +122,31 @@ func init() {
 		logLevel = lvl
 		return nil
 	}
+	// Easter egg: append the bilingual "portato bien" pun to the root
+	// --help output only. The footer is baked into the root help template
+	// once at init; Emoji is decided by logo.EmojiEnabled(). Subcommands are
+	// pinned to the default template in Execute() (see defaultHelpTemplate) —
+	// cobra's HelpTemplate() otherwise inherits the parent's template.
+	defaultHelpTemplate = rootCmd.HelpTemplate()
+	rootCmd.SetHelpTemplate(defaultHelpTemplate + "\n\n" + easterEggFooter() + "\n")
+}
+
+// defaultHelpTemplate is the cobra default help template captured before the
+// root's is augmented with the easter-egg footer. Execute() pins each
+// subcommand to it so `portato <sub> --help` does not inherit the footer.
+var defaultHelpTemplate string
+
+// easterEggFooter is the "And please, portato bien" line appended to
+// `portato --help` / `portato help` — the brand *portato* stands in for the
+// Spanish imperative ¡pórtate bien! ("behave yourself!"). The potato emoji is
+// appended only when the terminal is emoji-capable (the Phase 24 gate). The
+// emoji decision is read at call time so the logic is unit-testable.
+func easterEggFooter() string {
+	s := "And please, portato bien"
+	if logo.EmojiEnabled() {
+		s += " 🥔"
+	}
+	return s
 }
 
 // parseLogLevel maps the --log-level flag value to a slog.Level. An empty value
@@ -154,5 +180,10 @@ func Execute() error {
 		doctorCmd,
 		versionCmd,
 	)
+	// Pin every subcommand to the default help template so the root's
+	// easter-egg footer does not leak via cobra's HelpTemplate() parent-walk.
+	for _, sub := range rootCmd.Commands() {
+		sub.SetHelpTemplate(defaultHelpTemplate)
+	}
 	return rootCmd.Execute()
 }
