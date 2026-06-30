@@ -129,6 +129,15 @@ func (c *Client) AcceptHost(name string) error {
 	return err
 }
 
+// SetPassphrase sends the tunnel's identity passphrase to the daemon, which
+// stores it (in-memory cache, plus the OS keyring when identity_passphrase_store
+// is on) and unblocks a dial waiting on it. Sent over the authenticated 0600
+// unix socket (Phase 18), like socks5_password. Phase 19.
+func (c *Client) SetPassphrase(name, passphrase string) error {
+	return c.sendBody(http.MethodPost, fmt.Sprintf("/tunnels/%s/passphrase", name),
+		map[string]string{"passphrase": passphrase})
+}
+
 // Reload makes the daemon re-read the config from disk.
 func (c *Client) Reload() error {
 	_, err := c.post("/reload")

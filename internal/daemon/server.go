@@ -18,6 +18,7 @@ import (
 	"github.com/kipkaev55/portato/internal/forward"
 	"github.com/kipkaev55/portato/internal/ipctoken"
 	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/kipkaev55/portato/internal/secret"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -58,6 +59,12 @@ type Server struct {
 	markerPath string
 	log        *slog.Logger
 	logs       *routelog.Ring
+	// secrets caches identity passphrases for the engine's dials (and persists
+	// them to the OS keyring when cfg.Defaults.IdentityPassphraseStore is on).
+	// It is the forward.PassphraseProvider injected into the engine and the
+	// store the passphrase handler writes to. nil only in handler tests that
+	// build a server without the engine/provider path.
+	secrets *secret.Store
 
 	// ipcToken controls whether Start generates and enforces a bearer token.
 	// Set on the production server from the escape-hatch flag; the test helper
@@ -99,7 +106,13 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ri
 		return nil, err
 	}
 	s := newServer(nil, cfg, cfgPath, socketPath, markerPath, log, ring)
-	s.engine = forward.NewEngine(s.ctx, cfg, log, nil)
+	// The persist closure reads s.cfg live so a config reload that flips
+	// identity_passphrase_store takes effect without rebuilding the store.
+	store := secret.NewStore(secret.DefaultBackend(), func() bool {
+		return s.cfg.Defaults.IdentityPassphraseStore
+	})
+	s.secrets = store
+	s.engine = forward.NewEngine(s.ctx, cfg, log, store)
 	s.ipcToken = !ipcTokenDisabled
 	return s, nil
 }
@@ -221,6 +234,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /tunnels/{name}/disable", s.handleDisable)
 	mux.HandleFunc("POST /tunnels/{name}/restart", s.handleRestart)
 	mux.HandleFunc("POST /tunnels/{name}/accept-host", s.handleAcceptHost)
+	mux.HandleFunc("POST /tunnels/{name}/passphrase", s.handlePassphrase)
 	mux.HandleFunc("POST /reload", s.handleReload)
 	mux.HandleFunc("GET /config", s.handleGetConfig)
 	mux.HandleFunc("POST /tunnels", s.handleAddTunnel)
@@ -410,6 +424,60 @@ func (s *Server) handleAcceptHost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "accepted", "tunnel": name})
+}
+
+// handlePassphrase stores the submitted passphrase for the tunnel's identity
+// and unblocks a dial waiting on it (Phase 19). The identity path is the one
+// the dial reported pending (Status.PendingPassphrase), falling back to the
+// tunnel's resolved identity. No Restart: the blocked dial wakes on the store.
+// The passphrase is sent over the authenticated 0600 unix socket, like
+// socks5_password; nothing is written to disk in plaintext (cache + keyring).
+func (s *Server) handlePassphrase(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	var body struct {
+		Passphrase string `json:"passphrase"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "decode body: %v", err)
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasTunnel(name) {
+		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+		return
+	}
+	if s.secrets == nil {
+		writeError(w, http.StatusInternalServerError, "passphrase storage unavailable")
+		return
+	}
+	path := identityPathForTunnel(s.engine.List(), s.cfg, name)
+	if path == "" {
+		writeError(w, http.StatusConflict, "no identity to store a passphrase for %q", name)
+		return
+	}
+	if err := s.secrets.Set(path, body.Passphrase); err != nil {
+		writeError(w, http.StatusInternalServerError, "store passphrase: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "stored", "tunnel": name})
+}
+
+// identityPathForTunnel resolves the identity path a passphrase applies to: the
+// path the dial reported pending (Status.PendingPassphrase), or the tunnel's
+// resolved identity from config. "" when the tunnel has no identity.
+func identityPathForTunnel(statuses []forward.Status, cfg *config.Config, name string) string {
+	for _, st := range statuses {
+		if st.Name == name && st.PendingPassphrase != "" {
+			return st.PendingPassphrase
+		}
+	}
+	for _, t := range cfg.Tunnels {
+		if t.Name == name {
+			return t.ResolvedIdentity(cfg.Defaults)
+		}
+	}
+	return ""
 }
 
 func (s *Server) handleReload(w http.ResponseWriter, _ *http.Request) {

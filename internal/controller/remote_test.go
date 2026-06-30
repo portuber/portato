@@ -69,6 +69,8 @@ func (f *fakeClient) Logs(string) ([]routelog.Entry, error) { return nil, f.err 
 
 func (f *fakeClient) AcceptHost(string) error { return f.err }
 
+func (f *fakeClient) SetPassphrase(string, string) error { return f.err }
+
 // Events pops the next queued stream; when none remain it blocks on ctx,
 // modelling a daemon that is up but produces no further events. This lets the
 // reconnect loop be exercised deterministically without a real server.
@@ -136,6 +138,21 @@ func TestRemote_MutationsDelegate(t *testing.T) {
 	}
 	if fc.enables != 1 || fc.disables != 1 || fc.restarts != 1 || fc.reloads != 1 {
 		t.Fatalf("counts = enables:%d disables:%d restarts:%d reloads:%d", fc.enables, fc.disables, fc.restarts, fc.reloads)
+	}
+}
+
+// TestRemote_AcceptPassphraseDelegates asserts AcceptPassphrase forwards to
+// the daemon client (Phase 19). The fakeClient returns its err, so flip it to
+// confirm the call actually reaches the client.
+func TestRemote_AcceptPassphraseDelegates(t *testing.T) {
+	fc := &fakeClient{}
+	r := newRemote(fc)
+	if err := r.AcceptPassphrase("db", "pw"); err != nil {
+		t.Fatalf("AcceptPassphrase: %v", err)
+	}
+	fc.err = errors.New("boom")
+	if err := r.AcceptPassphrase("db", "pw"); err == nil {
+		t.Error("expected the fake error to propagate from AcceptPassphrase")
 	}
 }
 

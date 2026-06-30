@@ -10,6 +10,7 @@ import (
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
 	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/kipkaev55/portato/internal/secret"
 )
 
 type Local struct {
@@ -18,6 +19,10 @@ type Local struct {
 	cfgPath string
 	log     *slog.Logger
 	ring    *routelog.Ring
+	// secrets caches identity passphrases for the engine's dials (and persists
+	// them to the OS keyring when cfg.Defaults.IdentityPassphraseStore is on).
+	// nil only in tests that build a Local literal directly.
+	secrets *secret.Store
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -34,12 +39,18 @@ func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routel
 		log = slog.Default()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
+	// The persist closure reads the flag live so a config reload that flips
+	// identity_passphrase_store takes effect without rebuilding the store.
+	store := secret.NewStore(secret.DefaultBackend(), func() bool {
+		return cfg.Defaults.IdentityPassphraseStore
+	})
 	return &Local{
-		engine:  forward.NewEngine(ctx, cfg, log, nil),
+		engine:  forward.NewEngine(ctx, cfg, log, store),
 		cfg:     cfg,
 		cfgPath: cfgPath,
 		log:     log,
 		ring:    ring,
+		secrets: store,
 		ctx:     ctx,
 		cancel:  cancel,
 	}
@@ -151,6 +162,41 @@ func pendingHostLine(statuses []forward.Status, name string) string {
 	for _, st := range statuses {
 		if st.Name == name {
 			return st.PendingHostLine
+		}
+	}
+	return ""
+}
+
+// AcceptPassphrase stores the passphrase for the tunnel's identity and unblocks
+// a dial waiting on it (Phase 19). The identity path is the one the dial
+// reported pending (Status.PendingPassphrase), falling back to the tunnel's
+// resolved identity. No Restart: the blocked dial wakes on the store.
+func (l *Local) AcceptPassphrase(name, passphrase string) error {
+	if l.secrets == nil {
+		return fmt.Errorf("passphrase storage unavailable")
+	}
+	path := identityPathFor(l.engine.List(), l.cfg, name)
+	if path == "" {
+		return fmt.Errorf("no identity to store a passphrase for %q", name)
+	}
+	if err := l.secrets.Set(path, passphrase); err != nil {
+		return fmt.Errorf("store passphrase: %w", err)
+	}
+	return nil
+}
+
+// identityPathFor resolves the identity path a passphrase applies to: the path
+// the dial reported pending (Status.PendingPassphrase), or the tunnel's
+// resolved identity from config. "" when the tunnel has no identity.
+func identityPathFor(statuses []forward.Status, cfg *config.Config, name string) string {
+	for _, st := range statuses {
+		if st.Name == name && st.PendingPassphrase != "" {
+			return st.PendingPassphrase
+		}
+	}
+	for _, t := range cfg.Tunnels {
+		if t.Name == name {
+			return t.ResolvedIdentity(cfg.Defaults)
 		}
 	}
 	return ""

@@ -127,6 +127,10 @@ func (f *fakeCtrl) AcceptHost(name string) error {
 	return f.tunErr
 }
 
+func (f *fakeCtrl) AcceptPassphrase(name, passphrase string) error {
+	return f.tunErr
+}
+
 func newFake(statuses ...controller.Status) *fakeCtrl {
 	cp := make([]controller.Status, len(statuses))
 	copy(cp, statuses)

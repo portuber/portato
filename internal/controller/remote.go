@@ -29,6 +29,7 @@ type daemonClient interface {
 	DeleteTunnel(name string) error
 	Logs(name string) ([]routelog.Entry, error)
 	AcceptHost(name string) error
+	SetPassphrase(name, passphrase string) error
 }
 
 // Remote is a Controller backed by the daemon via an HTTP client over a unix
@@ -93,6 +94,12 @@ func (r *Remote) Logs(name string) ([]routelog.Entry, error) { return r.client.L
 // AcceptHost asks the daemon to append the tunnel's pending unknown-host key
 // and restart it (Phase 11 TOFU prompt).
 func (r *Remote) AcceptHost(name string) error { return r.client.AcceptHost(name) }
+
+// AcceptPassphrase sends the tunnel's identity passphrase to the daemon, which
+// stores it and unblocks a dial waiting on it (Phase 19 passphrase prompt).
+func (r *Remote) AcceptPassphrase(name, passphrase string) error {
+	return r.client.SetPassphrase(name, passphrase)
+}
 
 // Changes returns the push channel fed by the daemon's /events SSE stream.
 // A goroutine reads frames, reconnects on break with exponential backoff,

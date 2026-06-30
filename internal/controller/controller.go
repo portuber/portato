@@ -51,4 +51,11 @@ type Controller interface {
 	// connects. It errors when the tunnel has no pending key. Phase 11 (TOFU
 	// prompt in the TUI).
 	AcceptHost(name string) error
+
+	// AcceptPassphrase provides the passphrase for the tunnel's identity
+	// (Status.PendingPassphrase) and unblocks a dial waiting on it. The
+	// passphrase is stored in the process cache (and the OS keyring when
+	// identity_passphrase_store is on); no Restart is needed — the blocked
+	// dial wakes on the store. Phase 19 (passphrase prompt in the TUI/CLI).
+	AcceptPassphrase(name, passphrase string) error
 }
