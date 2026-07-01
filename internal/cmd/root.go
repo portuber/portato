@@ -82,7 +82,7 @@ func runStandalone() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
-	logger, ring, closer, err := routelog.Setup("", logLevel)
+	logger, ring, closer, err := routelog.Setup("", logLevel, logOptions(cfg))
 	if err != nil {
 		return fmt.Errorf("setup logger: %w", err)
 	}
@@ -163,6 +163,18 @@ func parseLogLevel(s string) (slog.Level, error) {
 		return slog.LevelError, nil
 	default:
 		return 0, fmt.Errorf("invalid --log-level %q (want debug|info|warn|error)", s)
+	}
+}
+
+// logOptions translates the config's log-rotation knobs (defaults.log.*) into
+// the rotating writer's LogOptions: MiB -> bytes, leaving zeros where the user
+// did not configure a value so the writer's package defaults apply.
+func logOptions(cfg *config.Config) routelog.LogOptions {
+	lc := cfg.Defaults.Log
+	return routelog.LogOptions{
+		MaxSize:    int64(lc.MaxSizeMB) << 20,
+		Retain:     lc.Retain,
+		MaxAgeDays: lc.MaxAgeDays,
 	}
 }
 

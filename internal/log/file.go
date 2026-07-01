@@ -26,9 +26,10 @@ const (
 // (ring.go) forwards formatted records to, so the on-disk log and the TUI's
 // in-memory ring see identical content.
 type RotatingWriter struct {
-	path    string
-	maxSize int64
-	keep    int
+	path       string
+	maxSize    int64
+	keep       int
+	maxAgeDays int
 
 	mu         sync.Mutex
 	f          *os.File
@@ -37,9 +38,13 @@ type RotatingWriter struct {
 }
 
 // NewRotatingWriter opens path (created 0600, parent dir 0700) for appending
-// and returns a writer that rotates at maxSize, keeping `keep` archives. A
-// zero/negative maxSize or keep falls back to the package defaults.
-func NewRotatingWriter(path string, maxSize int64, keep int) (*RotatingWriter, error) {
+// and returns a writer that rotates at maxSize, keeping `keep` archives (the
+// oldest is removed on each rotation). A zero/negative maxSize or keep falls
+// back to the package defaults. maxAgeDays additionally bounds retention by
+// age: archives older than that many days are purged at each rotation (0/none
+// disables age-based purging). Age never triggers a rotation on its own — the
+// trigger stays size-driven.
+func NewRotatingWriter(path string, maxSize int64, keep, maxAgeDays int) (*RotatingWriter, error) {
 	if maxSize <= 0 {
 		maxSize = defaultMaxSize
 	}
@@ -61,11 +66,12 @@ func NewRotatingWriter(path string, maxSize int64, keep int) (*RotatingWriter, e
 		return nil, fmt.Errorf("stat log file: %w", err)
 	}
 	return &RotatingWriter{
-		path:    path,
-		maxSize: maxSize,
-		keep:    keep,
-		f:       f,
-		written: info.Size(),
+		path:       path,
+		maxSize:    maxSize,
+		keep:       keep,
+		maxAgeDays: maxAgeDays,
+		f:          f,
+		written:    info.Size(),
 	}, nil
 }
 
@@ -120,7 +126,31 @@ func (w *RotatingWriter) rotateLocked() error {
 	w.f = f
 	w.written = 0
 	w.lastRotate = time.Now()
+	// Retention is bounded by count (the shift above) and, when configured, by
+	// age: drop archives older than maxAgeDays from the oldest end so disk does
+	// not grow without bound over a long-running daemon's lifetime.
+	w.purgeAgedLocked()
 	return nil
+}
+
+// purgeAgedLocked removes rotated archives whose mtime is older than maxAgeDays,
+// starting from the oldest end (.keep) so survivors stay contiguous (.1 = newest
+// upward). No-op when maxAgeDays <= 0. Caller holds w.mu.
+func (w *RotatingWriter) purgeAgedLocked() {
+	if w.maxAgeDays <= 0 {
+		return
+	}
+	cutoff := time.Now().Add(-time.Duration(w.maxAgeDays) * 24 * time.Hour)
+	for n := w.keep; n >= 1; n-- {
+		p := archivePath(w.path, n)
+		info, err := os.Stat(p)
+		if err != nil {
+			continue
+		}
+		if info.ModTime().Before(cutoff) {
+			_ = os.Remove(p)
+		}
+	}
 }
 
 func (w *RotatingWriter) Close() error {

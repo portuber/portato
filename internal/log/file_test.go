@@ -16,7 +16,7 @@ func rec(i int) string { return fmt.Sprintf("%08d\n", i) }
 func TestRotatingWriter_RotatesAtCapAndKeepsArchives(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "portato.log")
-	w, err := NewRotatingWriter(path, 16, 3) // 16-byte cap: 2 records rotate
+	w, err := NewRotatingWriter(path, 16, 3, 0) // 16-byte cap: 2 records rotate
 	if err != nil {
 		t.Fatalf("NewRotatingWriter: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestRotatingWriter_RotatesAtCapAndKeepsArchives(t *testing.T) {
 func TestRotatingWriter_CurrentResetsAndLastRotateSet(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "p.log")
-	w, err := NewRotatingWriter(path, 8, 2)
+	w, err := NewRotatingWriter(path, 8, 2, 0)
 	if err != nil {
 		t.Fatalf("NewRotatingWriter: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestRotatingWriter_ResumesExistingSize(t *testing.T) {
 	if err := os.WriteFile(path, []byte("seeded"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	w, err := NewRotatingWriter(path, 8, 2)
+	w, err := NewRotatingWriter(path, 8, 2, 0)
 	if err != nil {
 		t.Fatalf("NewRotatingWriter: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestRotatingWriter_ResumesExistingSize(t *testing.T) {
 func TestRotatingWriter_ConcurrentSafe(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "p.log")
-	w, err := NewRotatingWriter(path, 64, 3)
+	w, err := NewRotatingWriter(path, 64, 3, 0)
 	if err != nil {
 		t.Fatalf("NewRotatingWriter: %v", err)
 	}

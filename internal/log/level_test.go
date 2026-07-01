@@ -16,7 +16,7 @@ import (
 func TestSetup_LevelGatesFileWrite(t *testing.T) {
 	t.Run("debug writes debug records", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "p.log")
-		logger, _, closer, err := Setup(path, slog.LevelDebug)
+		logger, _, closer, err := Setup(path, slog.LevelDebug, LogOptions{})
 		if err != nil {
 			t.Fatalf("setup: %v", err)
 		}
@@ -32,7 +32,7 @@ func TestSetup_LevelGatesFileWrite(t *testing.T) {
 
 	t.Run("error suppresses info keeps error", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "p.log")
-		logger, _, closer, err := Setup(path, slog.LevelError)
+		logger, _, closer, err := Setup(path, slog.LevelError, LogOptions{})
 		if err != nil {
 			t.Fatalf("setup: %v", err)
 		}
@@ -56,7 +56,7 @@ func TestSetup_LevelGatesFileWrite(t *testing.T) {
 // TUI logs screen's debug toggle has something to show.
 func TestSetup_RingKeepsDebugAtInfoLevel(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "p.log")
-	logger, ring, closer, err := Setup(path, slog.LevelInfo)
+	logger, ring, closer, err := Setup(path, slog.LevelInfo, LogOptions{})
 	if err != nil {
 		t.Fatalf("setup: %v", err)
 	}
