@@ -16,6 +16,8 @@ func TestLinux_RenderUnit(t *testing.T) {
 	for _, want := range []string{
 		"Description=",
 		"After=network.target",
+		"Requires=" + linuxSocketUnit,
+		"After=network.target " + linuxSocketUnit,
 		"ExecStart=" + binary + " daemon --config " + config,
 		"Restart=on-failure",
 		"RestartSec=3",
@@ -23,6 +25,19 @@ func TestLinux_RenderUnit(t *testing.T) {
 	} {
 		if !strings.Contains(got, want) {
 			t.Errorf("unit missing %q\ngot:\n%s", want, got)
+		}
+	}
+}
+
+func TestLinux_RenderSocketUnit(t *testing.T) {
+	got := renderSocketUnit(1000)
+	for _, want := range []string{
+		"ListenStream=/run/user/1000/portato-1000.sock",
+		"SocketMode=0600",
+		"WantedBy=sockets.target",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("socket unit missing %q\ngot:\n%s", want, got)
 		}
 	}
 }
@@ -41,15 +56,24 @@ func TestLinux_Install_New_CommandSequence(t *testing.T) {
 	if !exists(unit) {
 		t.Errorf("unit not written at %q", unit)
 	}
+	if !exists(socketUnitPath()) {
+		t.Errorf("socket unit not written at %q", socketUnitPath())
+	}
 	j := fx.joined()
 	for _, want := range []string{
 		"systemctl --user daemon-reload",
+		"systemctl --user enable --now " + linuxSocketUnit,
 		"systemctl --user enable --now " + linuxUnit,
 		"loginctl enable-linger",
 	} {
 		if !strings.Contains(j, want) {
 			t.Errorf("missing command %q\ngot:\n%s", want, j)
 		}
+	}
+	// The socket unit is enabled before the service so systemd owns the IPC
+	// socket when the service (Requires+After it) starts and gets the fd.
+	if io, sc := strings.Index(j, linuxSocketUnit), strings.Index(j, linuxUnit+" "); io < 0 || io > sc {
+		t.Errorf("socket unit should be enabled before the service:\n%s", j)
 	}
 	// A brand-new unit must restart, not be merely enabled.
 	if strings.Contains(j, "systemctl --user restart ") {
@@ -90,6 +114,7 @@ func TestLinux_Uninstall(t *testing.T) {
 	unit := unitPath()
 	_ = os.MkdirAll(strings.TrimSuffix(unit, "/"+linuxUnit), 0o700)
 	_ = os.WriteFile(unit, []byte("x"), 0o644)
+	_ = os.WriteFile(socketUnitPath(), []byte("x"), 0o644)
 
 	fx := newFakeExec()
 	l := &linuxInstaller{exec: fx.run}
@@ -98,6 +123,7 @@ func TestLinux_Uninstall(t *testing.T) {
 	}
 	j := fx.joined()
 	for _, want := range []string{
+		"systemctl --user disable --now " + linuxSocketUnit,
 		"systemctl --user disable --now " + linuxUnit,
 		"systemctl --user daemon-reload",
 	} {
@@ -107,6 +133,9 @@ func TestLinux_Uninstall(t *testing.T) {
 	}
 	if exists(unit) {
 		t.Errorf("unit was not removed")
+	}
+	if exists(socketUnitPath()) {
+		t.Errorf("socket unit was not removed")
 	}
 }
 
