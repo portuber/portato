@@ -60,8 +60,12 @@ type Server struct {
 	// lockFile is the held-open single-instance flock (Phase 22). nil on
 	// platforms without flock, or before Start acquires it. Closed in Shutdown.
 	lockFile *os.File
-	log      *slog.Logger
-	logs     *routelog.Ring
+	// activated reports whether the listening socket was handed in by a service
+	// manager (systemd LISTEN_FDS) rather than self-bound. When true, cleanup
+	// leaves the socket file in place (the service manager owns it).
+	activated bool
+	log       *slog.Logger
+	logs      *routelog.Ring
 	// secrets caches identity passphrases for the engine's dials (and persists
 	// them to the OS keyring when cfg.Defaults.IdentityPassphraseStore is on).
 	// It is the forward.PassphraseProvider injected into the engine and the
@@ -170,21 +174,14 @@ func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, markerP
 // Socket returns the unix-socket path the daemon binds (for logging/display).
 func (s *Server) Socket() string { return s.socketPath }
 
-// Start binds the socket, writes the discovery marker (advertising the socket
-// path + PID), starts the enabled tunnels and serves HTTP until ctx is
-// cancelled (or serving fails). It always shuts down cleanly on return. SPEC §6.
+// Start binds the socket (or serves on a service-manager-activated listener),
+// writes the discovery marker (advertising the socket path + PID), starts the
+// enabled tunnels and serves HTTP until ctx is cancelled (or serving fails). It
+// always shuts down cleanly on return. SPEC §6.
 func (s *Server) Start(ctx context.Context) error {
-	if err := os.MkdirAll(filepath.Dir(s.socketPath), 0o700); err != nil {
-		return fmt.Errorf("create socket dir: %w", err)
-	}
-	ln, err := net.Listen("unix", s.socketPath)
+	ln, err := s.openListener()
 	if err != nil {
-		return fmt.Errorf("listen %s: %w", s.socketPath, err)
-	}
-	if err := os.Chmod(s.socketPath, 0o600); err != nil {
-		_ = ln.Close()
-		s.cleanup()
-		return fmt.Errorf("chmod socket: %w", err)
+		return err
 	}
 	if err := WriteMarker(s.markerPath, s.socketPath, os.Getpid()); err != nil {
 		_ = ln.Close()
@@ -213,7 +210,6 @@ func (s *Server) Start(ctx context.Context) error {
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- s.srv.Serve(ln) }()
-	s.log.Info("daemon listening", "socket", s.socketPath, "pid", os.Getpid())
 
 	select {
 	case <-ctx.Done():
@@ -223,6 +219,43 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}
 	return s.Shutdown()
+}
+
+// openListener returns the listener the daemon serves on: a socket-activation
+// fd from the service manager when present (systemd LISTEN_FDS), otherwise a
+// self-bound unix socket. Under activation the daemon adopts the activated
+// socket path (for the discovery marker) and skips chmod/ownership, since the
+// service manager owns the socket file.
+func (s *Server) openListener() (net.Listener, error) {
+	if lns, aerr := activationListeners(); aerr != nil {
+		return nil, fmt.Errorf("socket activation: %w", aerr)
+	} else if len(lns) > 0 {
+		ln := lns[0]
+		s.activated = true
+		if ua, ok := ln.Addr().(*net.UnixAddr); ok && ua.Name != "" {
+			s.socketPath = ua.Name
+		}
+		// We only serve one socket; release any extras we were handed.
+		for _, extra := range lns[1:] {
+			_ = extra.Close()
+		}
+		s.log.Info("daemon listening (socket-activated)", "socket", s.socketPath, "pid", os.Getpid())
+		return ln, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(s.socketPath), 0o700); err != nil {
+		return nil, fmt.Errorf("create socket dir: %w", err)
+	}
+	ln, err := net.Listen("unix", s.socketPath)
+	if err != nil {
+		return nil, fmt.Errorf("listen %s: %w", s.socketPath, err)
+	}
+	if err := os.Chmod(s.socketPath, 0o600); err != nil {
+		_ = ln.Close()
+		s.cleanup()
+		return nil, fmt.Errorf("chmod socket: %w", err)
+	}
+	s.log.Info("daemon listening", "socket", s.socketPath, "pid", os.Getpid())
+	return ln, nil
 }
 
 // Shutdown stops the HTTP server, tears down all tunnels and removes the
@@ -246,7 +279,11 @@ func (s *Server) Shutdown() error {
 }
 
 func (s *Server) cleanup() {
-	_ = os.Remove(s.socketPath)
+	// Under socket activation the service manager owns the socket file; never
+	// remove it (removing it would break the next socket-activated start).
+	if !s.activated {
+		_ = os.Remove(s.socketPath)
+	}
 	_ = RemoveMarker(s.markerPath)
 	if s.tokenPath != "" {
 		_ = os.Remove(s.tokenPath)
