@@ -120,6 +120,13 @@ func withIsolatedDiscovery(t *testing.T) (markerPath, runtimePath string) {
 	saved := discoveryPathFn
 	discoveryPathFn = func() (string, error) { return mp, nil }
 	t.Cleanup(func() { discoveryPathFn = saved })
+	// Likewise isolate the single-instance lock (Phase 22): daemon.New acquires
+	// a flock at lockPathFn(), so a test calling New must not touch the host's
+	// real lock (and must not be blocked by a real daemon running outside it).
+	lp := filepath.Join(filepath.Dir(mp), "daemon.lock")
+	savedLock := lockPathFn
+	lockPathFn = func() (string, error) { return lp, nil }
+	t.Cleanup(func() { lockPathFn = savedLock })
 	// RuntimeSocketPath uses os.TempDir() on darwin; redirect it to a short
 	// dir under /tmp so (a) a host daemon's socket is not picked up by the
 	// fallback probe, and (b) the runtime path stays under sockaddr_un's
