@@ -405,3 +405,58 @@ func TestDefaultPath(t *testing.T) {
 		t.Errorf("DefaultPath = %q, want suffix portato/config.yaml", p)
 	}
 }
+
+// TestLoadLogRotationDefaults parses a config with the defaults.log.* block
+// (Phase 22) and asserts the fields round-trip. An absent block must leave
+// the struct at its zero value so the writer falls back to its defaults.
+func TestLoadLogRotationDefaults(t *testing.T) {
+	t.Setenv("USER", "alice")
+	dir := t.TempDir()
+	p := writeConfigFile(t, dir, "config.yaml", `
+defaults:
+  identity: ~/.ssh/id_ed25519
+  known_hosts: ~/.ssh/known_hosts
+  log:
+    max_size_mb: 2
+    max_age_days: 14
+    retain: 5
+tunnels:
+  - name: db-stage
+    type: local
+    local: 5432
+    remote: 10.0.0.5:5432
+    ssh: deploy@bastion.example.com:2222
+`)
+	c, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	want := LogConfig{MaxSizeMB: 2, MaxAgeDays: 14, Retain: 5}
+	if !reflect.DeepEqual(c.Defaults.Log, want) {
+		t.Fatalf("Defaults.Log = %+v, want %+v", c.Defaults.Log, want)
+	}
+}
+
+// TestLoadLogRotationDefaultsAbsent ensures a config without a log: block does
+// not break loading and leaves the knobs zero (writer defaults apply).
+func TestLoadLogRotationDefaultsAbsent(t *testing.T) {
+	t.Setenv("USER", "alice")
+	dir := t.TempDir()
+	p := writeConfigFile(t, dir, "config.yaml", `
+defaults:
+  identity: ~/.ssh/id_ed25519
+tunnels:
+  - name: db-stage
+    type: local
+    local: 5432
+    remote: 10.0.0.5:5432
+    ssh: deploy@bastion.example.com:2222
+`)
+	c, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if !reflect.DeepEqual(c.Defaults.Log, LogConfig{}) {
+		t.Fatalf("Defaults.Log = %+v, want zero value", c.Defaults.Log)
+	}
+}

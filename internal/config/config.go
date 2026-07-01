@@ -51,6 +51,28 @@ type Defaults struct {
 	// cached in memory for the process either way (so reconnects don't
 	// re-prompt); this flag only gates cross-restart persistence.
 	IdentityPassphraseStore bool `yaml:"identity_passphrase_store" json:"identity_passphrase_store"`
+
+	// Log configures the persistent file's size-capped rotation (Phase 22). The
+	// fields are hints: a zero/negative value falls back to the rotating
+	// writer's package defaults at setup time, so an absent `log:` block keeps
+	// the pre-Phase-22 behaviour. MaxAgeDays bounds retention by age (archives
+	// older than N days are purged at rotation); it is NOT a time-based rotation
+	// trigger — rotation stays size-driven (see internal/log).
+	Log LogConfig `yaml:"log" json:"log"`
+}
+
+// LogConfig holds the config-driven log-rotation knobs (Phase 22). All fields
+// optional; zero means "use the writer default".
+type LogConfig struct {
+	// MaxSizeMB is the per-file size cap in MiB at which the log rotates.
+	MaxSizeMB int `yaml:"max_size_mb" json:"max_size_mb"`
+	// MaxAgeDays purges rotated archives whose age exceeds this many days
+	// (evaluated at each rotation). 0 disables age-based purging. It does not
+	// trigger rotation on its own; rotation is size-driven (Retain/MaxSizeMB).
+	MaxAgeDays int `yaml:"max_age_days" json:"max_age_days"`
+	// Retain is how many rotated archives to keep (.1 .. .Retain). The oldest
+	// beyond Retain (and any older than MaxAgeDays) is dropped on rotation.
+	Retain int `yaml:"retain" json:"retain"`
 }
 
 type Tunnel struct {
