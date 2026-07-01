@@ -28,19 +28,32 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.list = m.ctrl.List()
 		m.clampCursor()
+		// Auto-open a pending prompt for the tunnel under the cursor: pressing
+		// space once to enable a tunnel that then blocks on a passphrase / an
+		// unknown host should surface the prompt without a second keypress.
+		// Skipped while the user is busy (another modal/editor/filter) or after
+		// they dismissed this exact prompt (esc) — otherwise it would reopen
+		// on every tick. Phase 19 UX (also covers the TOFU host-key prompt).
+		var openCmd tea.Cmd
+		m, openCmd = m.autoOpenIfPending()
 		// Auto-close the passphrase modal once the dial accepts it
 		// (Status.PendingPassphrase clears). A wrong passphrase leaves it set,
-		// so the modal stays open for another attempt. Phase 19.
+		// so the modal stays open for another attempt.
 		if m.enteringPassphrase && !pendingPassphraseFor(m.list, m.passphraseTarget) {
 			m.enteringPassphrase = false
 			m.passphraseTarget = ""
 			m.passphraseAttempts = 0
 			m.passphraseInput.SetValue("")
 		}
+		// Forget a stale dismissal once the cursor's tunnel has no pending
+		// prompt, so a future block on it auto-opens again.
+		if m.hasCurrent() && pendingKey(m.list[m.cursor]) == "" {
+			m.dismissedPending = ""
+		}
 		if m.logs != nil {
 			m.logs.refresh()
 		}
-		return m, waitForChange(m.ctrl.Changes())
+		return m, tea.Batch(openCmd, waitForChange(m.ctrl.Changes()))
 	case redrawTickMsg:
 		// Local re-render tick: refreshes time-based display fields (uptime)
 		// without fetching from the controller. Re-arm; the change-waiter is
@@ -236,6 +249,9 @@ func (m Model) handleAcceptConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		_ = m.ctrl.AcceptHost(name)
 		m.list = m.ctrl.List()
 	case "n", "enter", "esc":
+		// Record the dismissal so the tick auto-open does not re-pop the same
+		// host-key prompt; a manual space still reopens it.
+		m.dismissedPending = pendingKeyForName(m.list, m.acceptTarget)
 		m.confirmAccept = false
 		m.acceptTarget = ""
 	}
@@ -260,6 +276,9 @@ func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		// stays open for another attempt.
 		return m, m.passphraseInput.Focus()
 	case "esc":
+		// Record which prompt was dismissed so the tick auto-open does not
+		// immediately re-pop it; a manual space still reopens on demand.
+		m.dismissedPending = pendingKeyForName(m.list, m.passphraseTarget)
 		m.enteringPassphrase = false
 		m.passphraseTarget = ""
 		m.passphraseAttempts = 0
@@ -280,6 +299,62 @@ func pendingPassphraseFor(list []controller.Status, name string) bool {
 		}
 	}
 	return false
+}
+
+// pendingKey returns a stable identifier for whatever prompt a tunnel is
+// blocked on (a passphrase path or a host-key line), or "" when it is not
+// blocked. Used so a dismissed prompt is not auto-reopened until it changes.
+func pendingKey(s controller.Status) string {
+	if s.PendingPassphrase != "" {
+		return "pp:" + s.PendingPassphrase
+	}
+	if s.PendingHostLine != "" {
+		return "hk:" + s.PendingHostLine
+	}
+	return ""
+}
+
+// pendingKeyForName looks up pendingKey for a tunnel by name in a snapshot.
+func pendingKeyForName(list []controller.Status, name string) string {
+	for _, s := range list {
+		if s.Name == name {
+			return pendingKey(s)
+		}
+	}
+	return ""
+}
+
+// isBusy reports whether the user is mid-interaction with something that an
+// auto-opened prompt would interrupt (another modal, the editor/logs screens,
+// the `/` filter, the help overlay, or an in-flight daemon hand-off).
+func (m Model) isBusy() bool {
+	return m.editor != nil || m.logs != nil || m.filtering || m.confirmDelete ||
+		m.confirmQuit || m.confirmAccept || m.enteringPassphrase || m.handoffing || m.help
+}
+
+// autoOpenIfPending surfaces a pending passphrase / unknown-host prompt for the
+// tunnel under the cursor without requiring a second keypress (Phase 19 UX). It
+// is a no-op when the user is busy or has dismissed this exact prompt. Returns
+// a command (the masked-input blink) when it opens the passphrase modal.
+func (m Model) autoOpenIfPending() (Model, tea.Cmd) {
+	if m.isBusy() || !m.hasCurrent() {
+		return m, nil
+	}
+	s := m.list[m.cursor]
+	key := pendingKey(s)
+	if key == "" || key == m.dismissedPending {
+		return m, nil
+	}
+	if s.PendingPassphrase != "" {
+		m.enteringPassphrase = true
+		m.passphraseTarget = s.Name
+		m.passphraseAttempts = 0
+		m.passphraseInput.SetValue("")
+		return m, m.passphraseInput.Focus()
+	}
+	m.confirmAccept = true
+	m.acceptTarget = s.Name
+	return m, nil
 }
 
 // openEditor builds the tunnel editor form. For edit mode the current tunnel

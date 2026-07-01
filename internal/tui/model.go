@@ -55,6 +55,11 @@ type Model struct {
 	passphraseTarget   string
 	passphraseInput    textinput.Model
 	passphraseAttempts int
+	// dismissedPending is the pending-prompt key (a passphrase path or a host
+	// line) the user cancelled with esc, so the auto-open on tick does not
+	// re-pop the same prompt endlessly. Cleared once the cursor's tunnel has no
+	// pending prompt. A manual space still reopens it on demand. Phase 19 UX.
+	dismissedPending string
 
 	// logs is the Phase 11 per-tunnel log screen sub-model (nil when inactive).
 	logs *logsView
