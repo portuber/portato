@@ -57,8 +57,11 @@ type Server struct {
 	cfgPath    string
 	socketPath string
 	markerPath string
-	log        *slog.Logger
-	logs       *routelog.Ring
+	// lockFile is the held-open single-instance flock (Phase 22). nil on
+	// platforms without flock, or before Start acquires it. Closed in Shutdown.
+	lockFile *os.File
+	log      *slog.Logger
+	logs     *routelog.Ring
 	// secrets caches identity passphrases for the engine's dials (and persists
 	// them to the OS keyring when cfg.Defaults.IdentityPassphraseStore is on).
 	// It is the forward.PassphraseProvider injected into the engine and the
@@ -94,18 +97,41 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ri
 	if log == nil {
 		log = slog.Default()
 	}
+	// Acquire the single-instance flock before anything else: two daemons
+	// started at once would otherwise both pass the marker check (neither has
+	// written one yet) and fight over the socket. The lock is crash-safe
+	// (released when this process exits) and held for the daemon's lifetime.
+	lockPath, err := LockPath()
+	if err != nil {
+		return nil, fmt.Errorf("resolve lock path: %w", err)
+	}
+	lockF, err := acquireInstanceLock(lockPath)
+	if err != nil {
+		return nil, err
+	}
+	releaseLock := false
+	defer func() {
+		if releaseLock && lockF != nil {
+			_ = lockF.Close()
+		}
+	}()
+
 	socketPath, err := resolveListenSocket()
 	if err != nil {
+		releaseLock = true
 		return nil, fmt.Errorf("resolve socket path: %w", err)
 	}
 	markerPath, err := DiscoveryPath()
 	if err != nil {
+		releaseLock = true
 		return nil, fmt.Errorf("resolve discovery path: %w", err)
 	}
 	if err := ensureNotRunning(markerPath, socketPath); err != nil {
+		releaseLock = true
 		return nil, err
 	}
 	s := newServer(nil, cfg, cfgPath, socketPath, markerPath, log, ring)
+	s.lockFile = lockF
 	// The persist closure reads s.cfg live so a config reload that flips
 	// identity_passphrase_store takes effect without rebuilding the store.
 	store := secret.NewStore(secret.DefaultBackend(), func() bool {
@@ -211,6 +237,9 @@ func (s *Server) Shutdown() error {
 		}
 		s.engine.StopAll()
 		s.cleanup()
+		if s.lockFile != nil {
+			_ = s.lockFile.Close()
+		}
 		s.log.Info("daemon stopped")
 	})
 	return nil

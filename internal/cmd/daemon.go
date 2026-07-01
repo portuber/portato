@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -53,6 +54,12 @@ func daemonRunE(_ *cobra.Command, _ []string) error {
 
 	srv, err := daemon.New(cfg, path, logger, ring)
 	if err != nil {
+		// A concurrent start that lost the single-instance flock exits 0 with a
+		// clear message (Phase 22), not a failure.
+		if errors.Is(err, daemon.ErrAlreadyRunning) {
+			fmt.Fprintln(os.Stdout, "daemon already running")
+			return nil
+		}
 		return err
 	}
 
