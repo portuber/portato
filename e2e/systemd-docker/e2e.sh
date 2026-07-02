@@ -58,7 +58,15 @@ check)
   as_app systemctl --user stop portato.service 2>/dev/null || true
   as_app systemctl --user start portato.socket
   pre=$(as_app systemctl --user is-active portato 2>/dev/null || true)
-  if as_app portato list >/tmp/plist.$$ 2>&1; then
+  # The first 'portato list' is what socket-ACTIVATES the stopped service, so
+  # its discovery probe races the daemon's cold start (it times out while the
+  # daemon is still coming up). Retry briefly until the activated daemon Serve()s.
+  ok=no
+  for i in $(seq 1 20); do
+    if as_app portato list >/tmp/plist.$$ 2>&1; then ok=yes; break; fi
+    sleep 0.5
+  done
+  if [ "$ok" = yes ]; then
     pass "portato list served via socket activation (pre-list state=$pre)"
   else
     fail "portato list via socket activation (pre-list state=$pre): $(cat /tmp/plist.$$)"
