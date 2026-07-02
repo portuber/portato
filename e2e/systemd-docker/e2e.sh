@@ -52,6 +52,22 @@ check)
   r=no; for i in $(seq 1 60); do as_app portato list | grep -qi connected && { r=yes; break; }; sleep 0.5; done
   [ "$r" = yes ] && pass "auto-reconnect after sshd drop" || fail "no auto-reconnect"
   as_app portato list
+  echo "== [Phase 22] socket activation =="
+  # Stop the daemon so the only thing holding the IPC socket is portato.socket
+  # (which install enabled). The service unit is NOT running for this probe.
+  as_app systemctl --user stop portato.service 2>/dev/null || true
+  as_app systemctl --user start portato.socket
+  pre=$(as_app systemctl --user is-active portato 2>/dev/null || true)
+  if as_app portato list >/tmp/plist.$$ 2>&1; then
+    pass "portato list served via socket activation (pre-list state=$pre)"
+  else
+    fail "portato list via socket activation (pre-list state=$pre): $(cat /tmp/plist.$$)"
+  fi
+  rm -f /tmp/plist.$$
+  post=$(as_app systemctl --user is-active portato 2>/dev/null || true)
+  [ "$post" = active ] && pass "portato.service socket-activated (active after list)" \
+    || fail "portato.service not active after socket-activated list (state=$post)"
+  as_app portato list
   echo "== summary: exit $RC =="
   exit $RC
   ;;

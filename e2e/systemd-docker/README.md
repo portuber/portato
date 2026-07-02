@@ -2,7 +2,10 @@
 
 Verifies the Linux DoD items of Phase 6: lingering [116], reboot survival [115]
 (approximated by `docker restart`), uninstall-after-restart [117], and the
-live-traffic + auto-reconnect MVP E2E [119]. launchd parts are macOS-only.
+live-traffic + auto-reconnect MVP E2E [119]. launchd parts are macOS-only. The
+`check` run also exercises Phase 22 socket activation: it stops the service,
+leaving only `portato.socket` holding the IPC socket, and confirms `portato list`
+is served (the connection socket-activates the daemon).
 
 ## Build (from repo root)
 
