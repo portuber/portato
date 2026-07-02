@@ -62,10 +62,16 @@ type Server struct {
 	lockFile *os.File
 	// activated reports whether the listening socket was handed in by a service
 	// manager (systemd LISTEN_FDS) rather than self-bound. When true, cleanup
-	// leaves the socket file in place (the service manager owns it).
+	// leaves the socket file in place (the service manager owns it), and
+	// ensureNotRunning skipped unlinking it during New.
 	activated bool
-	log       *slog.Logger
-	logs      *routelog.Ring
+	// activatedListeners are the service-manager-provided listeners (parsed
+	// once in New, before ensureNotRunning, so that stale-marker cleanup does
+	// not unlink the socket systemd handed us). Start consumes the first; the
+	// rest are released. nil/empty when not running under socket activation.
+	activatedListeners []net.Listener
+	log                *slog.Logger
+	logs               *routelog.Ring
 	// secrets caches identity passphrases for the engine's dials (and persists
 	// them to the OS keyring when cfg.Defaults.IdentityPassphraseStore is on).
 	// It is the forward.PassphraseProvider injected into the engine and the
@@ -113,29 +119,49 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ri
 	if err != nil {
 		return nil, err
 	}
-	releaseLock := false
-	defer func() {
-		if releaseLock && lockF != nil {
+	activatedListeners, err := activationListeners()
+	if err != nil {
+		_ = lockF.Close()
+		return nil, fmt.Errorf("socket activation: %w", err)
+	}
+	// releaseOnErr frees every resource acquired so far if a later step fails.
+	releaseOnErr := func() {
+		if lockF != nil {
 			_ = lockF.Close()
 		}
-	}()
+		for _, ln := range activatedListeners {
+			_ = ln.Close()
+		}
+	}
 
 	socketPath, err := resolveListenSocket()
 	if err != nil {
-		releaseLock = true
+		releaseOnErr()
 		return nil, fmt.Errorf("resolve socket path: %w", err)
 	}
 	markerPath, err := DiscoveryPath()
 	if err != nil {
-		releaseLock = true
+		releaseOnErr()
 		return nil, fmt.Errorf("resolve discovery path: %w", err)
 	}
-	if err := ensureNotRunning(markerPath, socketPath); err != nil {
-		releaseLock = true
+	// Detect socket activation BEFORE stale-marker cleanup: if a service
+	// manager handed us a listening socket, ensureNotRunning must NOT unlink it
+	// (the manager owns the file — removing it leaves the daemon serving on an
+	// orphaned inode no client can reach).
+	activated := len(activatedListeners) > 0
+	if err := ensureNotRunning(markerPath, socketPath, activated); err != nil {
+		releaseOnErr()
 		return nil, err
 	}
 	s := newServer(nil, cfg, cfgPath, socketPath, markerPath, log, ring)
 	s.lockFile = lockF
+	s.activatedListeners = activatedListeners
+	if activated {
+		s.activated = true
+		if ua, ok := activatedListeners[0].Addr().(*net.UnixAddr); ok && ua.Name != "" {
+			s.socketPath = ua.Name
+		}
+	}
 	// The persist closure reads s.cfg live so a config reload that flips
 	// identity_passphrase_store takes effect without rebuilding the store.
 	store := secret.NewStore(secret.DefaultBackend(), func() bool {
@@ -223,22 +249,20 @@ func (s *Server) Start(ctx context.Context) error {
 
 // openListener returns the listener the daemon serves on: a socket-activation
 // fd from the service manager when present (systemd LISTEN_FDS), otherwise a
-// self-bound unix socket. Under activation the daemon adopts the activated
-// socket path (for the discovery marker) and skips chmod/ownership, since the
-// service manager owns the socket file.
+// self-bound unix socket. Activation is detected once in New (so stale-marker
+// cleanup cannot unlink the inherited socket); this just consumes the stored
+// listener. Under activation the daemon adopts the activated socket path (for
+// the discovery marker) and skips chmod/ownership, since the service manager
+// owns the socket file.
 func (s *Server) openListener() (net.Listener, error) {
-	if lns, aerr := activationListeners(); aerr != nil {
-		return nil, fmt.Errorf("socket activation: %w", aerr)
-	} else if len(lns) > 0 {
-		ln := lns[0]
-		s.activated = true
-		if ua, ok := ln.Addr().(*net.UnixAddr); ok && ua.Name != "" {
-			s.socketPath = ua.Name
-		}
-		// We only serve one socket; release any extras we were handed.
-		for _, extra := range lns[1:] {
+	if len(s.activatedListeners) > 0 {
+		ln := s.activatedListeners[0]
+		// We serve one socket; release any extras we were handed.
+		for _, extra := range s.activatedListeners[1:] {
 			_ = extra.Close()
 		}
+		s.activatedListeners = nil
+		// s.activated + s.socketPath were set in New.
 		s.log.Info("daemon listening (socket-activated)", "socket", s.socketPath, "pid", os.Getpid())
 		return ln, nil
 	}
@@ -767,15 +791,20 @@ func writeError(w http.ResponseWriter, status int, format string, args ...any) {
 
 // ensureNotRunning reads the discovery marker (if any) and signals its PID to
 // detect a live daemon. A dead/corrupt marker or a stray socket file are stale
-// artefacts and are removed so a fresh daemon can start.
-func ensureNotRunning(markerPath, socketPath string) error {
+// artefacts and are removed so a fresh daemon can start — UNLESS the daemon is
+// running under socket activation (activated=true), in which case the service
+// manager owns the socket file and it must never be unlinked here (doing so
+// would leave the daemon serving on an orphaned inode no client can reach).
+func ensureNotRunning(markerPath, socketPath string, activated bool) error {
 	m, err := ReadMarker(markerPath)
 	if err != nil {
 		if !os.IsNotExist(err) {
 			// Corrupt marker — clean it up and fall through.
 			_ = RemoveMarker(markerPath)
 		}
-		_ = os.Remove(socketPath)
+		if !activated {
+			_ = os.Remove(socketPath)
+		}
 		return nil
 	}
 	if pidAlive(m.PID) {
@@ -788,9 +817,12 @@ func ensureNotRunning(markerPath, socketPath string) error {
 		return fmt.Errorf("daemon already running at %s (marker pid %d not alive but the socket still answers)", m.Socket, m.PID)
 	}
 	// Stale marker (dead PID, silent socket): remove it and any leftover
-	// socket it pointed at, then let a fresh daemon start.
+	// socket it pointed at, then let a fresh daemon start. Under socket
+	// activation leave the socket file to the service manager.
 	_ = RemoveMarker(markerPath)
-	_ = os.Remove(m.Socket)
-	_ = os.Remove(socketPath)
+	if !activated {
+		_ = os.Remove(m.Socket)
+		_ = os.Remove(socketPath)
+	}
 	return nil
 }

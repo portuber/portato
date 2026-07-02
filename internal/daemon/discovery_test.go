@@ -394,7 +394,7 @@ func TestEnsureNotRunning_StaleMarkerButLiveSocketBlocksStart(t *testing.T) {
 	if err := WriteMarker(mp, liveSocket, 999999); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(mp, liveSocket); err == nil {
+	if err := ensureNotRunning(mp, liveSocket, false); err == nil {
 		t.Fatal("ensureNotRunning must block when the socket answers despite a dead marker PID")
 	}
 	if _, err := os.Stat(mp); err != nil {
@@ -414,7 +414,7 @@ func TestEnsureNotRunning_DeadMarkerDeadSocketCleansUp(t *testing.T) {
 	if err := WriteMarker(mp, deadSocket, 999999); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(mp, filepath.Join(dir, "new.sock")); err != nil {
+	if err := ensureNotRunning(mp, filepath.Join(dir, "new.sock"), false); err != nil {
 		t.Fatalf("ensureNotRunning should allow a fresh start, got %v", err)
 	}
 	if _, err := os.Stat(mp); !os.IsNotExist(err) {
@@ -434,7 +434,7 @@ func TestEnsureNotRunning_LivePIDBlocksStart(t *testing.T) {
 	if err := WriteMarker(mp, sock, os.Getpid()); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(mp, sock); err == nil {
+	if err := ensureNotRunning(mp, sock, false); err == nil {
 		t.Fatal("ensureNotRunning must block when the marker PID is alive")
 	}
 }

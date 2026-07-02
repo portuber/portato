@@ -342,7 +342,7 @@ func TestEnsureNotRunning(t *testing.T) {
 	if err := os.WriteFile(sock, []byte{}, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(marker, sock); err != nil {
+	if err := ensureNotRunning(marker, sock, false); err != nil {
 		t.Fatalf("no marker: %v", err)
 	}
 	if _, err := os.Stat(sock); !os.IsNotExist(err) {
@@ -353,7 +353,7 @@ func TestEnsureNotRunning(t *testing.T) {
 	if err := os.WriteFile(marker, []byte("nope"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(marker, sock); err != nil {
+	if err := ensureNotRunning(marker, sock, false); err != nil {
 		t.Fatalf("corrupt marker: %v", err)
 	}
 
@@ -365,7 +365,7 @@ func TestEnsureNotRunning(t *testing.T) {
 	if err := os.WriteFile(deadSock, []byte{}, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(marker, sock); err != nil {
+	if err := ensureNotRunning(marker, sock, false); err != nil {
 		t.Fatalf("dead pid: %v", err)
 	}
 	if _, err := os.Stat(marker); !os.IsNotExist(err) {
@@ -376,7 +376,7 @@ func TestEnsureNotRunning(t *testing.T) {
 	if err := WriteMarker(marker, sock, os.Getpid()); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureNotRunning(marker, sock); err == nil {
+	if err := ensureNotRunning(marker, sock, false); err == nil {
 		t.Fatalf("expected already-running error for live pid")
 	}
 }
