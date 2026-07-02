@@ -189,6 +189,15 @@ Implementations:
   Intended for tests and CI.
 - **Protocol:** HTTP over the unix socket (`net.Listen("unix", path)` + `http.Serve`). JSON in request/response bodies.
 - **Permissions:** the socket is created with mode `0600`, accessible only to the owner.
+- **Socket activation (Phase 22):** under systemd the service manager can own the
+  listening socket and hand it to the daemon. `portato install` writes a
+  `portato.socket` unit (`ListenStream=/run/user/<uid>/portato-<uid>.sock`,
+  `SocketMode=0600`) and a `portato.service` that `Requires`+`After`s it; when
+  started, systemd passes the bound socket via `LISTEN_FDS` and the daemon serves
+  on it instead of binding (it still runs at boot to manage enabled tunnels).
+  Off activation (or non-Linux) the daemon self-binds as before. launchd socket
+  activation would need a libc call (`launch_activate_socket_fd`) that requires
+  cgo, incompatible with the pure-Go single binary, so macOS stays bind-on-start.
 - **Authorization (Phase 18):** layered on top of the `0600` socket, the daemon
   authenticates every IPC request with a bearer token. At startup it generates
   a 32-byte (`crypto/rand`) token, writes it hex-encoded to
@@ -262,6 +271,10 @@ defaults:
   socks5_user: alice              # optional (Phase 20): default SOCKS5 user/pass
   socks5_password: $secret        # for type=dynamic tunnels; empty -> NoAuth
   identity_passphrase_store: false # opt-in (Phase 19): persist identity passphrases in the OS keyring
+  log:                            # optional (Phase 22): persistent log-rotation knobs
+    max_size_mb: 1                # rotate the log file at this size; 0 -> default (1 MiB)
+    max_age_days: 0               # purge rotated archives older than N days; 0 -> disabled
+    retain: 3                     # rotated archives to keep (.1 .. .retain); 0 -> default (3)
 
 tunnels:
   - name: db-stage                # unique, required
@@ -441,10 +454,16 @@ MVP limitation: between the standalone `StopAll()` and the daemon rebinding/SSH-
 | OS     | Method          | Where we put it                                                     |
 |--------|-----------------|---------------------------------------------------------------------|
 | macOS  | launchd         | `~/Library/LaunchAgents/dev.portato.daemon.plist`, `RunAtLoad=true`, `KeepAlive=true` |
-| Linux  | systemd --user  | `~/.config/systemd/user/portato.service`, `Restart=on-failure`, lingering enabled |
+| Linux  | systemd --user  | `~/.config/systemd/user/portato.service` (+ `portato.socket`), `Restart=on-failure`, lingering enabled |
 
 `portato install` detects the OS and installs the right mechanism; `portato uninstall` reverses it.
 Since tunnels are `enabled: false` by default, at system boot **only** the control daemon is brought up.
+
+On Linux `install` also writes and enables `portato.socket` (Phase 22 socket
+activation); the service `Requires`+`After`s it so systemd hands the daemon the
+pre-bound IPC socket via `LISTEN_FDS`. macOS launchd does **not** get a `Sockets`
+dict: claiming the handed fd needs a libc call that would require cgo, breaking
+the pure-Go single binary — socket activation there is deferred.
 
 ## 14. Logging
 
@@ -458,11 +477,14 @@ Since tunnels are `enabled: false` by default, at system boot **only** the contr
 - The slog handler also feeds an in-memory ring buffer (Phase 11) so the TUI
   logs screen (`l`) can show recent per-tunnel entries without reading the
   file; in attach mode they are fetched over `GET /logs`.
-- Rotation (Phase 13): the file is a size-capped rotating writer
-  (`internal/log` `RotatingWriter`, ~1 MiB, 3 archives) so a long-running
-  daemon's log stays bounded — `portato.log`/`daemon.log` → `.log.1` → `.2`
-  → `.3` (oldest dropped). `portato doctor` reports the path and the last
-  rotation.
+- Rotation (Phase 13, config-driven in Phase 22): the file is a size-capped
+  rotating writer (`internal/log` `RotatingWriter`) so a long-running daemon's
+  log stays bounded — `portato.log`/`daemon.log` → `.log.1` → `.2` → `.3`
+  (oldest dropped). The knobs are operator-tunable via the `defaults.log.*`
+  block: `max_size_mb` (rotate at this size; default 1 MiB), `retain` (archives
+  to keep; default 3), and `max_age_days` (purge archives older than N days at
+  rotation; 0 disables). Age never triggers a rotation — the trigger stays
+  size-driven. `portato doctor` reports the path and the last rotation.
 
 ## 15. Non-functional requirements
 
