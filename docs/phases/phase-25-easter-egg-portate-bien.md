@@ -1,6 +1,6 @@
 ---
 phase: 25
-title: Easter egg — "portato bien" footer in --help
+title: Easter egg — "pórtate bien" footer in --help
 status: done
 depends_on: [24]
 ---
@@ -8,17 +8,17 @@ depends_on: [24]
 ## Goal
 
 Print a small bilingual easter egg at the end of `portato --help` (and
-`portato help`): "And please, portato bien" — the product name *portato*
-stands in for the Spanish imperative *¡pórtate bien!* ("behave
-yourself!"). The potato emoji 🥔 is appended only when the terminal is
+`portato help`): "And please, pórtate bien" — the Spanish imperative
+*¡pórtate bien!* ("behave yourself!"), a near-homophone of the product
+name *portato*. The potato emoji 🥔 is appended only when the terminal is
 emoji-capable, reusing the Phase 24 gate.
 
 ## Background
 
 - *¡Pórtate bien!* is the affirmative tú imperative of the Spanish reflexive
-  verb *portarse* ("to behave"): "behave well / be good". Substituting the
-  brand *portato* (port + potato) for *pórtate* yields the pun "portato,
-  behave (well in the network)".
+  verb *portarse* ("to behave"): "behave well / be good". The line uses the
+  correct Spanish; *pórtate* is a near-homophone of the brand *portato*
+  (port + potato), so it doubles as "portato, behave (well in the network)".
 - Bonus layer: *portato* is also an Italian musical term (a bowing between
   legato and staccato) and the past participle of *portare* ("carried") — a
   quiet nod to port-forwarding.
@@ -35,7 +35,7 @@ emoji-capable, reusing the Phase 24 gate.
 | Aspect | Decision |
 |---|---|
 | Placement | End of `portato --help` and `portato help` only. NOT on subcommand `--help` (each renders its own template). |
-| Wording | `And please, portato bien` (brand-name form of the pun). |
+| Wording | `And please, pórtate bien` (correct Spanish imperative; near-homophone of the brand portato). |
 | Emoji | Append ` 🥔` only when `logo.EmojiEnabled()` is true; plain text otherwise. |
 | Mechanism | `rootCmd.SetHelpTemplate(rootCmd.HelpTemplate() + "\n\n" + easterEggFooter() + "\n")` in `init()`. Root-only by nature (subcommands have their own template), so no runtime gate is needed. |
 | Testability | Extract `easterEggFooter() string` (reads `logo.EmojiEnabled()` at call time) so the emoji logic is unit-testable independently of the init-time template build. |
@@ -48,15 +48,15 @@ emoji-capable, reusing the Phase 24 gate.
       `rootCmd.SetHelpTemplate(...)` appending the footer to the default
       template.
 - [x] Test `internal/cmd/help_easter_egg_test.go`:
-      - `easterEggFooter()` contains "portato bien"; with
+      - `easterEggFooter()` contains "pórtate bien"; with
         `PORTATO_LOGO_EMOJI=on` it contains 🥔, with `=off` it does not;
-      - `portato --help` output contains "portato bien";
+      - `portato --help` output contains "pórtate bien";
       - `portato list --help` does NOT contain the footer.
 - [x] Docs: SPEC §3 note + ROADMAP post-MVP table — add phase 25 row.
 
 ## Definition of Done
 
-- [x] `portato --help` and `portato help` end with "And please, portato bien".
+- [x] `portato --help` and `portato help` end with "And please, pórtate bien".
 - [x] 🥔 appears on darwin (and via `PORTATO_LOGO_EMOJI=on`); absent with
       `=off` and on non-darwin.
 - [x] Subcommand `--help` (e.g. `portato list --help`) is unchanged.
@@ -65,7 +65,7 @@ emoji-capable, reusing the Phase 24 gate.
 ## Verification
 
 ```sh
-./bin/portato --help                            # ends with "portato bien" (+ 🥔 on darwin)
+./bin/portato --help                            # ends with "pórtate bien" (+ 🥔 on darwin)
 ./bin/portato help                              # same
 PORTATO_LOGO_EMOJI=off ./bin/portato --help     # no emoji
 PORTATO_LOGO_EMOJI=on ./bin/portato --help      # emoji forced on (linux)
@@ -91,7 +91,7 @@ PORTATO_LOGO_EMOJI=on ./bin/portato --help      # emoji forced on (linux)
 ## Commit plan
 
 1. `docs(phase-25): plan` — create this phase file + ROADMAP row (`[ ]`).
-2. `feat(cmd): "portato bien" easter egg in --help` — root.go wiring + test.
+2. `feat(cmd): "pórtate bien" easter egg in --help` — root.go wiring + test.
 3. `docs(spec): note the --help easter egg` (optional; can fold into 2).
 4. `docs(phase-25): complete` — DoD checklist + `[ ] -> [x]`.
 

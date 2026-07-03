@@ -122,7 +122,7 @@ func init() {
 		logLevel = lvl
 		return nil
 	}
-	// Easter egg: append the bilingual "portato bien" pun to the root
+	// Easter egg: append the bilingual "pórtate bien" pun to the root
 	// --help output only. The footer is baked into the root help template
 	// once at init; Emoji is decided by logo.EmojiEnabled(). Subcommands are
 	// pinned to the default template in Execute() (see defaultHelpTemplate) —
@@ -136,13 +136,13 @@ func init() {
 // subcommand to it so `portato <sub> --help` does not inherit the footer.
 var defaultHelpTemplate string
 
-// easterEggFooter is the "And please, portato bien" line appended to
-// `portato --help` / `portato help` — the brand *portato* stands in for the
-// Spanish imperative ¡pórtate bien! ("behave yourself!"). The potato emoji is
-// appended only when the terminal is emoji-capable (the Phase 24 gate). The
-// emoji decision is read at call time so the logic is unit-testable.
+// easterEggFooter is the "And please, pórtate bien" line appended to
+// `portato --help` / `portato help` — the Spanish imperative ¡pórtate bien!
+// ("behave yourself!"), a near-homophone of the brand *portato*. The potato
+// emoji is appended only when the terminal is emoji-capable (the Phase 24
+// gate). The emoji decision is read at call time so the logic is unit-testable.
 func easterEggFooter() string {
-	s := "And please, portato bien"
+	s := "And please, pórtate bien"
 	if logo.EmojiEnabled() {
 		s += " 🥔"
 	}

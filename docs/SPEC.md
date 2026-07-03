@@ -68,8 +68,8 @@ portato --version       -> print the logo banner + version/commit/date and exit 
 For `portato` (smart): the daemon's presence is detected by reading the discovery marker (§6) for its socket path and PID, then probing the socket.
 
 > **Easter egg (Phase 25):** `portato --help` and `portato help` end with the
-> line `And please, portato bien` — the brand *portato* stands in for the
-> Spanish imperative *¡pórtate bien!* ("behave yourself!"). The potato emoji 🥔
+> line `And please, pórtate bien` — the Spanish imperative *¡pórtate bien!*
+> ("behave yourself!"), a near-homophone of the brand *portato*. The potato emoji 🥔
 > is appended only when the terminal is emoji-capable (the §11 logo gate:
 > `GOOS=darwin` default, `PORTATO_LOGO_EMOJI=on|off` override, off under
 > `PORTATO_LOGO=off`). Subcommand `--help` output is unchanged.

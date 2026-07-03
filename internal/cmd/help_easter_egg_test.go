@@ -22,8 +22,8 @@ func TestEasterEggFooter_TextAndEmoji(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Setenv("PORTATO_LOGO_EMOJI", c.emoji)
 			got := easterEggFooter()
-			if !strings.Contains(got, "portato bien") {
-				t.Errorf("footer %q missing the 'portato bien' pun", got)
+			if !strings.Contains(got, "pórtate bien") {
+				t.Errorf("footer %q missing the 'pórtate bien' pun", got)
 			}
 			if c.emoji == "on" && !strings.Contains(got, "🥔") {
 				t.Errorf("footer %q should contain the potato emoji", got)
@@ -45,8 +45,8 @@ func TestRootHelp_HasFooter(t *testing.T) {
 	if err := rootCmd.Help(); err != nil {
 		t.Fatalf("rootCmd.Help: %v", err)
 	}
-	if !strings.Contains(out.String(), "portato bien") {
-		t.Errorf("root --help should contain the 'portato bien' footer\ngot:\n%s", out.String())
+	if !strings.Contains(out.String(), "pórtate bien") {
+		t.Errorf("root --help should contain the 'pórtate bien' footer\ngot:\n%s", out.String())
 	}
 }
 
@@ -62,7 +62,7 @@ func TestSubcommandHelp_NoFooter(t *testing.T) {
 	if err := listCmd.Help(); err != nil {
 		t.Fatalf("listCmd.Help: %v", err)
 	}
-	if strings.Contains(out.String(), "portato bien") {
+	if strings.Contains(out.String(), "pórtate bien") {
 		t.Errorf("list --help must not contain the easter-egg footer\ngot:\n%s", out.String())
 	}
 }
@@ -83,7 +83,7 @@ func TestSubcommandHelp_NeedsPin(t *testing.T) {
 	if got := listCmd.HelpTemplate(); got != rootCmd.HelpTemplate() {
 		t.Fatalf("unpinned subcommand should inherit root's template; got %q", got)
 	}
-	if !strings.Contains(listCmd.HelpTemplate(), "portato bien") {
+	if !strings.Contains(listCmd.HelpTemplate(), "pórtate bien") {
 		t.Fatalf("inherited template should contain the footer; got %q", listCmd.HelpTemplate())
 	}
 }
