@@ -253,3 +253,80 @@ func TestTunnelReconfigureUpdatesStatus(t *testing.T) {
 		t.Errorf("State = %v, want Off (reconfigure must not start an off tunnel)", st.State)
 	}
 }
+
+// TestEngineReload_RenameRunningRestartsUnderNewName guards the Phase 26 fix:
+// a running, enabled tunnel that is renamed must be started under its new name
+// instead of being left Off. See docs/phases/phase-26-rename-restart-fix.md.
+func TestEngineReload_RenameRunningRestartsUnderNewName(t *testing.T) {
+	src := tunnelCfg("a")
+	src.Enabled = true
+	e, fakes := newTestEngine(&config.Config{Tunnels: []config.Tunnel{src}})
+	if err := e.Enable("a"); err != nil { // make it running
+		t.Fatalf("Enable a: %v", err)
+	}
+
+	renamed := tunnelCfg("c")
+	renamed.Enabled = true
+	e.Reload(&config.Config{Tunnels: []config.Tunnel{renamed}})
+
+	if fakes["a"].stops.Load() != 1 {
+		t.Errorf("old name: a.stops = %d, want 1 (removed)", fakes["a"].stops.Load())
+	}
+	c, ok := fakes["c"]
+	if !ok {
+		t.Fatal("Reload: renamed tunnel c was not built")
+	}
+	if c.starts.Load() != 1 {
+		t.Errorf("renamed tunnel: c.starts = %d, want 1 (restart under new name)", c.starts.Load())
+	}
+	names := make(map[string]bool)
+	for _, s := range e.List() {
+		names[s.Name] = true
+	}
+	if !names["c"] || names["a"] {
+		t.Errorf("Reload: resulting set = %v, want {c}", names)
+	}
+}
+
+// TestEngineReload_NewEnabledTunnelStarts: a newly-added tunnel whose config has
+// Enabled == true is started on Reload (mirrors StartEnabled at boot); an added
+// disabled tunnel is not started.
+func TestEngineReload_NewEnabledTunnelStarts(t *testing.T) {
+	e, fakes := newTestEngine(&config.Config{})
+
+	on := tunnelCfg("on")
+	on.Enabled = true
+	off := tunnelCfg("off")
+	off.Enabled = false
+	e.Reload(&config.Config{Tunnels: []config.Tunnel{on, off}})
+
+	if fakes["on"].starts.Load() != 1 {
+		t.Errorf("enabled new tunnel: on.starts = %d, want 1", fakes["on"].starts.Load())
+	}
+	if fakes["off"].starts.Load() != 0 {
+		t.Errorf("disabled new tunnel: off.starts = %d, want 0", fakes["off"].starts.Load())
+	}
+}
+
+// TestEngineReload_RenameOffStaysOff: renaming a tunnel that is off (Enabled
+// false) must not start it under the new name.
+func TestEngineReload_RenameOffStaysOff(t *testing.T) {
+	src := tunnelCfg("a")
+	src.Enabled = false
+	e, fakes := newTestEngine(&config.Config{Tunnels: []config.Tunnel{src}})
+
+	renamed := tunnelCfg("c")
+	renamed.Enabled = false
+	e.Reload(&config.Config{Tunnels: []config.Tunnel{renamed}})
+
+	c, ok := fakes["c"]
+	if !ok {
+		t.Fatal("Reload: renamed tunnel c was not built")
+	}
+	if c.starts.Load() != 0 {
+		t.Errorf("off renamed tunnel: c.starts = %d, want 0", c.starts.Load())
+	}
+	if c.stops.Load() != 0 {
+		t.Errorf("off renamed tunnel: c.stops = %d, want 0", c.stops.Load())
+	}
+}

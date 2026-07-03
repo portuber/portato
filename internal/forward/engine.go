@@ -198,7 +198,8 @@ func (e *Engine) List() []Status {
 }
 
 // Reload applies a new config: tunnels no longer present are stopped and
-// removed, new tunnels are added, and changed tunnels are restarted.
+// removed, new tunnels are added (and started if enabled), and changed
+// tunnels are restarted.
 func (e *Engine) Reload(cfg *config.Config) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -225,7 +226,11 @@ func (e *Engine) Reload(cfg *config.Config) {
 		newConfigs[name] = t
 		old, existed := oldConfigs[name]
 		if !existed {
-			e.tunnels[name] = e.factory(t, cfg.Defaults, e.log)
+			tn := e.factory(t, cfg.Defaults, e.log)
+			e.tunnels[name] = tn
+			if t.Enabled {
+				_ = tn.Start(e.ctx)
+			}
 			continue
 		}
 		if tunnelChanged(old, t) || oldDefaults != cfg.Defaults {
