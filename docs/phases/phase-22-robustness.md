@@ -1,7 +1,7 @@
 ---
 phase: 22
 title: Robustness (socket activation, concurrent-start flock, log-rotation knobs)
-status: in-progress
+status: done
 depends_on: [6, 12, 13]
 ---
 
@@ -15,35 +15,48 @@ hardcoded).
 
 ## Tasks
 
-- [ ] Socket activation:
-  - systemd: `coreos/go-systemd/activation` — `Listeners()` reads
-    `LISTEN_FDS`; if a listener is handed in, serve on it instead of binding.
-  - launchd: a `Sockets` dict in the plist → the fd is handed via `launchd`
-    activation; serve on it.
+- [x] Socket activation:
+  - systemd: hand-rolled `LISTEN_FDS`/`LISTEN_PID` parsing (no `coreos/go-systemd`
+    dependency); if a listener is handed in, serve on it instead of binding.
+  - launchd: a `Sockets` dict in the plist → **deferred** — claiming the fd needs
+    `launch_activate_socket_fd` (libc, cgo), incompatible with the pure-Go single
+    binary; documented in SPEC §6/§13. macOS stays bind-on-start.
   - The daemon serves on the activated listener(s) when present, else binds its
     own (current behavior).
-- [ ] `internal/service`: generate the plist with a `Sockets` entry and the
-      unit with a `portato.socket` (`ListenStream`) so `install` enables the
-      socket alongside the service.
-- [ ] Concurrent-start: `flock` (`golang.org/x/sys/unix.Flock`) on the IPC
-      discovery marker. The second daemon started at once detects the lock and
-      exits `0` with "already running" — augmenting/replacing the current
-      PID-file-based check in `daemon.New`/`ensureNotRunning`.
-- [ ] Log-rotation config: `defaults.log.max_size_mb`, `max_age_days`,
-      `retain` — passed into `internal/log`'s rotating writer (currently
-      hardcoded in `internal/log/file.go`).
-- [ ] Tests: extend `e2e/systemd-docker` for socket activation; a concurrent
-      -start test (two daemons → one wins); a forced-rotation unit test.
+- [x] `internal/service`: generate the unit with a `portato.socket`
+  (`ListenStream=/run/user/<uid>/portato-<uid>.sock`, `SocketMode=0600`) so
+  `install` enables the socket alongside the service (which `Requires`+`After`s
+  it). The launchd plist `Sockets` entry is deferred (see above).
+- [x] Concurrent-start: `flock` (`golang.org/x/sys/unix.Flock`) on a dedicated
+      `<confighome>/portato/daemon.lock` (not the marker, to keep the marker's
+      atomic rewrite clean). The second daemon started at once detects the lock
+      and exits `0` with "already running", augmenting the PID-file-based check in
+      `daemon.New`/`ensureNotRunning`. Crash-safe (kernel releases the lock on
+      exit). Unix-only; `!unix` stub no-ops until Phase 17's `LockFileEx`.
+- [x] Log-rotation config: `defaults.log.max_size_mb`, `max_age_days`, `retain`
+      — passed into `internal/log`'s rotating writer. `max_age_days` is a
+      retention purge (archives older than N days dropped at rotation), not a
+      rotation trigger.
+- [x] Tests: `e2e/systemd-docker` extended for socket activation (green); a
+      concurrent-start unit test (two `New`s → one wins via `ErrAlreadyRunning`);
+      forced-rotation + age-purge unit tests.
 
 ## Definition of Done
 
-- [ ] Under systemd socket activation, `systemctl --user start portato.socket`
+- [x] Under systemd socket activation, `systemctl --user start portato.socket`
       → `portato list` works without the service having bound the socket.
-- [ ] Two simultaneous `portato daemon` invocations → one wins and serves, the
-      other exits `0` with a clear "already running" message.
-- [ ] Log rotation honors `max_size_mb` / `retain` (a forced-rotation test
-      produces the expected number of rotated files).
-- [ ] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
+      (Verified: fresh `docker build` + `e2e/systemd-docker check` → exit 0,
+      including the socket-activation block.)
+- [x] Two simultaneous `portato daemon` invocations → one wins and serves, the
+      other exits `0` with a clear "already running" message. (Verified
+      empirically with two real processes, both in the Linux container and on
+      macOS: the loser prints "daemon already running" and exits 0; plus the
+      `ErrAlreadyRunning` unit test.)
+- [x] Log rotation honors `max_size_mb` / `retain` (a forced-rotation test
+      produces the expected number of rotated files). (`TestSetup_HonorsLogOptions`
+      + age-purge tests.)
+- [x] `go vet ./...`, `gofmt -l .`, `go test ./...` clean. (darwin + `GOOS=linux`
+      build green.)
 
 ## Verification
 
