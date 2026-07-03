@@ -1,7 +1,7 @@
 ---
 phase: 26
 title: Fix — a renamed tunnel must keep running under its new name
-status: in-progress
+status: done
 depends_on: [10]
 ---
 
@@ -112,11 +112,11 @@ contract.
 
 ## Definition of Done
 
-- [ ] A running (`enabled: true`) tunnel renamed via the TUI editor reappears
+- [x] A running (`enabled: true`) tunnel renamed via the TUI editor reappears
       under the new name in `Connecting`/`Connected`, **not** `Off` — verified
       manually in both standalone (`portato`) and attach (`portato attach`).
       (Mechanism proven by `TestEngineReload_RenameRunningRestartsUnderNewName`;
-      the manual smoke is the one item pending the human's environment.)
+      manual smoke confirmed in both modes.)
 - [x] An off (`enabled: false`) tunnel renamed stays off (no spurious start).
 - [x] A tunnel renamed via the daemon/client path (`UpdateTunnel`) restarts
       under the new name (covered by the engine-level test, which is the
