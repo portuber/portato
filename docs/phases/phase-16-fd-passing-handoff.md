@@ -1,7 +1,7 @@
 ---
 phase: 16
 title: Seamless hand-off via FD-passing
-status: todo
+status: in-progress
 depends_on: [5]
 ---
 
@@ -11,7 +11,12 @@ Eliminate the MVP port-availability gap during the standalone→daemon
 hand-off. Instead of `StopAll()` (releasing local ports) → spawn daemon →
 rebind, the standalone passes its **already-bound local listeners** to the
 spawned daemon as file descriptors (SCM_RIGHTS), and the daemon **adopts**
-them — so the local port never goes down and in-flight connections survive.
+them — so the local port never goes down across the transition (new
+connections are seamless) and the daemon never rebinds. The established SSH
+session itself is **not** moved across processes: `golang.org/x/crypto/ssh`
+keeps the transport's crypto state in memory and cannot resume a session in
+another process, so the daemon re-dials; what survives is continuous **port
+availability**, not in-flight data on the old SSH channels.
 
 ## Background
 
