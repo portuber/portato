@@ -2,10 +2,14 @@ package forward
 
 import (
 	"context"
+	"errors"
 	"log/slog"
+	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/kipkaev55/portato/internal/config"
 )
@@ -18,6 +22,11 @@ type fakeTunnel struct {
 	stops    atomic.Int64
 	restarts atomic.Int64
 	startErr error
+
+	// listenerFile/listenerErr drive ListenerFile for hand-off tests. A nil
+	// file and nil err yield ErrNoListener (the "nothing to pass" case).
+	listenerFile *os.File
+	listenerErr  error
 }
 
 func (f *fakeTunnel) Start(ctx context.Context) error {
@@ -59,6 +68,16 @@ func (f *fakeTunnel) Status() Status {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return Status{Name: f.cfg.Name, Type: f.cfg.Type, State: f.state}
+}
+
+func (f *fakeTunnel) ListenerFile() (*os.File, error) {
+	if f.listenerErr != nil {
+		return nil, f.listenerErr
+	}
+	if f.listenerFile != nil {
+		return f.listenerFile, nil
+	}
+	return nil, ErrNoListener
 }
 
 func newTestEngine(cfg *config.Config) (*Engine, map[string]*fakeTunnel) {
@@ -328,5 +347,102 @@ func TestEngineReload_RenameOffStaysOff(t *testing.T) {
 	}
 	if c.stops.Load() != 0 {
 		t.Errorf("off renamed tunnel: c.stops = %d, want 0", c.stops.Load())
+	}
+}
+
+func TestEngineLiveListenerFiles(t *testing.T) {
+	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a"), tunnelCfg("b"), tunnelCfg("c")}}
+	e, fakes := newTestEngine(cfg)
+
+	fa, err := os.CreateTemp("", "portato-a-*")
+	if err != nil {
+		t.Fatalf("createtemp a: %v", err)
+	}
+	t.Cleanup(func() { _ = fa.Close() })
+	t.Cleanup(func() { _ = os.Remove(fa.Name()) })
+	fc, err := os.CreateTemp("", "portato-c-*")
+	if err != nil {
+		t.Fatalf("createtemp c: %v", err)
+	}
+	t.Cleanup(func() { _ = fc.Close() })
+	t.Cleanup(func() { _ = os.Remove(fc.Name()) })
+	// "a" and "c" have a live listener; "b" stays without (ErrNoListener).
+	fakes["a"].listenerFile = fa
+	fakes["c"].listenerFile = fc
+
+	got, err := e.LiveListenerFiles()
+	if err != nil {
+		t.Fatalf("LiveListenerFiles: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("want 2 files, got %d", len(got))
+	}
+	if got["a"] != fa || got["c"] != fc {
+		t.Errorf("unexpected files: a=%p(want %p) c=%p(want %p)", got["a"], fa, got["c"], fc)
+	}
+}
+
+func TestEngineLiveListenerFiles_HardError(t *testing.T) {
+	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}}
+	e, fakes := newTestEngine(cfg)
+	fakes["a"].listenerErr = errors.New("boom")
+
+	if _, err := e.LiveListenerFiles(); err == nil {
+		t.Fatal("want error for a tunnel that fails to produce its fd, got nil")
+	}
+}
+
+func TestTunnelListenerFile(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	t.Cleanup(func() { _ = ln.Close() })
+	addr := ln.Addr().String()
+
+	tn := &Tunnel{
+		baseCtx:  context.Background(),
+		cfg:      tunnelCfg("a"),
+		listener: ln,
+		running:  true,
+	}
+
+	f, err := tn.ListenerFile()
+	if err != nil {
+		t.Fatalf("ListenerFile: %v", err)
+	}
+	t.Cleanup(func() { _ = f.Close() })
+
+	// File dups the fd; the original listener must keep accepting.
+	connCh := make(chan net.Conn, 1)
+	go func() {
+		c, e := ln.Accept()
+		if e == nil {
+			connCh <- c
+		}
+	}()
+	c, err := net.Dial("tcp", addr)
+	if err != nil {
+		t.Fatalf("dial: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	select {
+	case got := <-connCh:
+		_ = got.Close()
+	case <-time.After(time.Second):
+		t.Fatal("original listener did not accept after File()")
+	}
+
+	// Stopped tunnel -> ErrNoListener.
+	tn.running = false
+	if _, err := tn.ListenerFile(); !errors.Is(err, ErrNoListener) {
+		t.Errorf("stopped: want ErrNoListener, got %v", err)
+	}
+
+	// Remote type has no local listener -> ErrNoListener.
+	tn.running = true
+	tn.cfg.Type = "remote"
+	if _, err := tn.ListenerFile(); !errors.Is(err, ErrNoListener) {
+		t.Errorf("remote: want ErrNoListener, got %v", err)
 	}
 }

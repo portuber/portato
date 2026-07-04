@@ -2,8 +2,10 @@ package forward
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 
 	"github.com/kipkaev55/portato/internal/config"
@@ -17,6 +19,10 @@ type tunneler interface {
 	// tunnel only if it is currently running. Used by Engine.Reload.
 	Reconfigure(cfg config.Tunnel, def config.Defaults) error
 	Status() Status
+	// ListenerFile returns a dup'd fd for the tunnel's local listener, or
+	// ErrNoListener when there is nothing to pass (stopped / type=remote).
+	// Drives the standalone->daemon hand-off FD transfer (Phase 16).
+	ListenerFile() (*os.File, error)
 }
 
 // Engine is a thread-safe manager of a set of tunnels derived from a Config.
@@ -195,6 +201,35 @@ func (e *Engine) List() []Status {
 		}
 	}
 	return out
+}
+
+// LiveListenerFiles returns one dup'd listener fd per running local/dynamic
+// tunnel, keyed by tunnel name, for the standalone->daemon hand-off (Phase 16).
+// Stopped tunnels and type=remote tunnels (no local listener) are skipped via
+// ErrNoListener; a running local/dynamic tunnel that fails to produce its fd is
+// a hard error, since omitting it would leave the daemon without that listener
+// and reintroduce the port-availability gap the hand-off is meant to remove.
+// The caller owns each returned *os.File and must close it (typically after the
+// daemon has acked adoption).
+func (e *Engine) LiveListenerFiles() (map[string]*os.File, error) {
+	e.mu.RLock()
+	defer e.mu.RUnlock()
+	out := make(map[string]*os.File)
+	for _, t := range e.cfg.Tunnels {
+		tn, ok := e.tunnels[t.Name]
+		if !ok {
+			continue
+		}
+		f, err := tn.ListenerFile()
+		if err != nil {
+			if errors.Is(err, ErrNoListener) {
+				continue
+			}
+			return nil, fmt.Errorf("listener %s: %w", t.Name, err)
+		}
+		out[t.Name] = f
+	}
+	return out, nil
 }
 
 // Reload applies a new config: tunnels no longer present are stopped and

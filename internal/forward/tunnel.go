@@ -8,6 +8,7 @@ import (
 	"log"
 	"log/slog"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -281,6 +282,31 @@ func (t *Tunnel) PendingHostLine() (line string, ok bool) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.pendingHostLine, t.pendingHostLine != ""
+}
+
+// ErrNoListener is returned by ListenerFile when the tunnel has no local
+// listener to hand off: it is stopped, or type=remote (whose listener is bound
+// on the SSH server, not locally). LiveListenerFiles treats it as "skip this
+// tunnel" rather than a failure.
+var ErrNoListener = errors.New("tunnel has no local listener to pass")
+
+// ListenerFile returns a duplicated file descriptor for the tunnel's local
+// listener, for passing to the spawned daemon during the standalone->daemon
+// hand-off (Phase 16). File dups the fd; the tunnel's own listener stays open
+// and keeps accepting until Close. Returns ErrNoListener when the tunnel is
+// stopped or has no local listener (type=remote); any other failure is a hard
+// error.
+func (t *Tunnel) ListenerFile() (*os.File, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	if !t.running || t.listener == nil || t.cfg.Type == "remote" {
+		return nil, ErrNoListener
+	}
+	tcp, ok := t.listener.(*net.TCPListener)
+	if !ok {
+		return nil, fmt.Errorf("listener is %T, want *net.TCPListener", t.listener)
+	}
+	return tcp.File()
 }
 
 func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{}) {
