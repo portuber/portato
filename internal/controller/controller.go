@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"os"
+
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/forward"
 	routelog "github.com/kipkaev55/portato/internal/log"
@@ -58,4 +60,12 @@ type Controller interface {
 	// identity_passphrase_store is on); no Restart is needed — the blocked
 	// dial wakes on the store. Phase 19 (passphrase prompt in the TUI/CLI).
 	AcceptPassphrase(name, passphrase string) error
+
+	// LiveListenerFiles returns a dup'd fd for each running local/dynamic
+	// tunnel's local listener, keyed by tunnel name, for the standalone->daemon
+	// hand-off (Phase 16). An empty map means there is nothing to pass (no live
+	// local listeners) and the hand-off falls back to the Phase 5 close+rebind
+	// path. The remote (attach) controller has no live listeners and always
+	// returns an empty map.
+	LiveListenerFiles() (map[string]*os.File, error)
 }

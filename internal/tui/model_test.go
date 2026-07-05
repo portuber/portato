@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -137,6 +138,12 @@ func (f *fakeCtrl) AcceptPassphrase(name, passphrase string) error {
 	}
 	f.passphrases[name] = passphrase
 	return f.tunErr
+}
+
+// LiveListenerFiles is unused by model tests; it satisfies the Controller
+// interface (the hand-off path is covered in handoff_test.go).
+func (f *fakeCtrl) LiveListenerFiles() (map[string]*os.File, error) {
+	return nil, nil
 }
 
 func newFake(statuses ...controller.Status) *fakeCtrl {
@@ -614,7 +621,7 @@ func TestModel_QuitAttachNoModal(t *testing.T) {
 
 func TestModel_ConfirmKeys(t *testing.T) {
 	restoreHandoffSeams(t)
-	startCmd = func(string) error { return nil }
+	startCmd = func(string, string) error { return nil }
 	probeSocket = func() bool { return true }
 
 	f := newFake(controller.Status{Name: "a", State: controller.Connected})

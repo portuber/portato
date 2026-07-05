@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"sync"
 	"time"
 
@@ -57,6 +58,13 @@ func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routel
 }
 
 func (l *Local) List() []Status { return l.engine.List() }
+
+// LiveListenerFiles surfaces the engine's live local-listener fds for the
+// standalone->daemon hand-off (Phase 16). The standalone sends these to the
+// spawned daemon so the local ports never go down across the transition.
+func (l *Local) LiveListenerFiles() (map[string]*os.File, error) {
+	return l.engine.LiveListenerFiles()
+}
 
 // Enable starts a tunnel and persists enabled=true to the config file. This
 // is the standalone-side mirror of the daemon's enable handler and the

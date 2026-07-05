@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"io"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -99,6 +100,14 @@ func (r *Remote) AcceptHost(name string) error { return r.client.AcceptHost(name
 // stores it and unblocks a dial waiting on it (Phase 19 passphrase prompt).
 func (r *Remote) AcceptPassphrase(name, passphrase string) error {
 	return r.client.SetPassphrase(name, passphrase)
+}
+
+// LiveListenerFiles is a no-op for the remote (attach) controller: it owns no
+// tunnels and therefore no local listeners to hand off. The hand-off only runs
+// in standalone mode, so this never participates; it exists to satisfy the
+// Controller interface.
+func (r *Remote) LiveListenerFiles() (map[string]*os.File, error) {
+	return nil, nil
 }
 
 // Changes returns the push channel fed by the daemon's /events SSE stream.

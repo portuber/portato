@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -14,9 +15,10 @@ import (
 // handoffFakeCtrl records the order of operations against a shared log so a
 // test can assert e.g. Close() happens before the daemon spawn.
 type handoffFakeCtrl struct {
-	log      *[]string
-	statuses []controller.Status
-	changes  chan struct{}
+	log       *[]string
+	statuses  []controller.Status
+	changes   chan struct{}
+	liveFiles map[string]*os.File // returned by LiveListenerFiles (nil -> empty -> legacy path)
 }
 
 func (h *handoffFakeCtrl) List() []controller.Status { return h.statuses }
@@ -34,6 +36,9 @@ func (h *handoffFakeCtrl) DeleteTunnel(string) error                { return nil
 func (h *handoffFakeCtrl) Logs(string) ([]routelog.Entry, error)    { return nil, nil }
 func (h *handoffFakeCtrl) AcceptHost(string) error                  { return nil }
 func (h *handoffFakeCtrl) AcceptPassphrase(string, string) error    { return nil }
+func (h *handoffFakeCtrl) LiveListenerFiles() (map[string]*os.File, error) {
+	return h.liveFiles, nil
+}
 func (h *handoffFakeCtrl) Close() error {
 	*h.log = append(*h.log, "close")
 	return nil
@@ -53,7 +58,7 @@ func TestHandoff_ClosesBeforeSpawn_WaitsForSocket(t *testing.T) {
 	ctrl := &handoffFakeCtrl{log: &log, changes: make(chan struct{})}
 	restoreHandoffSeams(t)
 
-	startCmd = func(string) error { log = append(log, "spawn"); return nil }
+	startCmd = func(string, string) error { log = append(log, "spawn"); return nil }
 	probes := 0
 	probeSocket = func() bool {
 		probes++
@@ -82,7 +87,7 @@ func TestHandoff_SpawnError(t *testing.T) {
 	restoreHandoffSeams(t)
 
 	boom := errors.New("no such binary")
-	startCmd = func(string) error { return boom }
+	startCmd = func(string, string) error { return boom }
 	probeSocket = func() bool { return true }
 
 	err := handoffToDaemon(ctrl, "/cfg")
@@ -101,7 +106,7 @@ func TestHandoff_Timeout(t *testing.T) {
 
 	handoffPollInterval = 5 * time.Millisecond
 	handoffTimeout = 20 * time.Millisecond
-	startCmd = func(string) error { return nil }
+	startCmd = func(string, string) error { return nil }
 	probeSocket = func() bool { return false } // never becomes ready
 
 	err := handoffToDaemon(ctrl, "/cfg")
