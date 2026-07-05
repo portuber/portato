@@ -148,6 +148,39 @@ func (t *Tunnel) Start(ctx context.Context) error {
 	return nil
 }
 
+// StartWith is like Start but adopts a pre-bound listener (handed in during a
+// standalone->daemon hand-off) instead of binding its own. The tunnel takes
+// ownership of ln and closes it on Stop. Only valid for the local-listener
+// types (local/dynamic); a type=remote tunnel has no local listener to adopt.
+// Phase 16.
+func (t *Tunnel) StartWith(ctx context.Context, ln net.Listener) error {
+	if ctx == nil {
+		ctx = t.baseCtx
+	}
+	t.mu.Lock()
+	if t.running {
+		t.mu.Unlock()
+		return errors.New("tunnel already running")
+	}
+	if t.cfg.Type == "remote" {
+		t.mu.Unlock()
+		return fmt.Errorf("StartWith: %s is type=remote (no local listener to adopt)", t.cfg.Name)
+	}
+	cctx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	t.listener = ln
+	t.cancel = cancel
+	t.done = done
+	t.running = true
+	t.state = Connecting
+	t.errMsg = ""
+	t.mu.Unlock()
+	t.notifyChange()
+
+	go t.run(cctx, ln, done)
+	return nil
+}
+
 // Stop tears down the listener and SSH client and blocks until the run loop exits.
 func (t *Tunnel) Stop() error {
 	t.mu.Lock()

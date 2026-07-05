@@ -81,8 +81,9 @@ func (f *fakeEngine) Reload(cfg *config.Config) {
 	f.cfg = cfg
 }
 
-func (f *fakeEngine) StartEnabled() {}
-func (f *fakeEngine) StopAll()      {}
+func (f *fakeEngine) StartEnabled()                              {}
+func (f *fakeEngine) StartEnabledWith(_ map[string]net.Listener) {}
+func (f *fakeEngine) StopAll()                                   {}
 
 // Subscribe mimics the real Engine broker for SSE tests. broadcast() fans a
 // signal out to every active subscriber (drop-old).

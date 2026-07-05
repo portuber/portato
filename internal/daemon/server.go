@@ -43,6 +43,10 @@ type tunneler interface {
 	Restart(name string) error
 	Reload(*config.Config)
 	StartEnabled()
+	// StartEnabledWith starts enabled tunnels, reusing pre-bound listeners
+	// handed in during a standalone->daemon hand-off (Phase 16) where present
+	// and binding normally for the rest.
+	StartEnabledWith(adopted map[string]net.Listener)
 	StopAll()
 	// Subscribe returns a channel that fires on every tunnel state change
 	// plus an unsubscribe func. Drives the GET /events SSE stream (Phase 9).
@@ -88,6 +92,11 @@ type Server struct {
 	token string
 	// tokenPath is where the token file is written/removed, next to the socket.
 	tokenPath string
+
+	// adopted holds pre-bound local listeners handed in by the standalone via
+	// --listen-fds at spawn (Phase 16). Start feeds them to the engine so the
+	// local ports never go down across the hand-off; nil for a normal start.
+	adopted map[string]net.Listener
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -200,6 +209,11 @@ func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, markerP
 // Socket returns the unix-socket path the daemon binds (for logging/display).
 func (s *Server) Socket() string { return s.socketPath }
 
+// SetAdopted installs pre-bound local listeners handed in by the standalone via
+// --listen-fds, consumed by Start (Phase 16). Must be called before Start. The
+// daemon takes ownership: StartEnabledWith closes any it does not consume.
+func (s *Server) SetAdopted(adopted map[string]net.Listener) { s.adopted = adopted }
+
 // Start binds the socket (or serves on a service-manager-activated listener),
 // writes the discovery marker (advertising the socket path + PID), starts the
 // enabled tunnels and serves HTTP until ctx is cancelled (or serving fails). It
@@ -232,7 +246,8 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 	s.listener = ln
 	s.srv = &http.Server{Handler: s.routes()}
-	s.engine.StartEnabled()
+	s.engine.StartEnabledWith(s.adopted)
+	s.adopted = nil
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- s.srv.Serve(ln) }()

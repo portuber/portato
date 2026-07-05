@@ -15,23 +15,36 @@ import (
 )
 
 type fakeTunnel struct {
-	cfg      config.Tunnel
-	mu       sync.Mutex
-	state    State
-	starts   atomic.Int64
-	stops    atomic.Int64
-	restarts atomic.Int64
-	startErr error
+	cfg        config.Tunnel
+	mu         sync.Mutex
+	state      State
+	starts     atomic.Int64
+	stops      atomic.Int64
+	restarts   atomic.Int64
+	withStarts atomic.Int64
+	startErr   error
 
 	// listenerFile/listenerErr drive ListenerFile for hand-off tests. A nil
 	// file and nil err yield ErrNoListener (the "nothing to pass" case).
 	listenerFile *os.File
 	listenerErr  error
+	// adopted records the listener passed to StartWith (nil for a plain Start).
+	adopted net.Listener
 }
 
 func (f *fakeTunnel) Start(ctx context.Context) error {
 	f.starts.Add(1)
 	f.mu.Lock()
+	f.state = Connected
+	f.mu.Unlock()
+	return f.startErr
+}
+
+func (f *fakeTunnel) StartWith(_ context.Context, ln net.Listener) error {
+	f.starts.Add(1)
+	f.withStarts.Add(1)
+	f.mu.Lock()
+	f.adopted = ln
 	f.state = Connected
 	f.mu.Unlock()
 	return f.startErr
@@ -444,5 +457,55 @@ func TestTunnelListenerFile(t *testing.T) {
 	tn.cfg.Type = "remote"
 	if _, err := tn.ListenerFile(); !errors.Is(err, ErrNoListener) {
 		t.Errorf("remote: want ErrNoListener, got %v", err)
+	}
+}
+
+// TestEngineStartEnabledWith_Adopts: an enabled tunnel with an adopted listener
+// is started via StartWith (no bind); a disabled tunnel's adopted listener is
+// closed so it does not leak.
+func TestEngineStartEnabledWith_Adopts(t *testing.T) {
+	on := tunnelCfg("a")
+	on.Enabled = true
+	off := tunnelCfg("b")
+	off.Enabled = false
+	e, fakes := newTestEngine(&config.Config{Tunnels: []config.Tunnel{on, off}})
+
+	ln1, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen ln1: %v", err)
+	}
+	defer ln1.Close()
+	ln2, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen ln2: %v", err)
+	}
+	adopted := map[string]net.Listener{"a": ln1, "b": ln2}
+
+	e.StartEnabledWith(adopted)
+
+	if fakes["a"].withStarts.Load() != 1 {
+		t.Errorf("a: want withStarts=1, got %d", fakes["a"].withStarts.Load())
+	}
+	if fakes["a"].adopted != ln1 {
+		t.Error("a: StartWith did not receive the adopted listener")
+	}
+	if fakes["b"].starts.Load() != 0 {
+		t.Errorf("b: disabled tunnel should not start, got starts=%d", fakes["b"].starts.Load())
+	}
+
+	// ln2 belonged to a disabled tunnel: it must have been closed. A closed
+	// listener's Accept returns immediately; a live one blocks.
+	errCh := make(chan error, 1)
+	go func() {
+		_, e := ln2.Accept()
+		errCh <- e
+	}()
+	select {
+	case e := <-errCh:
+		if e == nil {
+			t.Error("ln2 Accept returned nil; listener not closed")
+		}
+	case <-time.After(300 * time.Millisecond):
+		t.Error("ln2 Accept still blocking; listener was not closed")
 	}
 }

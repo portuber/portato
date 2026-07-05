@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"sync"
 
@@ -13,6 +14,9 @@ import (
 
 type tunneler interface {
 	Start(ctx context.Context) error
+	// StartWith starts the tunnel reusing a pre-bound listener (passed in during
+	// a hand-off) instead of binding its own. Local/dynamic tunnels only.
+	StartWith(ctx context.Context, ln net.Listener) error
 	Stop() error
 	Restart() error
 	// Reconfigure updates a tunnel's config/defaults in place; it restarts the
@@ -180,6 +184,56 @@ func (e *Engine) StartEnabled() {
 	e.mu.RUnlock()
 	for _, tn := range jobs {
 		_ = tn.Start(e.ctx)
+	}
+}
+
+// StartEnabledWith starts every enabled tunnel, reusing a pre-bound listener
+// from adopted (keyed by tunnel name) where present -- the standalone->daemon
+// hand-off adoption path (Phase 16) -- and binding normally for the rest. Any
+// adopted listener whose tunnel is unknown or disabled is closed so its port
+// does not leak; StartWith errors (e.g. an adopted listener for a type=remote
+// tunnel, which has no local listener) are logged, not fatal.
+func (e *Engine) StartEnabledWith(adopted map[string]net.Listener) {
+	e.mu.RLock()
+	type job struct {
+		tn   tunneler
+		ln   net.Listener // nil -> bind normally
+		name string
+	}
+	jobs := make([]job, 0)
+	used := make(map[string]bool)
+	for _, t := range e.cfg.Tunnels {
+		if !t.Enabled {
+			continue
+		}
+		tn, ok := e.tunnels[t.Name]
+		if !ok {
+			continue
+		}
+		ln := adopted[t.Name]
+		if ln != nil {
+			used[t.Name] = true
+		}
+		jobs = append(jobs, job{tn: tn, ln: ln, name: t.Name})
+	}
+	e.mu.RUnlock()
+	for _, j := range jobs {
+		if j.ln != nil {
+			if err := j.tn.StartWith(e.ctx, j.ln); err != nil {
+				e.log.Warn("adopted listener rejected; falling back to bind", "tunnel", j.name, "err", err)
+				_ = j.tn.Start(e.ctx)
+			}
+		} else {
+			_ = j.tn.Start(e.ctx)
+		}
+	}
+	// Close adopted listeners the daemon did not consume (unknown name or
+	// disabled): leaving them open would leak the port on the daemon side.
+	for name, ln := range adopted {
+		if !used[name] {
+			e.log.Warn("closing unused adopted listener", "tunnel", name)
+			_ = ln.Close()
+		}
 	}
 }
 
