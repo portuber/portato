@@ -31,7 +31,7 @@
 | 13  | Polish 2 (log rotation, `/` filter, goreleaser) | `[x]`  | [phase-13-polish-2.md](./phases/phase-13-polish-2.md) |
 | 14  | TUI: duplicate tunnel (Shift+C)   | `[x]`  | [phase-14-tui-duplicate.md](./phases/phase-14-tui-duplicate.md) |
 | 15  | Light-theme color tuning          | `[x]`  | [phase-15-light-theme-colors.md](./phases/phase-15-light-theme-colors.md) |
-| 16  | Seamless hand-off (FD-passing)    | `[~]`  | [phase-16-fd-passing-handoff.md](./phases/phase-16-fd-passing-handoff.md) |
+| 16  | Seamless hand-off (FD-passing)    | `[x]`  | [phase-16-fd-passing-handoff.md](./phases/phase-16-fd-passing-handoff.md) |
 | 17  | Windows support                   | `[ ]`  | [phase-17-windows.md](./phases/phase-17-windows.md) |
 | 18  | IPC authorization token           | `[x]`  | [phase-18-ipc-token.md](./phases/phase-18-ipc-token.md) |
 | 19  | Identity passphrase storage       | `[x]`  | [phase-19-identity-passphrase.md](./phases/phase-19-identity-passphrase.md) |

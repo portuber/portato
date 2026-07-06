@@ -1,7 +1,7 @@
 ---
 phase: 16
 title: Seamless hand-off via FD-passing
-status: in-progress
+status: done
 depends_on: [5]
 ---
 
@@ -29,38 +29,38 @@ creates the accepted MVP "blip" (SPEC §12). This phase removes it.
 
 ## Tasks
 
-- [ ] `forward.Tunnel`: add `ListenerFile() (*os.File, error)` —
+- [x] `forward.Tunnel`: add `ListenerFile() (*os.File, error)` —
       `t.listener.(*net.TCPListener).File()` — without closing the listener;
       return a typed error for `remote` (no local listener) and when stopped.
-- [ ] `forward.Engine`: add `LiveListenerFiles() (map[string]*os.File, error)`
+- [x] `forward.Engine`: add `LiveListenerFiles() (map[string]*os.File, error)`
       — one entry per running `type=local`/`dynamic` tunnel, keyed by name.
-- [ ] FD-transfer protocol: a small framing over a dedicated unix socket
+- [x] FD-transfer protocol: a small framing over a dedicated unix socket
       (separate from the HTTP control socket). Per tunnel: a JSON header
       `{"name": "...", "type": "..."}` followed by the FD sent with
       `(*net.UnixConn).WriteMsgUnix(..., unix.UnixRights(fds), ...)`.
-- [ ] `portato daemon`: accept `--listen-fds <unixsock>`; at startup read the
+- [x] `portato daemon`: accept `--listen-fds <unixsock>`; at startup read the
       offered FDs and reconstruct each listener via `net.FileListener`,
       adopting it into the engine (skip the `net.Listen` bind for that tunnel).
-- [ ] `tui/handoff.go`: open the transfer socket, spawn the daemon with
+- [x] `tui/handoff.go`: open the transfer socket, spawn the daemon with
       `--listen-fds`, **send the live FDs before `ctrl.Close()`**, and keep the
       standalone alive until the daemon acks adoption (its `healthz` answers)
       — then exit.
-- [ ] Fallback: if FD-passing fails at any step, fall back to the current
+- [x] Fallback: if FD-passing fails at any step, fall back to the current
       Phase 5 close→rebind path and log the degradation.
-- [ ] Unit tests: FD round-trip (`net.FileListener` reconstructs a working
+- [x] Unit tests: FD round-trip (`net.FileListener` reconstructs a working
       listener from the passed `*os.File`); the adoption path; the fallback
       path.
 
 ## Definition of Done
 
-- [ ] During hand-off, a long-lived TCP connection through a local tunnel
+- [x] During hand-off, a long-lived TCP connection through a local tunnel
       survives (data flows continuously across the transition), or at minimum
       `nc -z 127.0.0.1 <local>` never fails during the hand-off window.
-- [ ] `type=remote` tunnels reconnect normally after hand-off (no FD to pass);
+- [x] `type=remote` tunnels reconnect normally after hand-off (no FD to pass);
       `type=dynamic` passes its local listener like `local`.
-- [ ] FD-passing failure degrades gracefully to the Phase 5 hand-off (no crash,
+- [x] FD-passing failure degrades gracefully to the Phase 5 hand-off (no crash,
       tunnels still come up after the brief MVP blip).
-- [ ] `go vet ./...`, `gofmt -l .`, `go test ./...` clean; cross-compilation
+- [x] `go vet ./...`, `gofmt -l .`, `go test ./...` clean; cross-compilation
       darwin/linux × amd64/arm64 green.
 
 ## Verification
