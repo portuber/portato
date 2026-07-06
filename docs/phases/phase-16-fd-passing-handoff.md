@@ -67,12 +67,19 @@ creates the accepted MVP "blip" (SPEC §12). This phase removes it.
 
 ```sh
 make build
-# 1. In one terminal, keep a transfer going through a local tunnel:
-nc 127.0.0.1 <local>          # or a curl loop
-# 2. Standalone TUI, enable the tunnel, then hand off (q → y).
+
+# Automated (recommended): the black-box hand-off E2E proves the invariant:
+make e2e-handoff
+
+# Manual confirmation:
+# 1. Ensure no daemon is running and exactly one enabled local tunnel is up.
+# 2. Terminal 1 -- poll the local port; it must NEVER refuse across the hand-off:
+while nc -z -w1 127.0.0.1 <local> >/dev/null 2>&1; do printf .; sleep 0.05; done; echo REFUSED
+# 3. Terminal 2 -- standalone TUI, enable the tunnel, then hand off (q -> y):
 ./bin/portato
-# 3. The nc connection / port must stay up across the hand-off.
-./bin/portato list            # daemon: Connected, uptime not reset
+# 4. Expect no REFUSED in Terminal 1. The daemon re-dials SSH (uptime is fresh,
+#    NOT carried over) -- only the LOCAL PORT is seamless, not in-flight data:
+./bin/portato list           # daemon: Connected (uptime fresh -- SSH re-dialled)
 ```
 
 ## Technical details
