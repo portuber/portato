@@ -93,31 +93,39 @@ var probeSocket = func() bool {
 // pre-spawn step fails), it falls back to the Phase 5 close+rebind path (a brief
 // port blip). Either way the daemon comes up and the standalone exits.
 func handoffToDaemon(ctrl controller.Controller, cfgPath string) error {
-	if err := handoffWithFDs(ctrl, cfgPath); err == nil {
+	spawned, err := handoffWithFDs(ctrl, cfgPath)
+	if err == nil {
 		return nil
+	}
+	if spawned {
+		// The FD path already started a daemon; even though it did not become
+		// ready in time, do NOT fall back to a second spawn -- it would race the
+		// first (and the single-instance flock would reject it anyway).
+		return err
 	}
 	return handoffLegacy(ctrl, cfgPath)
 }
 
-// handoffWithFDs performs the seamless FD hand-off. It returns nil only when the
-// spawned daemon has answered healthz (having adopted the listeners or bound its
-// own). On any failure before the daemon is spawned it returns a non-nil error
-// WITHOUT closing ctrl, so handoffToDaemon can fall back to the legacy path;
-// once the daemon is spawned, success is defined by healthz answering -- a
-// failed send merely means the daemon binds normally.
-func handoffWithFDs(ctrl controller.Controller, cfgPath string) error {
+// handoffWithFDs performs the seamless FD hand-off. It reports whether it
+// spawned the daemon and the error (nil on success). It returns nil error only
+// when the spawned daemon has answered healthz (having adopted the listeners or
+// bound its own). Before spawning it returns (false, err) WITHOUT closing ctrl,
+// so handoffToDaemon can fall back to the legacy path; after spawning it returns
+// (true, ...) -- success is defined by healthz answering, so a failed send
+// merely means the daemon binds normally.
+func handoffWithFDs(ctrl controller.Controller, cfgPath string) (bool, error) {
 	files, err := ctrl.LiveListenerFiles()
 	if err != nil {
-		return fmt.Errorf("enumerate live listeners: %w", err)
+		return false, fmt.Errorf("enumerate live listeners: %w", err)
 	}
 	if len(files) == 0 {
-		return fmt.Errorf("no live local listeners to pass")
+		return false, fmt.Errorf("no live local listeners to pass")
 	}
 
 	sockPath, xfer, err := openTransferSocket()
 	if err != nil {
 		closeFiles(files)
-		return err
+		return false, err
 	}
 	cleanupSocket := func() {
 		_ = xfer.Close()
@@ -127,7 +135,7 @@ func handoffWithFDs(ctrl controller.Controller, cfgPath string) error {
 	if err := startCmd(cfgPath, sockPath); err != nil {
 		cleanupSocket()
 		closeFiles(files)
-		return fmt.Errorf("spawn daemon: %w", err)
+		return false, fmt.Errorf("spawn daemon: %w", err)
 	}
 
 	// Send the offers on the accepted connection in parallel with waiting for
@@ -150,14 +158,14 @@ func handoffWithFDs(ctrl controller.Controller, cfgPath string) error {
 	cleanupSocket() // unblock the accept/send goroutine if it never connected
 	sendResult := <-sendErr
 	if !ready {
-		return fmt.Errorf("daemon did not become ready within %s", handoffTimeout)
+		return true, fmt.Errorf("daemon did not become ready within %s", handoffTimeout)
 	}
 	_ = sendResult // a failed send is harmless once the daemon is healthy
 	// The daemon has adopted the listeners (or bound its own) and is healthy.
 	// Now the standalone may release its own copies; the daemon's dup'd fds keep
 	// the ports up.
 	_ = ctrl.Close()
-	return nil
+	return true, nil
 }
 
 // waitForDaemon polls the daemon's healthz until it answers or the hand-off
