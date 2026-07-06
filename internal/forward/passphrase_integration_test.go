@@ -14,6 +14,7 @@ import (
 
 	"github.com/kipkaev55/portato/internal/config"
 	"github.com/kipkaev55/portato/internal/secret"
+	"github.com/kipkaev55/portato/internal/sshtest"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -63,9 +64,9 @@ func TestPassphraseIdentity_ConnectsNoAgent(t *testing.T) {
 
 	idPath, authorizedKey := writePassphraseIdentity(t, "hunter2")
 	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	store := secret.NewStore(secret.NewMemBackend(), func() bool { return false })
 	if err := store.Set(idPath, "hunter2"); err != nil {
@@ -74,8 +75,8 @@ func TestPassphraseIdentity_ConnectsNoAgent(t *testing.T) {
 
 	cfg := config.Tunnel{
 		Name: "pp", Type: "local", Local: "0", Remote: "127.0.0.1:1",
-		SSH: "u@" + srv.addr(), Identity: idPath,
-		User: "u", Host: "127.0.0.1", Port: srv.port,
+		SSH: "u@" + srv.Addr(), Identity: idPath,
+		User: "u", Host: "127.0.0.1", Port: srv.Port,
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
 
@@ -102,16 +103,16 @@ func TestPassphraseIdentity_BlocksThenProvided(t *testing.T) {
 
 	idPath, authorizedKey := writePassphraseIdentity(t, "secret")
 	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	store := secret.NewStore(secret.NewMemBackend(), func() bool { return false }) // empty: dial must block
 
 	cfg := config.Tunnel{
 		Name: "pp", Type: "local", Local: "0", Remote: "127.0.0.1:1",
-		SSH: "u@" + srv.addr(), Identity: idPath,
-		User: "u", Host: "127.0.0.1", Port: srv.port,
+		SSH: "u@" + srv.Addr(), Identity: idPath,
+		User: "u", Host: "127.0.0.1", Port: srv.Port,
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
 
@@ -153,16 +154,16 @@ func TestPassphraseIdentity_WrongThenRight(t *testing.T) {
 
 	idPath, authorizedKey := writePassphraseIdentity(t, "correct")
 	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	store := secret.NewStore(secret.NewMemBackend(), func() bool { return false })
 
 	cfg := config.Tunnel{
-		Name: "pp", Type: "local", Local: "0", Remote: fmt.Sprintf("127.0.0.1:%d", srv.port),
-		SSH: "u@" + srv.addr(), Identity: idPath,
-		User: "u", Host: "127.0.0.1", Port: srv.port,
+		Name: "pp", Type: "local", Local: "0", Remote: fmt.Sprintf("127.0.0.1:%d", srv.Port),
+		SSH: "u@" + srv.Addr(), Identity: idPath,
+		User: "u", Host: "127.0.0.1", Port: srv.Port,
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
 

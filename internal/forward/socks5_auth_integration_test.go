@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/kipkaev55/portato/internal/config"
+	"github.com/kipkaev55/portato/internal/sshtest"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -151,9 +152,9 @@ func TestTunnelDynamicSocks5Auth(t *testing.T) {
 	}
 	knownHosts := filepath.Join(dir, "known_hosts")
 
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	localPort := freePort(t)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
@@ -161,9 +162,9 @@ func TestTunnelDynamicSocks5Auth(t *testing.T) {
 	cfg := config.Tunnel{
 		Name: "d-auth", Type: "dynamic",
 		Local:    strconv.Itoa(localPort),
-		SSH:      "u@" + srv.addr(),
+		SSH:      "u@" + srv.Addr(),
 		Identity: idPath,
-		User:     "u", Host: "127.0.0.1", Port: srv.port,
+		User:     "u", Host: "127.0.0.1", Port: srv.Port,
 		Socks5User: "alice", Socks5Password: "wonderland",
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}

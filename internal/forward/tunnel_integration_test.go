@@ -3,11 +3,8 @@ package forward
 import (
 	"bytes"
 	"context"
-	"crypto/ecdsa"
 	"crypto/ed25519"
-	"crypto/elliptic"
 	"crypto/rand"
-	"encoding/binary"
 	"encoding/pem"
 	"fmt"
 	"io"
@@ -16,316 +13,15 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"sync"
 	"testing"
 	"time"
 
 	"github.com/kipkaev55/portato/internal/config"
+	"github.com/kipkaev55/portato/internal/sshtest"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
-
-// directTCPIP mirrors the wire payload of a "direct-tcpip" channel open.
-type directTCPIP struct {
-	Raddr string
-	Rport uint32
-	Laddr string
-	Lport uint32
-}
-
-type connTracker struct {
-	mu    sync.Mutex
-	conns []*ssh.ServerConn
-}
-
-func (c *connTracker) add(s *ssh.ServerConn) {
-	c.mu.Lock()
-	c.conns = append(c.conns, s)
-	c.mu.Unlock()
-}
-
-func (c *connTracker) remove(s *ssh.ServerConn) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	for i, x := range c.conns {
-		if x == s {
-			c.conns = append(c.conns[:i], c.conns[i+1:]...)
-			return
-		}
-	}
-}
-
-func (c *connTracker) closeAll() {
-	c.mu.Lock()
-	old := c.conns
-	c.conns = nil
-	c.mu.Unlock()
-	for _, s := range old {
-		_ = s.Close()
-	}
-}
-
-type sshd struct {
-	t          *testing.T
-	cfg        *ssh.ServerConfig
-	port       int
-	listener   net.Listener
-	tracker    *connTracker
-	ed25519Pub ssh.PublicKey
-}
-
-// newSSHD configures a test server that offers BOTH an ECDSA and an ED25519
-// host key. x/crypto/ssh's default preference negotiates ECDSA first, so a
-// client that records only the ED25519 key would otherwise hit a spurious
-// "host key mismatch" — the regression this setup guards against.
-func newSSHD(t *testing.T, authorizedKey ssh.PublicKey) *sshd {
-	t.Helper()
-	_, edPriv, err := ed25519.GenerateKey(rand.Reader)
-	if err != nil {
-		t.Fatalf("gen ed25519 host key: %v", err)
-	}
-	edSigner, err := ssh.NewSignerFromSigner(edPriv)
-	if err != nil {
-		t.Fatalf("ed25519 signer: %v", err)
-	}
-	ecPriv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	if err != nil {
-		t.Fatalf("gen ecdsa host key: %v", err)
-	}
-	ecSigner, err := ssh.NewSignerFromKey(ecPriv)
-	if err != nil {
-		t.Fatalf("ecdsa signer: %v", err)
-	}
-	cfg := &ssh.ServerConfig{
-		PublicKeyCallback: func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			if bytes.Equal(key.Marshal(), authorizedKey.Marshal()) {
-				return nil, nil
-			}
-			return nil, fmt.Errorf("unknown public key")
-		},
-	}
-	cfg.AddHostKey(edSigner)
-	cfg.AddHostKey(ecSigner)
-	return &sshd{t: t, cfg: cfg, tracker: &connTracker{}, ed25519Pub: edSigner.PublicKey()}
-}
-
-func (s *sshd) start() {
-	s.t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
-	if err != nil {
-		s.t.Fatalf("sshd listen: %v", err)
-	}
-	s.listener = ln
-	s.port = ln.Addr().(*net.TCPAddr).Port
-	go s.accept()
-}
-
-func (s *sshd) accept() {
-	for {
-		nConn, err := s.listener.Accept()
-		if err != nil {
-			return
-		}
-		go s.handleConn(nConn)
-	}
-}
-
-func (s *sshd) addr() string {
-	return fmt.Sprintf("127.0.0.1:%d", s.port)
-}
-
-func (s *sshd) stop() {
-	if s.listener != nil {
-		_ = s.listener.Close()
-	}
-	s.tracker.closeAll()
-}
-
-func (s *sshd) restart() {
-	s.stop()
-	time.Sleep(80 * time.Millisecond)
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", s.port))
-	if err != nil {
-		s.t.Fatalf("sshd restart listen: %v", err)
-	}
-	s.listener = ln
-	go s.accept()
-}
-
-func (s *sshd) handleConn(nConn net.Conn) {
-	sconn, chans, reqs, err := ssh.NewServerConn(nConn, s.cfg)
-	if err != nil {
-		return
-	}
-	s.tracker.add(sconn)
-	defer func() {
-		s.tracker.remove(sconn)
-		_ = sconn.Close()
-	}()
-	go s.serveForwards(sconn, reqs)
-	for nch := range chans {
-		if nch.ChannelType() != "direct-tcpip" {
-			_ = nch.Reject(ssh.UnknownChannelType, "only direct-tcpip")
-			continue
-		}
-		var d directTCPIP
-		if err := ssh.Unmarshal(nch.ExtraData(), &d); err != nil {
-			_ = nch.Reject(ssh.Prohibited, "bad payload")
-			continue
-		}
-		ch, creqs, err := nch.Accept()
-		if err != nil {
-			continue
-		}
-		go s.serveDirect(ch, creqs, net.JoinHostPort(d.Raddr, strconv.Itoa(int(d.Rport))))
-	}
-}
-
-func (s *sshd) serveDirect(ch ssh.Channel, creqs <-chan *ssh.Request, addr string) {
-	defer ch.Close()
-	go ssh.DiscardRequests(creqs)
-	backend, err := net.Dial("tcp", addr)
-	if err != nil {
-		return
-	}
-	defer backend.Close()
-	done := make(chan struct{}, 2)
-	go func() { _, _ = io.Copy(ch, backend); done <- struct{}{} }()
-	go func() { _, _ = io.Copy(backend, ch); done <- struct{}{} }()
-	<-done
-}
-
-// forwardRequest is the wire payload of a "tcpip-forward" / "cancel-tcpip-
-// forward" global request (RFC 4254 §7.1).
-type forwardRequest struct {
-	Addr string
-	Port uint32
-}
-
-// forwardedPayload is the wire payload of a "forwarded-tcpip" channel that the
-// server opens on the client when a connection arrives at the forwarded port
-// (RFC 4254 §7.2). Addr/Port identify the listened address (must match what
-// the client registered); OriginAddr/OriginPort identify the connecting peer.
-type forwardedPayload struct {
-	Addr       string
-	Port       uint32
-	OriginAddr string
-	OriginPort uint32
-}
-
-type fwdEntry struct {
-	ln   net.Listener
-	host string
-	port uint32
-}
-
-// serveForwards implements the server side of remote (-R) forwarding for the
-// test sshd: it honors tcpip-forward (binds a real loopback port on the test
-// host, modelling the "server side") and, on each accepted connection, opens a
-// forwarded-tcpip channel back to the client. This is what a type=remote
-// tunnel relies on via ssh.Client.Listen.
-func (s *sshd) serveForwards(sconn *ssh.ServerConn, reqs <-chan *ssh.Request) {
-	var (
-		mu  sync.Mutex
-		fwd = make(map[string]fwdEntry)
-	)
-	for r := range reqs {
-		switch r.Type {
-		case "tcpip-forward":
-			var p forwardRequest
-			if err := ssh.Unmarshal(r.Payload, &p); err != nil {
-				r.Reply(false, nil)
-				continue
-			}
-			bind := net.JoinHostPort(p.Addr, strconv.FormatUint(uint64(p.Port), 10))
-			ln, err := net.Listen("tcp", bind)
-			if err != nil {
-				r.Reply(false, nil)
-				continue
-			}
-			port := p.Port
-			if port == 0 {
-				port = uint32(addrPort(ln.Addr()))
-			}
-			mu.Lock()
-			fwd[bind] = fwdEntry{ln: ln, host: p.Addr, port: port}
-			mu.Unlock()
-			resp := make([]byte, 4)
-			binary.BigEndian.PutUint32(resp, port)
-			r.Reply(true, resp)
-			go s.acceptForwarded(sconn, ln, p.Addr, port)
-		case "cancel-tcpip-forward":
-			var p forwardRequest
-			if err := ssh.Unmarshal(r.Payload, &p); err != nil {
-				r.Reply(false, nil)
-				continue
-			}
-			bind := net.JoinHostPort(p.Addr, strconv.FormatUint(uint64(p.Port), 10))
-			mu.Lock()
-			e, ok := fwd[bind]
-			if ok {
-				delete(fwd, bind)
-			}
-			mu.Unlock()
-			if ok {
-				_ = e.ln.Close()
-			}
-			r.Reply(true, nil)
-		default:
-			if r.WantReply {
-				r.Reply(false, nil)
-			}
-		}
-	}
-	mu.Lock()
-	for key, e := range fwd {
-		_ = e.ln.Close()
-		delete(fwd, key)
-	}
-	mu.Unlock()
-}
-
-func (s *sshd) acceptForwarded(sconn *ssh.ServerConn, ln net.Listener, host string, port uint32) {
-	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			return
-		}
-		go func(conn net.Conn) {
-			defer conn.Close()
-			originHost := "127.0.0.1"
-			originPort := uint32(0)
-			if ta, ok := conn.RemoteAddr().(*net.TCPAddr); ok {
-				originHost = ta.IP.String()
-				originPort = uint32(ta.Port)
-			}
-			payload := ssh.Marshal(&forwardedPayload{
-				Addr:       host,
-				Port:       port,
-				OriginAddr: originHost,
-				OriginPort: originPort,
-			})
-			ch, creqs, err := sconn.OpenChannel("forwarded-tcpip", payload)
-			if err != nil {
-				return
-			}
-			go ssh.DiscardRequests(creqs)
-			done := make(chan struct{}, 2)
-			go func() { _, _ = io.Copy(ch, conn); done <- struct{}{} }()
-			go func() { _, _ = io.Copy(conn, ch); done <- struct{}{} }()
-			<-done
-			_ = ch.Close()
-		}(conn)
-	}
-}
-
-func addrPort(a net.Addr) int {
-	if ta, ok := a.(*net.TCPAddr); ok {
-		return ta.Port
-	}
-	return 0
-}
 
 func startEcho(t *testing.T) (addr string, stop func()) {
 	t.Helper()
@@ -434,9 +130,9 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 	}
 	knownHosts := filepath.Join(dir, "known_hosts")
 
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	localPort := freePort(t)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
@@ -446,11 +142,11 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 		Type:     "local",
 		Local:    strconv.Itoa(localPort),
 		Remote:   echoAddr,
-		SSH:      "u@" + srv.addr(),
+		SSH:      "u@" + srv.Addr(),
 		Identity: idPath,
 		User:     "u",
 		Host:     "127.0.0.1",
-		Port:     srv.port,
+		Port:     srv.Port,
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
 
@@ -492,12 +188,12 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 
 	// Kill the SSH server (drop active conns + close listener) and confirm
 	// the tunnel self-heals via the reconnect loop.
-	srv.stop()
+	srv.Stop()
 	if !waitForNotState(tun, Connected, 5*time.Second) {
 		t.Fatal("tunnel stayed Connected after server kill")
 	}
 
-	srv.restart()
+	srv.Restart()
 	if !waitForState(tun, Connected, 15*time.Second) {
 		s := tun.Status()
 		t.Fatalf("did not reconnect after server restart: state=%s err=%q", s.State, s.Error)
@@ -541,13 +237,13 @@ func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
 		t.Fatalf("write identity: %v", err)
 	}
 
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	// Seed known_hosts with ONLY the server's ED25519 host key (strict mode).
 	knownHosts := filepath.Join(dir, "known_hosts")
-	line := knownhosts.Line([]string{knownhosts.Normalize(srv.addr())}, srv.ed25519Pub)
+	line := knownhosts.Line([]string{knownhosts.Normalize(srv.Addr())}, srv.Ed25519Pub)
 	if err := os.WriteFile(knownHosts, []byte(line+"\n"), 0o600); err != nil {
 		t.Fatalf("seed known_hosts: %v", err)
 	}
@@ -559,11 +255,11 @@ func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
 		Type:     "local",
 		Local:    strconv.Itoa(localPort),
 		Remote:   echoAddr,
-		SSH:      "u@" + srv.addr(),
+		SSH:      "u@" + srv.Addr(),
 		Identity: idPath,
 		User:     "u",
 		Host:     "127.0.0.1",
-		Port:     srv.port,
+		Port:     srv.Port,
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: false}
 
@@ -618,9 +314,9 @@ func TestTunnelAuthViaAgent(t *testing.T) {
 	defer stopAgent()
 	t.Setenv("SSH_AUTH_SOCK", sock)
 
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
 	localPort := freePort(t)
@@ -630,10 +326,10 @@ func TestTunnelAuthViaAgent(t *testing.T) {
 		Type:   "local",
 		Local:  strconv.Itoa(localPort),
 		Remote: echoAddr,
-		SSH:    "u@" + srv.addr(),
+		SSH:    "u@" + srv.Addr(),
 		User:   "u",
 		Host:   "127.0.0.1",
-		Port:   srv.port,
+		Port:   srv.Port,
 		// no Identity -> agent is the only auth source
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
@@ -696,9 +392,9 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 	}
 	knownHosts := filepath.Join(dir, "known_hosts")
 
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	// The port the remote tunnel will bind on the server side (loopback): the
 	// test sshd is a Go listener that cannot bind the "*" wildcard a bare port
@@ -711,11 +407,11 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 		Type:     "remote",
 		Local:    echoAddr,                                // forward server-side conns to the local echo
 		Remote:   fmt.Sprintf("127.0.0.1:%d", remotePort), // server-side listen (explicit loopback)
-		SSH:      "u@" + srv.addr(),
+		SSH:      "u@" + srv.Addr(),
 		Identity: idPath,
 		User:     "u",
 		Host:     "127.0.0.1",
-		Port:     srv.port,
+		Port:     srv.Port,
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
 
@@ -758,11 +454,11 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 
 	// Kill the SSH server and confirm the remote listener is re-bound after
 	// the tunnel self-heals.
-	srv.stop()
+	srv.Stop()
 	if !waitForNotState(tun, Connected, 5*time.Second) {
 		t.Fatal("tunnel stayed Connected after server kill")
 	}
-	srv.restart()
+	srv.Restart()
 	if !waitForState(tun, Connected, 15*time.Second) {
 		s := tun.Status()
 		t.Fatalf("did not reconnect after server restart: state=%s err=%q", s.State, s.Error)
@@ -871,9 +567,9 @@ func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
 	}
 	knownHosts := filepath.Join(dir, "known_hosts")
 
-	srv := newSSHD(t, authorizedKey)
-	srv.start()
-	defer srv.stop()
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
 
 	localPort := freePort(t)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
@@ -882,11 +578,11 @@ func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
 		Name:     "d-test",
 		Type:     "dynamic",
 		Local:    strconv.Itoa(localPort),
-		SSH:      "u@" + srv.addr(),
+		SSH:      "u@" + srv.Addr(),
 		Identity: idPath,
 		User:     "u",
 		Host:     "127.0.0.1",
-		Port:     srv.port,
+		Port:     srv.Port,
 		// no Remote: each SOCKS request carries its own destination.
 	}
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
@@ -925,11 +621,11 @@ func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
 	ping("first")
 
 	// Kill the SSH server and confirm the SOCKS proxy self-heals.
-	srv.stop()
+	srv.Stop()
 	if !waitForNotState(tun, Connected, 5*time.Second) {
 		t.Fatal("tunnel stayed Connected after server kill")
 	}
-	srv.restart()
+	srv.Restart()
 	if !waitForState(tun, Connected, 15*time.Second) {
 		s := tun.Status()
 		t.Fatalf("did not reconnect after server restart: state=%s err=%q", s.State, s.Error)
