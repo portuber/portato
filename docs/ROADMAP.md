@@ -42,6 +42,10 @@
 | 24  | TUI branding / logo               | `[x]`  | [phase-24-tui-logo.md](./phases/phase-24-tui-logo.md) |
 | 25  | Easter egg — "pórtate bien" in --help | `[x]`  | [phase-25-easter-egg-portate-bien.md](./phases/phase-25-easter-egg-portate-bien.md) |
 | 26  | Fix: renamed tunnel restarts under new name | `[x]`  | [phase-26-rename-restart-fix.md](./phases/phase-26-rename-restart-fix.md) |
+| 27  | portato stop                     | `[ ]`  | [phase-27-portato-stop.md](./phases/phase-27-portato-stop.md) |
+| 28  | config reload (reload CLI + watch) | `[ ]` | [phase-28-config-reload.md](./phases/phase-28-config-reload.md) |
+| 29  | standalone/daemon enabled consistency | `[ ]` | [phase-29-standalone-daemon-enabled-consistency.md](./phases/phase-29-standalone-daemon-enabled-consistency.md) |
+| 30  | TUI toggle vs passphrase-prompt  | `[ ]`  | [phase-30-tui-toggle-vs-passphrase.md](./phases/phase-30-tui-toggle-vs-passphrase.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -51,11 +55,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24, 25 and 26 (post-MVP backlog) are planned in detail — 18, 19, 20, 23, 24, 25 and 26 are done, the rest are pending (`[ ]`), to be started on an explicit command.
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24, 25, 26 and 27–30 (post-MVP backlog) are planned in detail — 16, 18, 19, 20, 23, 24, 25 and 26 are done, the rest are pending (`[ ]`), to be started on an explicit command.
 
 ## Current focus
 
-**All phases 0–15, 18, 19, 20, 24, 25 and 26 are `[x]`; phases 16, 17, 21 and 22 (the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
+**Phases 0–16, 18, 19, 20, 24, 25 and 26 are `[x]`; phases 17, 21, 22 and 27–30 (the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -83,10 +87,11 @@ CLI/UX polish: `--log-level`, `portato list --json`, SOCKS5 user/pass auth for
 
 ### Post-MVP backlog
 All previously-backlogged items now have detailed phase plans (todo) — see
-phases 16–22 in the table above and in [`docs/phases/`](./phases/). Items not
-yet covered anywhere: seamless hand-off FD-passing on Windows (Phase 17 will
-need a Windows-specific mechanism or skip), and time-based (not just
-size-based) log rotation.
+phases 16–22, 27–30 in the table above and in [`docs/phases/`](./phases/).
+Phase 16 (seamless hand-off via FD-passing) is done and proved by
+`make e2e-handoff`. Items not yet covered anywhere: seamless hand-off FD-passing
+on Windows (Phase 17 will need a Windows-specific mechanism or skip), and
+time-based (not just size-based) log rotation.
 
 ## Phase summary
 
