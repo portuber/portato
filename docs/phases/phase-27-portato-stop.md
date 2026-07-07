@@ -1,7 +1,7 @@
 ---
 phase: 27
 title: "portato stop — gracefully terminate the daemon"
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -21,24 +21,24 @@ There is no `portato stop`; users must `kill <pid>` or
 
 ## Tasks
 
-- [ ] `internal/cmd/stop.go`: a cobra command that resolves the daemon socket
+- [x] `internal/cmd/stop.go`: a cobra command that resolves the daemon socket
       (`daemon.ResolveSocket`, honoring `--socket`), reads the discovery marker
       for the PID, sends SIGTERM, and polls `healthz` until the socket goes
       silent (~5s). No marker / dead PID / silent socket -> "no daemon running"
       (exit 0) + stale-marker cleanup. Overridable seams for tests.
-- [ ] Register `stopCmd` in `Execute()`; add `portato stop` to the root help
+- [x] Register `stopCmd` in `Execute()`; add `portato stop` to the root help
       `Modes` list.
-- [ ] `Makefile`: a `stop` target (`./bin/portato stop`) + `.PHONY`.
-- [ ] `internal/cmd/stop_test.go`: no-daemon, stale-marker, live→stopped,
+- [x] `Makefile`: a `stop` target (`./bin/portato stop`) + `.PHONY`.
+- [x] `internal/cmd/stop_test.go`: no-daemon, stale-marker, live→stopped,
       timeout.
 
 ## Definition of Done
 
-- [ ] `portato stop` stops a running daemon (SIGTERM, waits for the socket to
+- [x] `portato stop` stops a running daemon (SIGTERM, waits for the socket to
       go silent); prints `no daemon running` when none is running (exit 0) and
       cleans stale markers.
-- [ ] `make stop` works from the repo.
-- [ ] `go vet ./...`, `gofmt -l .`, `go test ./...` clean; cross-compilation
+- [x] `make stop` works from the repo.
+- [x] `go vet ./...`, `gofmt -l .`, `go test ./...` clean; cross-compilation
       darwin/linux × amd64/arm64 green.
 
 ## Verification
