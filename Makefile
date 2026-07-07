@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet cross build-all cover install-service snapshot e2e-handoff
+.PHONY: build run test fmt vet cross build-all cover install-service snapshot e2e-handoff stop
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -41,6 +41,10 @@ snapshot:
 # install-service builds the local binary and registers autostart (Phase 6).
 install-service: build
 	./bin/portato install
+
+# stop terminates the running daemon via the CLI (Phase 27).
+stop:
+	./bin/portato stop
 
 # e2e-handoff runs the Phase 16 black-box hand-off E2E: builds the real binary,
 # spins up an in-process SSH server (internal/sshtest), and asserts the local
