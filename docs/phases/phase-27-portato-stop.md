@@ -1,7 +1,7 @@
 ---
 phase: 27
 title: "portato stop — gracefully terminate the daemon"
-status: todo
+status: in-progress
 depends_on: []
 ---
 

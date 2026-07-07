@@ -42,7 +42,7 @@
 | 24  | TUI branding / logo               | `[x]`  | [phase-24-tui-logo.md](./phases/phase-24-tui-logo.md) |
 | 25  | Easter egg — "pórtate bien" in --help | `[x]`  | [phase-25-easter-egg-portate-bien.md](./phases/phase-25-easter-egg-portate-bien.md) |
 | 26  | Fix: renamed tunnel restarts under new name | `[x]`  | [phase-26-rename-restart-fix.md](./phases/phase-26-rename-restart-fix.md) |
-| 27  | portato stop                     | `[ ]`  | [phase-27-portato-stop.md](./phases/phase-27-portato-stop.md) |
+| 27  | portato stop                     | `[~]`  | [phase-27-portato-stop.md](./phases/phase-27-portato-stop.md) |
 | 28  | config reload (reload CLI + watch) | `[ ]` | [phase-28-config-reload.md](./phases/phase-28-config-reload.md) |
 | 29  | standalone/daemon enabled consistency | `[ ]` | [phase-29-standalone-daemon-enabled-consistency.md](./phases/phase-29-standalone-daemon-enabled-consistency.md) |
 | 30  | TUI toggle vs passphrase-prompt  | `[ ]`  | [phase-30-tui-toggle-vs-passphrase.md](./phases/phase-30-tui-toggle-vs-passphrase.md) |
