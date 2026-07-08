@@ -1,7 +1,7 @@
 ---
 phase: 30
 title: TUI toggle vs passphrase-prompt on a pending tunnel
-status: todo
+status: in-progress
 depends_on: []
 ---
 
