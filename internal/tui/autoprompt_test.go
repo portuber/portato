@@ -3,8 +3,6 @@ package tui
 import (
 	"testing"
 
-	tea "charm.land/bubbletea/v2"
-
 	"github.com/kipkaev55/portato/internal/controller"
 )
 
@@ -72,13 +70,14 @@ func TestPassphraseModal_AutoOpenNotReopenedAfterEsc(t *testing.T) {
 	if m.enteringPassphrase {
 		t.Fatal("auto-open must not re-pop a dismissed prompt")
 	}
-	// But a manual space still reopens on demand.
-	mm2, _ := m.handleKey(specialKey(tea.KeySpace))
+	// But a manual p still reopens on demand (Phase 30: space toggles, so p is
+	// the manual passphrase affordance).
+	mm2, _ := m.handleKey(keyPress("p"))
 	if mm, ok := mm2.(Model); ok {
 		m = mm
 	}
 	if !m.enteringPassphrase {
-		t.Fatal("a manual space should reopen the dismissed prompt")
+		t.Fatal("a manual p should reopen the dismissed prompt")
 	}
 }
 

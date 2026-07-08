@@ -167,19 +167,16 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "down", "j":
 		(&m).moveCursor(1)
 	case "space":
-		if m.hasCurrent() && m.list[m.cursor].PendingPassphrase != "" {
-			m.enteringPassphrase = true
-			m.passphraseTarget = m.list[m.cursor].Name
-			m.passphraseAttempts = 0
-			m.passphraseInput.SetValue("")
-			return m, m.passphraseInput.Focus()
-		}
 		if m.hasCurrent() && m.list[m.cursor].PendingHost != "" {
 			m.confirmAccept = true
 			m.acceptTarget = m.list[m.cursor].Name
 			return m, nil
 		}
 		(&m).toggleCurrent()
+	case "p":
+		if m.hasCurrent() && m.list[m.cursor].PendingPassphrase != "" {
+			return m.openPassphraseModal(m.list[m.cursor].Name)
+		}
 	case "r":
 		(&m).restartCurrent()
 	case "a":
@@ -346,15 +343,23 @@ func (m Model) autoOpenIfPending() (Model, tea.Cmd) {
 		return m, nil
 	}
 	if s.PendingPassphrase != "" {
-		m.enteringPassphrase = true
-		m.passphraseTarget = s.Name
-		m.passphraseAttempts = 0
-		m.passphraseInput.SetValue("")
-		return m, m.passphraseInput.Focus()
+		return m.openPassphraseModal(s.Name)
 	}
 	m.confirmAccept = true
 	m.acceptTarget = s.Name
 	return m, nil
+}
+
+// openPassphraseModal arms the identity-passphrase modal for the named tunnel
+// (resetting the masked input and the attempt counter) and returns the
+// masked-input focus command. Shared by the manual `p` affordance and the tick
+// auto-open. Phase 30.
+func (m Model) openPassphraseModal(name string) (Model, tea.Cmd) {
+	m.enteringPassphrase = true
+	m.passphraseTarget = name
+	m.passphraseAttempts = 0
+	m.passphraseInput.SetValue("")
+	return m, m.passphraseInput.Focus()
 }
 
 // openEditor builds the tunnel editor form. For edit mode the current tunnel

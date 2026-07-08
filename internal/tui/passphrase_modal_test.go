@@ -20,8 +20,9 @@ func TestPassphraseModal_OpenTypeSubmitCancel(t *testing.T) {
 	})
 	m := New(f, Options{Mode: "standalone"})
 
-	// space opens the passphrase modal (the row has PendingPassphrase set).
-	next, _ := m.handleKey(specialKey(tea.KeySpace))
+	// p opens the passphrase modal (the row has PendingPassphrase set); since
+	// Phase 30 space only toggles, p is the manual affordance.
+	next, _ := m.handleKey(keyPress("p"))
 	m = next.(Model)
 	if !m.enteringPassphrase || m.passphraseTarget != "db" {
 		t.Fatalf("space should open the passphrase modal; got entering=%v target=%q", m.enteringPassphrase, m.passphraseTarget)
@@ -82,7 +83,7 @@ func TestPassphraseModal_AutoCloseOnAccept(t *testing.T) {
 		State: controller.Connecting, PendingPassphrase: "/keys/id",
 	})
 	m := New(f, Options{Mode: "standalone"})
-	next, _ := m.handleKey(specialKey(tea.KeySpace))
+	next, _ := m.handleKey(keyPress("p"))
 	m = next.(Model)
 	if !m.enteringPassphrase {
 		t.Fatal("modal should be open")
@@ -100,5 +101,62 @@ func TestPassphraseModal_AutoCloseOnAccept(t *testing.T) {
 	}
 	if m.passphraseAttempts != 0 {
 		t.Errorf("attempts should reset on close; got %d", m.passphraseAttempts)
+	}
+}
+
+// TestPassphraseModal_SpaceDisablesPending is the Phase 30 regression: pressing
+// space on a connecting / passphrase-pending tunnel must DISABLE it (call
+// Disable via the controller), not open the modal. Previously space was trapped
+// into opening the passphrase prompt, so a blocked tunnel could never be turned
+// off.
+func TestPassphraseModal_SpaceDisablesPending(t *testing.T) {
+	f := newFake(controller.Status{
+		Name: "db", Type: "local", Local: "1", Remote: "r",
+		State: controller.Connecting, PendingPassphrase: "/keys/id",
+	})
+	m := New(f, Options{Mode: "standalone"})
+
+	next, _ := m.handleKey(specialKey(tea.KeySpace))
+	mm := next.(Model)
+	if mm.enteringPassphrase {
+		t.Fatal("space on a passphrase-pending tunnel must not open the modal")
+	}
+	if len(f.disabled) != 1 || f.disabled[0] != "db" {
+		t.Errorf("space should disable the pending tunnel; got disabled=%v", f.disabled)
+	}
+	if len(f.enabled) != 0 {
+		t.Errorf("space must not enable a pending tunnel; got enabled=%v", f.enabled)
+	}
+}
+
+// TestPassphraseModal_PKeyOpensAfterDismissal covers the case autoOpen cannot:
+// once the user dismisses the prompt (esc records dismissedPending, which the
+// tick auto-open honours so it won't re-pop), p is the way back into the modal.
+func TestPassphraseModal_PKeyOpensAfterDismissal(t *testing.T) {
+	f := newFake(controller.Status{
+		Name: "db", Type: "local", Local: "1", Remote: "r",
+		State: controller.Connecting, PendingPassphrase: "/keys/id",
+	})
+	m := New(f, Options{Mode: "standalone"})
+
+	m = tick(m)
+	if !m.enteringPassphrase {
+		t.Fatal("tick should auto-open the passphrase modal")
+	}
+	mm, _ := m.handlePassphraseKey(keyPress("esc"))
+	m = mm.(Model)
+	if m.enteringPassphrase {
+		t.Fatal("esc should close the modal")
+	}
+
+	m = tick(m)
+	if m.enteringPassphrase {
+		t.Fatal("auto-open must not re-pop a dismissed prompt")
+	}
+
+	next, _ := m.handleKey(keyPress("p"))
+	m = next.(Model)
+	if !m.enteringPassphrase || m.passphraseTarget != "db" {
+		t.Fatalf("p should reopen the dismissed passphrase modal; got entering=%v target=%q", m.enteringPassphrase, m.passphraseTarget)
 	}
 }

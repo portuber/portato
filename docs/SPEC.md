@@ -373,6 +373,7 @@ otherwise NoAuth (the pre-Phase-20 behaviour).
 |----------------|-------------------------------------------------------|
 | `↑`/`↓`, `j`/`k` | navigate the list                                   |
 | `space`        | toggle the selected tunnel on/off                     |
+| `p`            | enter the passphrase for a passphrase-blocked selected tunnel (manual affordance; the modal also auto-opens on block); `space` always toggles (Phase 30) |
 | `r`            | restart the selected tunnel                           |
 | `a` / `x`      | enable all / disable all                              |
 | `e` / `n` / `d`| edit / create / delete the selected tunnel            |

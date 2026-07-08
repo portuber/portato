@@ -348,7 +348,7 @@ func formatUptime(d time.Duration) string {
 }
 
 func (m Model) footer() string {
-	return footerStyle.Render("↑↓/jk move · space toggle · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · / filter · R reload · ? help · q quit")
+	return footerStyle.Render("↑↓/jk move · space toggle · p passphrase · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · / filter · R reload · ? help · q quit")
 }
 
 func (m Model) helpBlock() string {
@@ -356,6 +356,7 @@ func (m Model) helpBlock() string {
 		"↑ / k        move cursor up",
 		"↓ / j        move cursor down",
 		"space        toggle selected tunnel (on/off)",
+		"p            enter passphrase for the selected tunnel",
 		"r            restart selected tunnel",
 		"a            enable all tunnels",
 		"x            disable all tunnels",
