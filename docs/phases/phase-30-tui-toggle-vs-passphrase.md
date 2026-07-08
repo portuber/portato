@@ -1,7 +1,7 @@
 ---
 phase: 30
 title: TUI toggle vs passphrase-prompt on a pending tunnel
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -20,21 +20,23 @@ open modal }`. A tunnel stuck dialing on a missing passphrase can then only be
 
 ## Tasks
 
-- [ ] Decide the passphrase-entry affordance once `space` no longer opens the
+- [x] Decide the passphrase-entry affordance once `space` no longer opens the
       modal: a dedicated key (e.g. `p`) OR auto-open via `autoOpenIfPending`
-      when an Off tunnel is enabled and then blocks.
-- [ ] `space` toggles purely on State (active → Disable; Off → Enable),
+      when an Off tunnel is enabled and then blocks. — **both:** `p` plus the
+      existing `autoOpenIfPending`; auto-open covers the common enable→block
+      path and `p` reopens after an `esc` dismissal (the case auto-open cannot).
+- [x] `space` toggles purely on State (active → Disable; Off → Enable),
       ignoring `PendingPassphrase`.
-- [ ] Ensure a passphrase can still be entered for a tunnel that needs one
+- [x] Ensure a passphrase can still be entered for a tunnel that needs one
       (via the chosen affordance).
-- [ ] Tests: `space` disables a pending tunnel; a passphrase is still enterable.
+- [x] Tests: `space` disables a pending tunnel; a passphrase is still enterable.
 
 ## Definition of Done
 
-- [ ] `space` on a connecting / passphrase-pending tunnel DISABLES it.
-- [ ] A passphrase can still be entered for a tunnel that needs one (via the
+- [x] `space` on a connecting / passphrase-pending tunnel DISABLES it.
+- [x] A passphrase can still be entered for a tunnel that needs one (via the
       chosen affordance).
-- [ ] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
+- [x] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
 
 ## Verification
 
