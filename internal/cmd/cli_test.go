@@ -42,6 +42,9 @@ type stubServer struct {
 	enabled  []string
 	disabled []string
 	restarts []string
+	reloads  int
+	// reloadFail makes POST /reload respond 500, to exercise the CLI error path.
+	reloadFail bool
 }
 
 func newStubServer(t *testing.T, statuses []forward.Status) *stubServer {
@@ -74,6 +77,16 @@ func newStubServer(t *testing.T, statuses []forward.Status) *stubServer {
 	})
 	mux.HandleFunc("POST /tunnels/{name}/restart", func(w http.ResponseWriter, r *http.Request) {
 		s.record(w, r, "restart", known)
+	})
+	mux.HandleFunc("POST /reload", func(w http.ResponseWriter, _ *http.Request) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.reloadFail {
+			writeStubErr(s.t, w, http.StatusInternalServerError, "reload config: parse config: boom")
+			return
+		}
+		s.reloads++
+		writeStubJSON(s.t, w, map[string]bool{"ok": true})
 	})
 
 	go func() { _ = s.server.Serve(ln) }()

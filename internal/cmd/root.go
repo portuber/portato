@@ -46,6 +46,7 @@ Modes:
   portato enable     enable a tunnel on the daemon
   portato disable    disable a tunnel on the daemon
   portato restart    restart a tunnel
+  portato reload    reload the config on the running daemon
   portato stop       stop the running daemon
   portato install    install system autostart (launchd / systemd --user)
   portato uninstall  remove system autostart
@@ -187,6 +188,7 @@ func Execute() error {
 		enableCmd,
 		disableCmd,
 		restartCmd,
+		reloadCmd,
 		stopCmd,
 		installCmd,
 		uninstallCmd,
