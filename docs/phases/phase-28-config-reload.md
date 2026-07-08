@@ -1,7 +1,7 @@
 ---
 phase: 28
 title: config reload — portato reload + file watch
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -33,13 +33,13 @@ both forms.
 
 ## Definition of Done
 
-- [ ] `portato reload` makes the daemon re-read the config (an edit takes effect
+- [x] `portato reload` makes the daemon re-read the config (an edit takes effect
       without a restart).
-- [ ] Editing `config.yaml` while the daemon runs applies within ~1s (no reload
+- [x] Editing `config.yaml` while the daemon runs applies within ~1s (no reload
       or restart needed).
-- [ ] A syntactically bad edit does NOT crash the daemon (keeps last-good,
+- [x] A syntactically bad edit does NOT crash the daemon (keeps last-good,
       logs the error).
-- [ ] `go vet ./...`, `gofmt -l .`, `go test ./...` clean; cross-compilation
+- [x] `go vet ./...`, `gofmt -l .`, `go test ./...` clean; cross-compilation
       darwin/linux × amd64/arm64 green.
 
 ## Verification
