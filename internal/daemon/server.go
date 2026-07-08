@@ -98,6 +98,11 @@ type Server struct {
 	// local ports never go down across the hand-off; nil for a normal start.
 	adopted map[string]net.Listener
 
+	// watcher auto-reloads the config when config.yaml changes on disk
+	// (Phase 28). nil on servers built via newServer (tests); set in New so
+	// only the production daemon watches. Started in Start, stopped in Shutdown.
+	watcher *watcher
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -179,6 +184,7 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ri
 	s.secrets = store
 	s.engine = forward.NewEngine(s.ctx, cfg, log, store)
 	s.ipcToken = !ipcTokenDisabled
+	s.watcher = newWatcher(cfgPath, s.reloadFromWatch, log)
 	return s, nil
 }
 
@@ -248,6 +254,9 @@ func (s *Server) Start(ctx context.Context) error {
 	s.srv = &http.Server{Handler: s.routes()}
 	s.engine.StartEnabledWith(s.adopted)
 	s.adopted = nil
+	if s.watcher != nil {
+		s.watcher.start()
+	}
 
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- s.srv.Serve(ln) }()
@@ -302,6 +311,10 @@ func (s *Server) openListener() (net.Listener, error) {
 func (s *Server) Shutdown() error {
 	s.shutdownOnce.Do(func() {
 		s.cancel()
+		// Stop the file watcher first so no reload races the teardown below.
+		if s.watcher != nil {
+			s.watcher.stop()
+		}
 		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
 		if s.srv != nil {
@@ -663,6 +676,18 @@ func (s *Server) applyReload() error {
 	s.engine.Reload(cfg)
 	s.cfg = cfg
 	return nil
+}
+
+// reloadFromWatch is the file watcher's entry into the shared reload path: it
+// serialises against the HTTP handlers (s.mu) and reuses applyReload, so the
+// manual (POST /reload, 'portato reload') and automatic (file watch) reloads
+// share one code path. It returns applyReload's error so the caller decides
+// how to log; on a parse error applyReload returns before swapping s.cfg, so
+// the last-good config and the running tunnels survive a bad edit. Phase 28.
+func (s *Server) reloadFromWatch() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.applyReload()
 }
 
 // handleGetConfig returns the daemon's current configuration as JSON. The

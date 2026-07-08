@@ -21,14 +21,14 @@ both forms.
 
 ## Tasks
 
-- [ ] `internal/cmd/reload.go`: a cobra command that resolves the socket and
+- [x] `internal/cmd/reload.go`: a cobra command that resolves the socket and
       POSTs `/reload` via `client.Client`; report the result.
-- [ ] Register `reloadCmd` in `Execute()`; add to the root help; `make reload`
+- [x] Register `reloadCmd` in `Execute()`; add to the root help; `make reload`
       target.
-- [ ] Daemon: a file watcher on the config path (fsnotify, or polling fallback)
+- [x] Daemon: a file watcher on the config path (fsnotify, or polling fallback)
       that debounces (~500ms) and triggers `applyReload`; tolerates parse errors
       (keep the last-good config, log).
-- [ ] Tests: reload command (ok / no-daemon / error); watch applies an edit;
+- [x] Tests: reload command (ok / no-daemon / error); watch applies an edit;
       a syntactically bad edit keeps the last-good config and logs.
 
 ## Definition of Done

@@ -247,6 +247,18 @@ file is left untouched and a 4xx is returned.
 
 **Key invariant:** every `enable/disable` writes `enabled` back to the YAML config. This is the foundation of the "leave in the background" hand-off: a fresh daemon reads the same config and brings up the same set of tunnels.
 
+**Config reload (Phase 28):** the daemon watches `config.yaml` for changes and
+applies an edit within ~1s without a restart, over the same `applyReload` path
+as `POST /reload` and the `portato reload` CLI. The watcher is deliberately
+polling-only (no fsnotify dependency): it stats the path every ~500ms and
+debounces for ~300ms, which is robust to the atomic temp+rename saves editors
+use and coalesces a save burst into one reload. Reload failures never crash the
+daemon — `applyReload` returns before swapping the in-memory config on a parse
+error, so a syntactically bad edit is logged and the last-good config and
+running tunnels survive. A vanished config is skipped (not reloaded) — a reload
+would hit `EnsureExample` and replace the live config with an empty example —
+and the skip is logged once until the file reappears.
+
 ## 7. Config
 
 Default path (via `xdg.ConfigHome`):
