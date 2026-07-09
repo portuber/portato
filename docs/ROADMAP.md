@@ -46,7 +46,7 @@
 | 28  | config reload (reload CLI + watch) | `[x]` | [phase-28-config-reload.md](./phases/phase-28-config-reload.md) |
 | 29  | standalone/daemon enabled consistency | `[x]` | [phase-29-standalone-daemon-enabled-consistency.md](./phases/phase-29-standalone-daemon-enabled-consistency.md) |
 | 30  | TUI toggle vs passphrase-prompt  | `[x]`  | [phase-30-tui-toggle-vs-passphrase.md](./phases/phase-30-tui-toggle-vs-passphrase.md) |
-| 31  | TUI logo wordmark + drop PNG mode | `[~]` | [phase-31-logo-wordmark.md](./phases/phase-31-logo-wordmark.md) |
+| 31  | TUI logo wordmark + drop PNG mode | `[x]` | [phase-31-logo-wordmark.md](./phases/phase-31-logo-wordmark.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -56,11 +56,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–31 (post-MVP backlog) are planned in detail — all are done (`[x]`) except **17 (Windows)** and **21 (packaging)** (pending (`[ ]`), blocked on external infrastructure) and **31 (logo wordmark)** (in work (`[~]`)).
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–31 (post-MVP backlog) are planned in detail — all are done (`[x]`) except **17 (Windows)** and **21 (packaging)**, which are pending (`[ ]`) and blocked on external infrastructure.
 
 ## Current focus
 
-**Phases 0–16, 18–20 and 22–30 are `[x]`; phases 17 (Windows) and 21 (packaging) remain pending (`[ ]`), blocked on external infrastructure; phase 31 (logo wordmark + drop PNG mode) is in work (`[~]`).** The single binary runs the smart launcher
+**Phases 0–16, 18–20, 22–30 and 31 are `[x]`; phases 17 (Windows) and 21 (packaging) remain pending (`[ ]`), blocked on external infrastructure.** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports

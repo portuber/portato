@@ -1,7 +1,7 @@
 ---
 phase: 31
 title: TUI logo wordmark + drop inline-PNG image mode
-status: in-progress
+status: done
 depends_on: [24]
 ---
 
@@ -76,55 +76,55 @@ Current code pointers:
 ## Tasks
 
 ### `internal/logo/logo.go`
-- [ ] Remove `ModeImage` from the `Mode` enum (keep `ModeBraille`, `ModeBlock`,
+- [x] Remove `ModeImage` from the `Mode` enum (keep `ModeBraille`, `ModeBlock`,
       `ModeOff`).
-- [ ] Remove `pngBytes` and its `//go:embed assets/logo.png`.
-- [ ] Remove `isImageTerm()` and the `case "image": return ModeImage` branch in
+- [x] Remove `pngBytes` and its `//go:embed assets/logo.png`.
+- [x] Remove `isImageTerm()` and the `case "image": return ModeImage` branch in
       `Detect()`; remove the `if isImageTerm() { return ModeImage }` auto-branch
       so iTerm2/WezTerm fall through to braille.
-- [ ] Embed the two wordmark assets:
+- [x] Embed the two wordmark assets:
       `//go:embed assets/logo-portato.braille.txt` → `wordmarkBraille`;
       `//go:embed assets/logo-portato-block.txt` → `wordmarkBlock`.
-- [ ] Replace constants `logoWidth=28`/`logoHeight=12` (only used by the removed
+- [x] Replace constants `logoWidth=28`/`logoHeight=12` (only used by the removed
       `inlineImage`) with `artHeight = 12`, `potatoW = 24`, `wordmarkW = 70`.
-- [ ] `Render(mode, accent, mono)` — compact potato (braille/block/off); drop
+- [x] `Render(mode, accent, mono)` — compact potato (braille/block/off); drop
       the `ModeImage` case.
-- [ ] Add `RenderWordmark(mode, accent, mono)` (wordmarkBraille/wordmarkBlock/
+- [x] Add `RenderWordmark(mode, accent, mono)` (wordmarkBraille/wordmarkBlock/
       off) and `Wordmark(accent, mono) = RenderWordmark(Detect(), …)`.
-- [ ] `Banner(accent, mono)` — unchanged (compact potato via `Render`).
-- [ ] `VersionBanner(version, commit, date string)` — drop the `tty` parameter;
+- [x] `Banner(accent, mono)` — unchanged (compact potato via `Render`).
+- [x] `VersionBanner(version, commit, date string)` — drop the `tty` parameter;
       render the **wordmark** untinted (`strings.TrimRight(wordmarkBraille,"\n")`
       / `wordmarkBlock` / `""`) + the version line. Inherently pipe-safe (raw
       braille/block, no ANSI, no OSC).
 
 ### `internal/logo/logo_image.go`
-- [ ] Delete the file (`inlineImage` was its only content and only consumer).
+- [x] Delete the file (`inlineImage` was its only content and only consumer).
 
 ### `internal/logo/assets/logo.png`
-- [ ] Delete the file.
+- [x] Delete the file.
 
 ### `internal/cmd/version.go`
-- [ ] `printVersion(w io.Writer)` — drop the `tty` parameter; body becomes
+- [x] `printVersion(w io.Writer)` — drop the `tty` parameter; body becomes
       `fmt.Fprintln(w, logo.VersionBanner(version, commit, date))`.
-- [ ] Delete `isTerminal()`.
-- [ ] `versionCmd.RunE`: `printVersion(cmd.OutOrStdout())`.
-- [ ] Drop the now-unused `"os"` import if nothing else in the file uses it.
+- [x] Delete `isTerminal()`.
+- [x] `versionCmd.RunE`: `printVersion(cmd.OutOrStdout())`.
+- [x] Drop the now-unused `"os"` import if nothing else in the file uses it.
 
 ### `internal/cmd/root.go`
-- [ ] Line ~60: `printVersion(cmd.OutOrStdout(), isTerminal(os.Stdout))` →
+- [x] Line ~60: `printVersion(cmd.OutOrStdout(), isTerminal(os.Stdout))` →
       `printVersion(cmd.OutOrStdout())`. (Keep the `"os"` import if used
       elsewhere in the file.)
 
 ### `internal/tui/view.go`
-- [ ] Add constant `splashWordmarkW = 70` next to `splashLogoW = 28`.
-- [ ] Rewrite `splash(hint)` to pick the wordmark when
+- [x] Add constant `splashWordmarkW = 70` next to `splashLogoW = 28`.
+- [x] Rewrite `splash(hint)` to pick the wordmark when
       `avail := m.width - 2*sideMargin >= splashWordmarkW`, else the compact
       potato (`logo.Banner`); keep the `splashLogoW` floor and the existing
       `centerBlock` calls. `helpBlock()` is left untouched.
-- [ ] The height gate in `table()` (`m.height >= splashMinH`) is unchanged.
+- [x] The height gate in `table()` (`m.height >= splashMinH`) is unchanged.
 
 ### Tests
-- [ ] `internal/logo/logo_test.go`:
+- [x] `internal/logo/logo_test.go`:
       - `TestEmbeddedAssets`: drop the `pngBytes`/PNG-signature checks; add
         non-empty + 12-line (`artHeight`) checks for `wordmarkBraille` and
         `wordmarkBlock`.
@@ -139,7 +139,7 @@ Current code pointers:
         version line.
       - Add `TestRenderWordmark` / `TestWordmark` (non-empty for Braille/Block,
         `""` for Off).
-- [ ] `internal/tui/logo_test.go`:
+- [x] `internal/tui/logo_test.go`:
       - `TestEmptyListSplashShowsLogo`: keep (the wordmark still contains
         braille glyphs).
       - Add `TestEmptyListSplashWideUsesWordmark`: `width=80` → the rendered
@@ -149,7 +149,7 @@ Current code pointers:
         the longest rendered line width.
       - `TestHelpShowsLogo`, `TestSmallHeightOmitsLogo`,
         `TestNonEmptyListHasNoLogo`, `TestLogoOffHidesBranding`: unchanged.
-- [ ] `internal/cmd/version_test.go`:
+- [x] `internal/cmd/version_test.go`:
       - All `printVersion(&b, true|false)` → `printVersion(&b)`.
       - Replace `TestPrintVersion_PipedImageNoOSC` with
         `TestPrintVersion_ImageFallsBackToBraille` (`PORTATO_LOGO=image`, no
@@ -157,33 +157,33 @@ Current code pointers:
       - Delete `TestIsTerminal`; remove the now-unused `"os"` import.
 
 ### Docs (reality diverged from the spec — fix and mention in the commit)
-- [ ] `docs/SPEC.md` §11 "Branding / logo" (≈ lines 425–456): rewrite — drop
+- [x] `docs/SPEC.md` §11 "Branding / logo" (≈ lines 425–456): rewrite — drop
       the image mode / OSC 1337 / inline-PNG and the "all variants 28×12" claim;
       describe the wordmark (70×12) for splash + `--version`, the compact
       potato (24×12) for the help overlay and the narrow-terminal fallback, the
       width gate (`avail ≥ 70`), and that the `--version` banner is plain
       braille/block (pipe-safe by construction).
-- [ ] `docs/phases/phase-24-tui-logo.md`: update the Design Decisions table,
+- [x] `docs/phases/phase-24-tui-logo.md`: update the Design Decisions table,
       Definition of Done, Verification and Out-of-scope sections to note the
       wordmark + potato fallback and the removal of the image mode (cross-link
       this phase). Phase 24 stays `[x]` — this is a post-hoc refinement.
 
 ## Definition of Done
 
-- [ ] Empty-config splash shows the wordmark on a wide terminal (≥ ~72 cols)
+- [x] Empty-config splash shows the wordmark on a wide terminal (≥ ~72 cols)
       and the compact potato on a narrow one; a short terminal shows the hint
       only.
-- [ ] `portato --version` prints the wordmark + the `portato <version>
+- [x] `portato --version` prints the wordmark + the `portato <version>
       (<commit>, <date>)` line; pipe-safe (no ANSI, no OSC).
-- [ ] The help (`?`) overlay still shows the compact potato (unchanged).
-- [ ] No `ModeImage` / `pngBytes` / `inlineImage` / `isImageTerm` / `logo.png` /
+- [x] The help (`?`) overlay still shows the compact potato (unchanged).
+- [x] No `ModeImage` / `pngBytes` / `inlineImage` / `isImageTerm` / `logo.png` /
       `logo_image.go` remain; iTerm2/WezTerm render braille.
-- [ ] `PORTATO_LOGO=off` hides the big logo everywhere (splash, help, version)
+- [x] `PORTATO_LOGO=off` hides the big logo everywhere (splash, help, version)
       and the header emoji.
-- [ ] `PORTATO_LOGO=image` no longer errors and renders braille.
-- [ ] `go build ./...`, `make fmt`, `make vet`, `make test` all clean;
+- [x] `PORTATO_LOGO=image` no longer errors and renders braille.
+- [x] `go build ./...`, `make fmt`, `make vet`, `make test` all clean;
       `gofmt -l .` empty.
-- [ ] SPEC §11 and the phase-24 doc reflect the new behaviour.
+- [x] SPEC §11 and the phase-24 doc reflect the new behaviour.
 
 ## Verification
 
