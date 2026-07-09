@@ -149,7 +149,7 @@ type Status struct {
 ```
 
 Implementations:
-- **`localController`** (`controller/local.go`): wraps `forward.Engine`. `Changes()` forwards the Engine's event broker — every tunnel state transition pushes a signal through an owned, drop-old channel (Phase 9).
+- **`localController`** (`controller/local.go`): wraps `forward.Engine`. `Changes()` forwards the Engine's event broker — every tunnel state transition pushes a signal through an owned, drop-old channel (Phase 9). The standalone launcher calls its `StartEnabled` right after construction so every `enabled: true` tunnel is up on launch, matching the daemon's boot-time `StartEnabledWith` (§6).
 - **`remoteController`** (`controller/remote.go`): HTTP client to the daemon. `Changes()` reads the daemon's `GET /events` SSE stream and reconnects with exponential backoff on a stream break (Phase 9).
 
 ## 6. IPC (daemon <-> clients)
@@ -246,6 +246,8 @@ config first, then patches the file, then reloads — on a validation error the
 file is left untouched and a 4xx is returned.
 
 **Key invariant:** every `enable/disable` writes `enabled` back to the YAML config. This is the foundation of the "leave in the background" hand-off: a fresh daemon reads the same config and brings up the same set of tunnels.
+
+**Auto-start of enabled tunnels (both modes):** the daemon calls `engine.StartEnabledWith` at boot, and the standalone launcher calls the local controller's `StartEnabled` right after building it — so in *both* modes every `enabled: true` tunnel is up from the first moment. A hand-off to the daemon therefore starts exactly what the standalone already had running; no new tunnels appear. An enabled tunnel that cannot connect (no network, bad host, unknown host key) surfaces as `Reconnecting`/`Error` — the Engine's existing behaviour — rather than being silently skipped.
 
 **Config reload (Phase 28):** the daemon watches `config.yaml` for changes and
 applies an edit within ~1s without a restart, over the same `applyReload` path
@@ -461,7 +463,7 @@ When quitting standalone mode (`q`):
    - **Seamless (default):** for each live `local`/`dynamic` tunnel the standalone dups its already-bound local listener (`(*net.TCPListener).File`), opens a one-shot SOCK_STREAM unix transfer socket, spawns `portato daemon --config <cfg> --listen-fds <sockpath>` (detached, `Setsid`) and sends the dup'd fds (SCM_RIGHTS) over the transfer socket. The daemon reconstructs each listener (`net.FileListener`) and adopts it — skipping its own `net.Listen` — so the kernel listening socket never closes: the standalone's and the daemon's dup'd fds reference the same socket, and the standalone closes its copy only after the daemon's `GET /healthz` answers. The local port therefore stays continuously available across the transition. The established SSH session is **not** moved — `golang.org/x/crypto/ssh` keeps the transport's crypto state in process memory and cannot resume it in another process — so the daemon re-dials; `type=remote` tunnels have no local listener and simply re-dial.
    - **Fallback** (no live local listeners, or any pre-spawn step fails): the standalone runs `StopAll()` (releasing the local ports), spawns the daemon without `--listen-fds`, and waits for `healthz`. The brief gap between release and the daemon's rebind is the legacy MVP blip.
 
-   In both paths the standalone probes the advertised socket (§6) with `GET /healthz` every 100ms up to a 5s timeout, then exits; the fresh daemon reads `enabled: true` from the persisted config (the §6 invariant) and brings up the same set of tunnels.
+   In both paths the standalone probes the advertised socket (§6) with `GET /healthz` every 100ms up to a 5s timeout, then exits; the fresh daemon reads `enabled: true` from the persisted config (the §6 invariant) and brings up the same set of tunnels. Because the standalone also auto-starts `enabled: true` tunnels on launch (§6), the daemon's set is exactly what was already running — the hand-off never surfaces "surprise" tunnels the user did not toggle.
 4. **`n`** or `enter`: `StopAll()` + exit; **`Esc`**: cancel — close the modal and return to the list (without stopping the tunnels and without exiting).
 
 Limitation: the seamless hand-off preserves continuous **local-port** availability (a `nc -z` to the local port never fails across the transition), but the underlying SSH session is re-established by the daemon — so a forwarded connection in flight at the moment of the hand-off is dropped (its SSH channel dies with the standalone's `*ssh.Client`); only new connections are seamless. This is a fundamental limit of FD-passing with `golang.org/x/crypto/ssh` (no cross-process session resume), not a defect.
