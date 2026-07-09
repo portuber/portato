@@ -41,10 +41,10 @@ Pick one before implementing:
 
 ## Tasks
 
-- [ ] After the decision: implement the chosen behaviour in `runStandalone`
+- [x] After the decision: implement the chosen behaviour in `runStandalone`
       and/or the hand-off spawn.
 - [ ] Update SPEC §6 / §12 to match the chosen rule.
-- [ ] Tests for the chosen start set (standalone launch + state after hand-off).
+- [x] Tests for the chosen start set (standalone launch + state after hand-off).
 
 ## Definition of Done
 

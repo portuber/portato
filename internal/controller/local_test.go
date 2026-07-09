@@ -159,6 +159,40 @@ func TestLocal_ChangesPushesAndCloses(t *testing.T) {
 	}
 }
 
+// TestLocal_StartEnabledStartsOnlyEnabled verifies the standalone launch path:
+// StartEnabled starts the tunnel whose config has Enabled == true and leaves the
+// disabled one Off. Tunnel.Start binds the local listener and sets Connecting
+// synchronously (Error only if the bind fails), so the assertion needs no
+// polling — the enabled tunnel is never Off right after the call.
+func TestLocal_StartEnabledStartsOnlyEnabled(t *testing.T) {
+	body := "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n" +
+		"  - name: on\n    type: local\n    local: \"19994\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n    enabled: true\n" +
+		"  - name: off\n    type: local\n    local: \"19995\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	p := writeConfigFile(t, body)
+	cfg := mustLoad(t, p)
+	l := NewLocal(cfg, p, nil, nil)
+	defer l.Close()
+
+	for _, s := range l.List() {
+		if s.State != Off {
+			t.Fatalf("%s state = %v before StartEnabled, want Off", s.Name, s.State)
+		}
+	}
+
+	l.StartEnabled()
+
+	states := make(map[string]State, 2)
+	for _, s := range l.List() {
+		states[s.Name] = s.State
+	}
+	if states["on"] == Off {
+		t.Errorf(`enabled "on" state = Off after StartEnabled, want not Off`)
+	}
+	if states["off"] != Off {
+		t.Errorf(`disabled "off" state = %v after StartEnabled, want Off`, states["off"])
+	}
+}
+
 func mustLoad(t *testing.T, p string) *config.Config {
 	t.Helper()
 	cfg, err := config.Load(p)

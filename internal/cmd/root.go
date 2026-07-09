@@ -93,6 +93,11 @@ func runStandalone() error {
 	ctrl := controller.NewLocal(cfg, path, logger, ring)
 	defer ctrl.Close()
 
+	// Match the daemon's boot-time StartEnabledWith (SPEC §6): launch every
+	// enabled:true tunnel so standalone and daemon agree on what is up, and a
+	// hand-off to the daemon brings up the same set instead of surprise tunnels.
+	ctrl.StartEnabled()
+
 	return tui.Run(ctrl, tui.Options{Mode: "standalone", CfgPath: path})
 }
 

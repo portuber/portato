@@ -59,6 +59,16 @@ func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routel
 
 func (l *Local) List() []Status { return l.engine.List() }
 
+// StartEnabled starts every tunnel whose config has Enabled == true. The
+// standalone launcher calls this right after building the controller so its
+// initial state matches the daemon's boot-time StartEnabledWith (SPEC §6): an
+// enabled:true tunnel is up in both modes, and a hand-off to the daemon brings
+// up the same set instead of surprise new tunnels. Not on the Controller
+// interface — attach mode never needs it (the daemon already owns its tunnels).
+func (l *Local) StartEnabled() {
+	l.engine.StartEnabled()
+}
+
 // LiveListenerFiles surfaces the engine's live local-listener fds for the
 // standalone->daemon hand-off (Phase 16). The standalone sends these to the
 // spawned daemon so the local ports never go down across the transition.
