@@ -1,7 +1,7 @@
 ---
 phase: 29
 title: standalone and daemon enabled-auto-start consistency
-status: todo
+status: in-progress
 depends_on: []
 ---
 
@@ -29,6 +29,15 @@ Pick one before implementing:
 - **(B)** on hand-off the daemon starts only the tunnels the standalone had
   running (plus any already up), so no surprise new tunnels appear.
 - **(C)** leave the behaviour as-is and document the asymmetry explicitly.
+
+> **Decision (2026-07-09): (A).** `runStandalone` calls `engine.StartEnabled`
+> after building the local controller, so the standalone launches the same set
+> of tunnels the daemon would (`StartEnabledWith`). This keeps the SPEC §6
+> invariant ("the config on disk is the source of truth for which tunnels are
+> up") true in both modes and removes the hand-off "surprise tunnels": the
+> daemon now adopts/starts exactly what the standalone already had running.
+> Enabled-but-unconnectable tunnels (no network, bad host) surface as
+> Reconnecting/Error — the Engine's existing behaviour — so no extra TUI work.
 
 ## Tasks
 
