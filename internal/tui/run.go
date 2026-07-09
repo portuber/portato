@@ -3,7 +3,7 @@ package tui
 import (
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/portuber/portato/internal/controller"
 )
 
 // Options configures a TUI run. In attach mode CfgPath is empty and unused;

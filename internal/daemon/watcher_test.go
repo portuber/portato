@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/config"
+	"github.com/portuber/portato/internal/config"
 )
 
 // restoreWatchSeams saves the package-level watcher timing seams and restores

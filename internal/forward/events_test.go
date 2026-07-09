@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/config"
+	"github.com/portuber/portato/internal/config"
 )
 
 func TestEngineSubscribeNotify(t *testing.T) {

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kipkaev55/portato/internal/client"
+	"github.com/portuber/portato/internal/client"
 )
 
 func TestReload_Ok(t *testing.T) {

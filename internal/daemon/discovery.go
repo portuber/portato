@@ -16,7 +16,7 @@ import (
 
 	"github.com/adrg/xdg"
 
-	"github.com/kipkaev55/portato/internal/ipctoken"
+	"github.com/portuber/portato/internal/ipctoken"
 )
 
 // Phase 12 — robust IPC socket discovery.

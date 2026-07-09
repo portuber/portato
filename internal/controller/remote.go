@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/forward"
-	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/forward"
+	routelog "github.com/portuber/portato/internal/log"
 )
 
 // daemonClient is the subset of *client.Client that Remote needs. Kept

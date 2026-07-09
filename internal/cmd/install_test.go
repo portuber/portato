@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/service"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/service"
 )
 
 // fakeInstaller records the Options it is called with so tests can assert the

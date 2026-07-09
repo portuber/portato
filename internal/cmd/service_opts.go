@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/service"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/service"
 )
 
 // newServiceInstaller is the seam used by install/uninstall. Tests override it

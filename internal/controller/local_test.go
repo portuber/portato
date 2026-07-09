@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/forward"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/forward"
 )
 
 const oneTunnel = "  - name: t1\n    type: local\n    local: \"19999\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"

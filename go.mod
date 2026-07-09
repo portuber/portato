@@ -1,4 +1,4 @@
-module github.com/kipkaev55/portato
+module github.com/portuber/portato
 
 go 1.25.0
 

@@ -14,7 +14,7 @@ files are already in place — here we tie them together with a working skeleton
 
 ## Phase scope (what we do)
 
-- `go.mod` with module `github.com/kipkaev55/portato`, Go 1.22+.
+- `go.mod` with module `github.com/portuber/portato`, Go 1.22+.
 - Directory tree `cmd/portato/`, `internal/{config,forward,controller,daemon,client,tui,service,cmd,log}/`.
 - Dependencies: cobra, bubbletea, lipgloss, bubbles, `golang.org/x/crypto`, `gopkg.in/yaml.v3`, `adrg/xdg`.
 - cobra root + all subcommands as stubs (`not implemented yet`).
@@ -29,7 +29,7 @@ files are already in place — here we tie them together with a working skeleton
 
 ## Tasks
 
-- [x] `glm-complex/go.mod` via `go mod init github.com/kipkaev55/portato`.
+- [x] `glm-complex/go.mod` via `go mod init github.com/portuber/portato`.
 - [x] Add dependencies (`go get …`).
 - [x] Create the directory tree:
   - `glm-complex/cmd/portato/main.go`
@@ -76,7 +76,7 @@ make fmt && make vet         # must be clean
 
 ## Technical details
 
-- **Module path:** `github.com/kipkaev55/portato`. Use this prefix everywhere in `import`.
+- **Module path:** `github.com/portuber/portato`. Use this prefix everywhere in `import`.
 - **Go version:** set `go 1.22` in `go.mod` (the environment may have 1.26 — that's fine, the lower bound is 1.22).
 - **Cobra layout:** root + subcommands in separate files in `internal/cmd/`; each `cobra.Command` is registered via `rootCmd.AddCommand(...)` in `Execute()`.
 - **Do not** introduce custom config/Tunnel/Engine types yet — only empty packages with a `doc.go` if needed (optional).

@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/secret"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/secret"
 )
 
 // withIdentityDeps swaps the identity-command dependencies (keyring backend,

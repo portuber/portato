@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/kipkaev55/portato/internal/config"
+	"github.com/portuber/portato/internal/config"
 )
 
 func newEditorFake() *fakeCtrl {

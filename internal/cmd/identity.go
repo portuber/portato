@@ -8,8 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/secret"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/secret"
 )
 
 // keyringBackend is the OS keyring the identity commands write to. Overridable

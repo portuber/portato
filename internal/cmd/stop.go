@@ -9,8 +9,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/daemon"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/daemon"
 )
 
 var stopCmd = &cobra.Command{

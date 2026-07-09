@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/ipctoken"
+	"github.com/portuber/portato/internal/ipctoken"
 )
 
 func TestDiscoveryPathUnderConfigHome(t *testing.T) {

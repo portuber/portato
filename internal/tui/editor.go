@@ -6,8 +6,8 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/controller"
 )
 
 // tunnelEditor is the Phase 10 form for creating/editing a tunnel. It is the

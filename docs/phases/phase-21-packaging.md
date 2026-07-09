@@ -34,7 +34,7 @@ publishing prerequisite.
       copyleft and therefore no conflict; the only obligation is to retain the
       deps' notices on redistribution (the same for any permissive choice).
 - [ ] README: an "Install" section listing all four channels —
-      `go install github.com/kipkaev55/portato/cmd/portato@latest` (note: requires
+      `go install github.com/portuber/portato/cmd/portato@latest` (note: requires
       Go 1.25+), direct download from the GitHub Release,
       `brew install <tap>/portato`, `scoop install portato`, deb/rpm.
 

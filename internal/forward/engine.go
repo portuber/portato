@@ -9,7 +9,7 @@ import (
 	"os"
 	"sync"
 
-	"github.com/kipkaev55/portato/internal/config"
+	"github.com/portuber/portato/internal/config"
 )
 
 type tunneler interface {

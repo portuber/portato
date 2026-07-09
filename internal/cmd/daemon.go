@@ -12,10 +12,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/daemon"
-	"github.com/kipkaev55/portato/internal/fdpass"
-	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/daemon"
+	"github.com/portuber/portato/internal/fdpass"
+	routelog "github.com/portuber/portato/internal/log"
 )
 
 var daemonCmd = &cobra.Command{

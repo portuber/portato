@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kipkaev55/portato/internal/forward"
+	"github.com/portuber/portato/internal/forward"
 )
 
 // TestPrintJSON covers the Phase 20 `portato list --json` path: the output is

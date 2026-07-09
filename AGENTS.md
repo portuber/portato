@@ -17,7 +17,7 @@ Source of truth:
 - `docs/CONVENTIONS.md` — how phases are planned and implemented.
 - `docs/phases/phase-N-*.md` — per-phase plans and Definition of Done.
 
-Module: `github.com/kipkaev55/portato` (Go 1.25+).
+Module: `github.com/portuber/portato` (Go 1.25+).
 
 ## Layout
 

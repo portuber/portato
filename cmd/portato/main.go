@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/kipkaev55/portato/internal/cmd"
+	"github.com/portuber/portato/internal/cmd"
 )
 
 func main() {

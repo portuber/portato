@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/armon/go-socks5"
-	"github.com/kipkaev55/portato/internal/config"
+	"github.com/portuber/portato/internal/config"
 	"golang.org/x/crypto/ssh"
 )
 

@@ -9,8 +9,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/kipkaev55/portato/internal/controller"
-	"github.com/kipkaev55/portato/internal/logo"
+	"github.com/portuber/portato/internal/controller"
+	"github.com/portuber/portato/internal/logo"
 )
 
 const (

@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/forward"
-	"github.com/kipkaev55/portato/internal/ipctoken"
-	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/forward"
+	"github.com/portuber/portato/internal/ipctoken"
+	routelog "github.com/portuber/portato/internal/log"
 )
 
 // fakeEngine is a tunneler stand-in: it flips in-memory states instead of

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/portuber/portato/internal/controller"
 )
 
 // threeTunnels is the fixture used across filter tests: two db tunnels and one

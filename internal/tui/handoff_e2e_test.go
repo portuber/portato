@@ -21,10 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/controller"
-	"github.com/kipkaev55/portato/internal/sshtest"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/controller"
+	"github.com/portuber/portato/internal/sshtest"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 	}
 	defer os.RemoveAll(dir)
 	e2eBin = filepath.Join(dir, "portato")
-	build := exec.Command("go", "build", "-o", e2eBin, "github.com/kipkaev55/portato/cmd/portato")
+	build := exec.Command("go", "build", "-o", e2eBin, "github.com/portuber/portato/cmd/portato")
 	if out, err := build.CombinedOutput(); err != nil {
 		fmt.Fprintf(os.Stderr, "e2e: build portato: %v\n%s\n", err, out)
 		os.Exit(1)

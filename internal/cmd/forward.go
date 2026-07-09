@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/forward"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/forward"
 	"github.com/spf13/cobra"
 )
 

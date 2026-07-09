@@ -14,11 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/forward"
-	"github.com/kipkaev55/portato/internal/ipctoken"
-	routelog "github.com/kipkaev55/portato/internal/log"
-	"github.com/kipkaev55/portato/internal/secret"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/forward"
+	"github.com/portuber/portato/internal/ipctoken"
+	routelog "github.com/portuber/portato/internal/log"
+	"github.com/portuber/portato/internal/secret"
 )
 
 const shutdownTimeout = 10 * time.Second

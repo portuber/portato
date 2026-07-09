@@ -5,7 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/portuber/portato/internal/controller"
 )
 
 // TestPassphraseModal_OpenTypeSubmitCancel drives the Phase 19 passphrase modal

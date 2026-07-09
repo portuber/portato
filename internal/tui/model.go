@@ -7,7 +7,7 @@ import (
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
 
-	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/portuber/portato/internal/controller"
 )
 
 type Model struct {

@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/kipkaev55/portato/internal/config"
-	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/portuber/portato/internal/config"
+	routelog "github.com/portuber/portato/internal/log"
 )
 
 // TestSetStateErrLogsToRing guards the visibility fix: a tunnel failure set via

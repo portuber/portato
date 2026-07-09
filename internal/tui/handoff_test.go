@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/controller"
-	"github.com/kipkaev55/portato/internal/fdpass"
-	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/controller"
+	"github.com/portuber/portato/internal/fdpass"
+	routelog "github.com/portuber/portato/internal/log"
 )
 
 // handoffFakeCtrl records the order of operations against a shared log so a

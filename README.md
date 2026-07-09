@@ -2,7 +2,7 @@
 
 # Portato
 
-[![CI](https://github.com/kipkaev55/portato/actions/workflows/ci.yml/badge.svg)](https://github.com/kipkaev55/portato/actions/workflows/ci.yml)
+[![CI](https://github.com/portuber/portato/actions/workflows/ci.yml/badge.svg)](https://github.com/portuber/portato/actions/workflows/ci.yml)
 
 **Portato** is an SSH port-forwarding manager with a TUI. It lets you turn
 individual SSH tunnels on and off, restart them, and watch their status from a

@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/secret"
-	"github.com/kipkaev55/portato/internal/sshtest"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/secret"
+	"github.com/portuber/portato/internal/sshtest"
 	"golang.org/x/crypto/ssh"
 )
 

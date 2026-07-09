@@ -8,10 +8,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/forward"
-	routelog "github.com/kipkaev55/portato/internal/log"
-	"github.com/kipkaev55/portato/internal/secret"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/forward"
+	routelog "github.com/portuber/portato/internal/log"
+	"github.com/portuber/portato/internal/secret"
 )
 
 type Local struct {

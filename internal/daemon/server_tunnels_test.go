@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/config"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/config"
 )
 
 const testTunnelsYAML = `# top comment

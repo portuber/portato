@@ -5,10 +5,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/controller"
-	"github.com/kipkaev55/portato/internal/daemon"
-	"github.com/kipkaev55/portato/internal/tui"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/controller"
+	"github.com/portuber/portato/internal/daemon"
+	"github.com/portuber/portato/internal/tui"
 )
 
 var attachCmd = &cobra.Command{

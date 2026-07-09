@@ -14,8 +14,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/forward"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/forward"
 )
 
 // shortDir returns a short temp directory for the unix socket, avoiding the

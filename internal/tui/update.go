@@ -7,8 +7,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"github.com/lithammer/fuzzysearch/fuzzy"
 
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/controller"
 )
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {

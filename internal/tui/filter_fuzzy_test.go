@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/portuber/portato/internal/controller"
 )
 
 // fuzzyFixture is a richer set used for the Phase 20 fuzzy / filter: it includes

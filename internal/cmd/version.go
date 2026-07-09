@@ -6,12 +6,12 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kipkaev55/portato/internal/logo"
+	"github.com/portuber/portato/internal/logo"
 )
 
 // version, commit, date are the build metadata. They default to "dev"/
 // "unknown" and are overridden at release time by goreleaser via -ldflags
-// "-X github.com/kipkaev55/portato/internal/cmd.version=<tag>" (and likewise
+// "-X github.com/portuber/portato/internal/cmd.version=<tag>" (and likewise
 // for commit and date).
 var (
 	version = "dev"

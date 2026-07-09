@@ -9,9 +9,9 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/controller"
-	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/controller"
+	routelog "github.com/portuber/portato/internal/log"
 )
 
 type fakeCtrl struct {

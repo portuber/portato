@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/daemon"
+	"github.com/portuber/portato/internal/daemon"
 )
 
 // restoreStopSeams saves the package-level stop seams and restores them on test

@@ -3,7 +3,7 @@ package tui
 import (
 	"testing"
 
-	"github.com/kipkaev55/portato/internal/controller"
+	"github.com/portuber/portato/internal/controller"
 )
 
 // tick drives one status refresh on m (the same path the SSE change signal

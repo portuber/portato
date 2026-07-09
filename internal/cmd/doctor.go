@@ -13,10 +13,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/daemon"
-	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/daemon"
+	routelog "github.com/portuber/portato/internal/log"
 )
 
 var doctorCmd = &cobra.Command{

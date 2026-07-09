@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/kipkaev55/portato/internal/forward"
+	"github.com/portuber/portato/internal/forward"
 )
 
 var listJSON bool

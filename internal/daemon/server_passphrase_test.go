@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/config"
-	"github.com/kipkaev55/portato/internal/forward"
-	"github.com/kipkaev55/portato/internal/secret"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/forward"
+	"github.com/portuber/portato/internal/secret"
 )
 
 // passphraseConfig is a test config whose single tunnel has an identity, so the

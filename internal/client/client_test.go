@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kipkaev55/portato/internal/client"
-	"github.com/kipkaev55/portato/internal/ipctoken"
+	"github.com/portuber/portato/internal/client"
+	"github.com/portuber/portato/internal/ipctoken"
 )
 
 // startUnixServer serves handler on a unix socket at sock and returns a stop

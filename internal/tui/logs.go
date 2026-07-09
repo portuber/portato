@@ -10,8 +10,8 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 
-	"github.com/kipkaev55/portato/internal/controller"
-	routelog "github.com/kipkaev55/portato/internal/log"
+	"github.com/portuber/portato/internal/controller"
+	routelog "github.com/portuber/portato/internal/log"
 )
 
 // logsView is the Phase 11 per-tunnel log screen opened with `l`. It is a
