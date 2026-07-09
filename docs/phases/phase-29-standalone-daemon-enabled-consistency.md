@@ -1,7 +1,7 @@
 ---
 phase: 29
 title: standalone and daemon enabled-auto-start consistency
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -48,11 +48,11 @@ Pick one before implementing:
 
 ## Definition of Done
 
-- [ ] A documented, consistent rule for which tunnels are running after a
+- [x] A documented, consistent rule for which tunnels are running after a
       standalone launch and after a hand-off.
-- [ ] No "surprise tunnels" after hand-off (or, under (A), they are expected
+- [x] No "surprise tunnels" after hand-off (or, under (A), they are expected
       because they also run in the standalone).
-- [ ] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
+- [x] `go vet ./...`, `gofmt -l .`, `go test ./...` clean.
 
 ## Verification
 
