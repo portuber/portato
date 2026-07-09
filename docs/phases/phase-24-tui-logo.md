@@ -13,6 +13,14 @@ best rendering the terminal supports: an inline PNG (iTerm2/WezTerm via OSC
 1337), falling back to braille ASCII, then to block ASCII for legacy Windows
 consoles. A small potato emoji marks the header on macOS only. NO startup splash.
 
+> **Refined in [Phase 31](./phase-31-logo-wordmark.md).** The single 28×12
+> potato + inline-PNG (OSC 1337) cascade described below was superseded: the
+> inline-PNG image mode was removed entirely, and a combined "potato + PORTATO"
+> wordmark (70×12) was added for the empty-list splash and `--version`, with the
+> compact potato kept in the help overlay and as the narrow-terminal fallback.
+> The sections below describe the Phase-24 state as shipped; see Phase 31 and
+> SPEC §11 "Branding / logo" for the current behaviour.
+
 ## Background
 
 Researched facts (verified in the planning session — do not re-derive):

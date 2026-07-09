@@ -27,9 +27,11 @@ const (
 	// empty-list splash and the help overlay omit the logo and show text only,
 	// so a short terminal never breaks the layout.
 	splashMinH = 18
-	// splashLogoW is the cell width of the embedded logo art; it mirrors the
-	// 28x12 grid the ASCII variants (and the inline PNG) are generated at.
-	splashLogoW = 28
+	// splashLogoW is the cell width of the compact potato art; splashWordmarkW
+	// is the width of the "potato + PORTATO" wordmark. The splash shows the
+	// wordmark when the terminal is wide enough, otherwise the compact potato.
+	splashLogoW     = 28
+	splashWordmarkW = 70
 )
 
 func (m Model) View() tea.View {
@@ -187,13 +189,21 @@ func (m Model) table() string {
 	return b.String()
 }
 
-// splash renders the empty-list state: the centered potato logo with the hint
-// line beneath it. It is shown only when the terminal is tall enough
-// (table() gates on splashMinH); a short terminal gets the hint-only line.
-// The logo is tinted with the title accent unless the theme is monochrome.
+// splash renders the empty-list state: the centered logo with the hint line
+// beneath it. It is shown only when the terminal is tall enough (table() gates
+// on splashMinH); a short terminal gets the hint-only line. On a wide terminal
+// the logo is the "potato + PORTATO" wordmark; on a narrow one it falls back to
+// the compact potato. The logo is tinted with the title accent unless the
+// theme is monochrome.
 func (m Model) splash(hint string) string {
-	art := logo.Banner(titleStyle, detectKind() == themeMono)
+	mono := detectKind() == themeMono
 	avail := m.width - 2*sideMargin
+	var art string
+	if avail >= splashWordmarkW {
+		art = logo.Wordmark(titleStyle, mono)
+	} else {
+		art = logo.Banner(titleStyle, mono)
+	}
 	if avail < splashLogoW {
 		avail = splashLogoW
 	}

@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/lipgloss/v2"
+
 	"github.com/kipkaev55/portato/internal/controller"
 )
 
@@ -17,6 +19,19 @@ func hasBraille(s string) bool {
 		}
 	}
 	return false
+}
+
+// maxLineWidth returns the widest display-cell line in s (ANSI stripped). It is
+// used to tell the wordmark splash (~70 cells) from the compact-potato fallback
+// (~24 cells) on a narrow terminal.
+func maxLineWidth(s string) int {
+	max := 0
+	for _, l := range strings.Split(s, "\n") {
+		if w := lipgloss.Width(l); w > max {
+			max = w
+		}
+	}
+	return max
 }
 
 // TestEmptyListSplashShowsLogo verifies the empty-list state renders the
@@ -34,8 +49,41 @@ func TestEmptyListSplashShowsLogo(t *testing.T) {
 	}
 }
 
-// TestHelpShowsLogo verifies the help (?) overlay prepends the logo above the
-// hotkey list on a tall terminal.
+// splashArt returns the logo portion of the empty-list splash (the block before
+// the "\n\n" that separates it from the hint line), so a test can measure the
+// art width without the hint line (which is wider than the compact potato)
+// polluting the measurement.
+func splashArt(table string) string {
+	if i := strings.Index(table, "\n\n"); i >= 0 {
+		return table[:i]
+	}
+	return table
+}
+
+// TestEmptyListSplashWideUsesWordmark verifies a wide terminal renders the
+// "potato + PORTATO" wordmark (~70 cells) in the empty-list splash.
+func TestEmptyListSplashWideUsesWordmark(t *testing.T) {
+	t.Setenv("PORTATO_LOGO", "braille")
+	m := New(newFake(), Options{Mode: "standalone"})
+	m.width, m.height = 80, 24
+	if w := maxLineWidth(splashArt(m.table())); w < 60 {
+		t.Errorf("wide terminal should render the wordmark (~70 cells), got max width %d\n%s", w, m.table())
+	}
+}
+
+// TestEmptyListSplashNarrowUsesPotato verifies a narrow terminal (avail < 70)
+// falls back to the compact potato (~24 cells) instead of the wordmark.
+func TestEmptyListSplashNarrowUsesPotato(t *testing.T) {
+	t.Setenv("PORTATO_LOGO", "braille")
+	m := New(newFake(), Options{Mode: "standalone"})
+	m.width, m.height = 60, 24
+	if w := maxLineWidth(splashArt(m.table())); w > 50 {
+		t.Errorf("narrow terminal should fall back to the compact potato (~24 cells), got max width %d\n%s", w, m.table())
+	}
+}
+
+// TestHelpShowsLogo verifies the help (?) overlay prepends the compact logo
+// above the hotkey list on a tall terminal.
 func TestHelpShowsLogo(t *testing.T) {
 	t.Setenv("PORTATO_LOGO", "braille")
 	m := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})

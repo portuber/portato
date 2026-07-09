@@ -1,47 +1,37 @@
 package logo
 
 import (
-	"bytes"
-	"encoding/base64"
 	"strings"
 	"testing"
 
 	"charm.land/lipgloss/v2"
 )
 
-// pngSig is the 8-byte PNG magic every PNG file starts with.
-var pngSig = []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}
-
-// TestEmbeddedAssets verifies the go:embed round-trip: both ASCII variants are
-// non-empty 28x12 grids and the PNG is a real PNG whose bytes decode back to
-// the embedded slice.
+// TestEmbeddedAssets verifies the go:embed round-trip: both ASCII variants of
+// each logo (compact potato + wordmark, in braille and block forms) are
+// non-empty artHeight-row grids.
 func TestEmbeddedAssets(t *testing.T) {
-	if strings.TrimSpace(brailleArt) == "" {
-		t.Error("brailleArt embedded empty")
+	arts := []struct{ name, val string }{
+		{"brailleArt", brailleArt},
+		{"blockArt", blockArt},
+		{"wordmarkBraille", wordmarkBraille},
+		{"wordmarkBlock", wordmarkBlock},
 	}
-	if strings.TrimSpace(blockArt) == "" {
-		t.Error("blockArt embedded empty")
-	}
-	if len(pngBytes) == 0 {
-		t.Fatal("pngBytes embedded empty")
-	}
-	if !bytes.HasPrefix(pngBytes, pngSig) {
-		t.Errorf("pngBytes does not start with the PNG signature: % x", pngBytes[:min(8, len(pngBytes))])
-	}
-	// The ASCII variants are generated at 28x12 cells: each line is 12 rows.
-	for _, art := range []struct{ name, val string }{
-		{"braille", brailleArt},
-		{"block", blockArt},
-	} {
+	for _, art := range arts {
+		if strings.TrimSpace(art.val) == "" {
+			t.Errorf("%s embedded empty", art.name)
+		}
 		lines := strings.Split(strings.TrimRight(art.val, "\n"), "\n")
-		if len(lines) != logoHeight {
-			t.Errorf("%s art has %d lines, want %d", art.name, len(lines), logoHeight)
+		if len(lines) != artHeight {
+			t.Errorf("%s has %d lines, want %d", art.name, len(lines), artHeight)
 		}
 	}
 }
 
 // TestDetectMatrix covers PORTATO_LOGO (each value) x TERM_PROGRAM x GOOS. The
 // goos var is swapped per-case so the matrix is deterministic on every host.
+// (The inline-PNG image mode is gone: iTerm2/WezTerm and PORTATO_LOGO=image all
+// resolve to braille.)
 func TestDetectMatrix(t *testing.T) {
 	prevGoos := goos
 	t.Cleanup(func() { goos = prevGoos })
@@ -53,24 +43,26 @@ func TestDetectMatrix(t *testing.T) {
 		goos string
 		want Mode
 	}{
-		{"explicit image overrides everything", "image", "", "linux", ModeImage},
 		{"explicit braille", "braille", "iTerm.app", "darwin", ModeBraille},
 		{"explicit block", "block", "", "darwin", ModeBlock},
 		{"explicit off", "off", "WezTerm", "darwin", ModeOff},
 
-		{"auto + iTerm.app -> image", "auto", "iTerm.app", "linux", ModeImage},
-		{"auto + WezTerm -> image", "auto", "WezTerm", "darwin", ModeImage},
+		// "image" is now an alias for auto (image mode removed) -> braille.
+		{"explicit image falls back to braille", "image", "", "linux", ModeBraille},
+		{"image + iTerm.app still braille", "image", "iTerm.app", "darwin", ModeBraille},
+
+		{"auto + iTerm.app -> braille", "auto", "iTerm.app", "linux", ModeBraille},
+		{"auto + WezTerm -> braille", "auto", "WezTerm", "darwin", ModeBraille},
 		{"auto + plain term + linux -> braille", "auto", "", "linux", ModeBraille},
 		{"auto + plain term + darwin -> braille", "auto", "", "darwin", ModeBraille},
 		{"auto + plain term + windows -> block", "auto", "", "windows", ModeBlock},
-		{"auto + image term + windows still image (explicit term wins)", "auto", "iTerm.app", "windows", ModeImage},
 
 		{"unset logo + plain -> braille (linux default)", "", "", "linux", ModeBraille},
 		{"unset logo + windows -> block", "", "", "windows", ModeBlock},
-		{"unset logo + iTerm.app -> image", "", "iTerm.app", "linux", ModeImage},
+		{"unset logo + iTerm.app -> braille", "", "iTerm.app", "linux", ModeBraille},
 
 		{"truthy '1' maps to auto", "1", "", "linux", ModeBraille},
-		{"truthy 'on' maps to auto + image term", "on", "WezTerm", "linux", ModeImage},
+		{"truthy 'on' maps to auto + image term -> braille", "on", "WezTerm", "linux", ModeBraille},
 		{"uppercase OFF -> off", "OFF", "iTerm.app", "darwin", ModeOff},
 		{"unknown value -> auto", "garbage", "", "linux", ModeBraille},
 	}
@@ -136,7 +128,6 @@ func TestRenderPerMode(t *testing.T) {
 		mode    Mode
 		emptyOK bool
 	}{
-		{"image non-empty", ModeImage, false},
 		{"braille non-empty", ModeBraille, false},
 		{"block non-empty", ModeBlock, false},
 		{"off empty", ModeOff, true},
@@ -154,35 +145,31 @@ func TestRenderPerMode(t *testing.T) {
 	}
 }
 
-// TestInlineImageWellFormed asserts the OSC 1337 sequence wraps the base64 PNG
-// with the right prefix (sized in cells) and a trailing BEL.
-func TestInlineImageWellFormed(t *testing.T) {
-	out := inlineImage(pngBytes)
-
-	prefix := "\x1b]1337;File=inline=1;width=28cells;height=12cells;preserveAspectRatio=1:"
-	if !strings.HasPrefix(out, prefix) {
-		t.Errorf("OSC 1337 missing prefix:\nwant prefix %q\ngot %q", prefix, out[:min(len(prefix), len(out))])
+// TestRenderWordmark checks RenderWordmark returns the wordmark art for the
+// renderable modes and "" for Off, and that it differs from the compact
+// potato (the wordmark is wider).
+func TestRenderWordmark(t *testing.T) {
+	accent := lipgloss.NewStyle().Foreground(lipgloss.Color("4"))
+	if got := RenderWordmark(ModeBraille, accent, false); got == "" {
+		t.Error("RenderWordmark(ModeBraille) returned empty")
 	}
-	if !strings.HasSuffix(out, "\x07") {
-		t.Error("OSC 1337 must end with BEL (\\x07)")
+	if got := RenderWordmark(ModeBlock, accent, false); got == "" {
+		t.Error("RenderWordmark(ModeBlock) returned empty")
 	}
-	payload := strings.TrimSuffix(strings.TrimPrefix(out, prefix), "\x07")
-	dec, err := base64.StdEncoding.DecodeString(payload)
-	if err != nil {
-		t.Errorf("OSC 1337 payload is not valid base64: %v", err)
+	if got := RenderWordmark(ModeOff, accent, false); got != "" {
+		t.Errorf("RenderWordmark(ModeOff) = %q, want empty", got)
 	}
-	if !bytes.Equal(dec, pngBytes) {
-		t.Errorf("OSC 1337 payload decodes to %d bytes, want %d (the embedded PNG)", len(dec), len(pngBytes))
+	// The wordmark is wider than the compact potato: its first line has more
+	// cells than the potato's whole frame.
+	potato := Render(ModeBraille, accent, true)
+	wm := RenderWordmark(ModeBraille, accent, true)
+	if lipgloss.Width(strings.Split(potato, "\n")[0]) >= lipgloss.Width(strings.Split(wm, "\n")[0]) {
+		t.Error("the wordmark should be wider than the compact potato")
 	}
-}
-
-// TestRenderImageViaMode checks the image mode Render path produces the same
-// OSC sequence as inlineImage (the public Render delegates to it).
-func TestRenderImageViaMode(t *testing.T) {
-	got := Render(ModeImage, lipgloss.NewStyle(), false)
-	want := inlineImage(pngBytes)
-	if got != want {
-		t.Error("Render(ModeImage,...) should equal inlineImage(pngBytes)")
+	// Wordmark convenience picks the detected mode.
+	t.Setenv("PORTATO_LOGO", "braille")
+	if Wordmark(accent, false) == "" {
+		t.Error("Wordmark() returned empty for braille")
 	}
 }
 
@@ -211,43 +198,42 @@ func TestTintAppliedUnlessMono(t *testing.T) {
 	}
 }
 
-// TestVersionBanner covers the three behaviours: logo + version line on a TTY,
-// braille fallback (no OSC) when piped, and PORTATO_LOGO=off yields just the
-// version line.
+// TestVersionBanner covers the behaviours: the wordmark + version line under
+// braille, "image" rendering braille (no inline-image escape), and
+// PORTATO_LOGO=off yielding just the version line.
 func TestVersionBanner(t *testing.T) {
 	prevGoos := goos
 	t.Cleanup(func() { goos = prevGoos })
 	goos = "linux"
 
 	t.Setenv("PORTATO_LOGO", "braille")
-	tty := VersionBanner("1.2.3", "abc1234", "2026-07-07", true)
-	if !strings.Contains(tty, "portato 1.2.3 (abc1234, 2026-07-07)") {
-		t.Errorf("tty banner missing version line:\n%s", tty)
+	out := VersionBanner("1.2.3", "abc1234", "2026-07-09")
+	if !strings.Contains(out, "portato 1.2.3 (abc1234, 2026-07-09)") {
+		t.Errorf("banner missing version line:\n%s", out)
 	}
-	if !strings.Contains(tty, "\n\n") {
-		t.Errorf("tty banner should separate the logo from the version line with a blank line:\n%s", tty)
+	if !strings.Contains(out, "\n\n") {
+		t.Errorf("banner should separate the logo from the version line with a blank line:\n%s", out)
 	}
-	if strings.Contains(tty, "\x1b]1337") {
-		t.Errorf("braille banner must not contain an OSC 1337 sequence:\n%s", tty)
+	if strings.Contains(out, "\x1b") {
+		t.Errorf("braille banner must contain no ANSI/OSC escapes:\n%s", out)
+	}
+	// The wordmark art is present verbatim (untinted).
+	if !strings.Contains(out, strings.TrimRight(wordmarkBraille, "\n")) {
+		t.Errorf("braille banner should contain the wordmark art:\n%s", out)
 	}
 
+	// "image" now renders braille and never emits an inline-image escape.
 	t.Setenv("PORTATO_LOGO", "image")
-	// Piped (tty=false): inline image suppressed, braille used instead.
-	piped := VersionBanner("1.2.3", "abc1234", "2026-07-07", false)
-	if strings.Contains(piped, "\x1b]1337") {
-		t.Errorf("piped banner must not emit an inline image:\n%s", piped)
+	img := VersionBanner("1.2.3", "abc1234", "2026-07-09")
+	if strings.Contains(img, "\x1b]1337") {
+		t.Errorf("image mode must not emit an OSC 1337 sequence:\n%s", img)
 	}
-	if !strings.Contains(piped, "portato 1.2.3") {
-		t.Errorf("piped banner missing version line:\n%s", piped)
-	}
-	// On a TTY the image mode emits the OSC sequence.
-	onTTY := VersionBanner("1.2.3", "abc1234", "2026-07-07", true)
-	if !strings.Contains(onTTY, "\x1b]1337") {
-		t.Errorf("image+TTY banner should emit OSC 1337:\n%s", onTTY)
+	if !strings.Contains(img, strings.TrimRight(wordmarkBraille, "\n")) {
+		t.Errorf("image mode should render the braille wordmark:\n%s", img)
 	}
 
 	t.Setenv("PORTATO_LOGO", "off")
-	off := VersionBanner("dev", "none", "unknown", true)
+	off := VersionBanner("dev", "none", "unknown")
 	if strings.Contains(off, "\x1b") {
 		t.Errorf("off banner should have no ANSI/logo:\n%s", off)
 	}

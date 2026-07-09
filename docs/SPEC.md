@@ -424,36 +424,38 @@ clears the query).
 
 ### Branding / logo
 
-The potato logo appears in three places — never on the working screen:
+The Portato logo appears in three places — never on the working screen. Two
+ASCII variants are embedded: a compact potato (24×12) and a combined
+"potato + PORTATO" wordmark (70×12), each in braille and solid-block forms.
 
 - **empty-list splash** — when the tunnel list is empty and the terminal is
   tall enough (≥ ~18 rows), the centered logo sits above the "no tunnels"
-  hint; a short terminal shows the hint only.
-- **help (`?`) overlay** — the compact logo is prepended above the hotkey list
-  (same height gate).
-- **`portato --version`** — the logo banner followed by a
-  `portato <version> (<commit>, <date>)` line. Pipe-safe: when stdout is not a
-  terminal the inline image and all ANSI are suppressed and the braille
-  variant is used, so `portato --version | head` stays clean.
+  hint. A wide terminal (≥ ~72 cols) shows the wordmark; a narrower one falls
+  back to the compact potato. A short terminal shows the hint only.
+- **help (`?`) overlay** — the compact potato is prepended above the hotkey
+  list (same height gate), so the wider wordmark does not clutter the hotkeys.
+- **`portato --version`** — the wordmark followed by a
+  `portato <version> (<commit>, <date>)` line. Pipe-safe by construction: plain
+  braille/block art with no ANSI and no inline-image escape, so
+  `portato --version | head` stays clean.
 
 A small potato emoji 🥔 marks the header before the title, on `GOOS=darwin`
 only (where it renders cleanly at 2 cells); `PORTATO_LOGO_EMOJI=on|off`
 overrides it, and `PORTATO_LOGO=off` hides it too.
 
-Rendering picks the best the terminal supports (override with
-`PORTATO_LOGO=auto|image|braille|block|off`):
+Rendering (override with `PORTATO_LOGO=auto|braille|block|off`; `image` is
+accepted as an alias for `auto`):
 
 | Mode    | When                                                               |
 |---------|--------------------------------------------------------------------|
-| image   | iTerm2 / WezTerm (`TERM_PROGRAM`) — inline PNG via OSC 1337.       |
 | braille | default on macOS (Terminal.app) and Linux — outline-braille ASCII. |
 | block   | `GOOS=windows` — solid block (robust on legacy conhost).           |
 | off     | no big logo anywhere, no header emoji.                             |
 
-All variants are 28×12 cells; the ASCII glyphs are tinted with the theme's
-title accent, except under the mono theme / `NO_COLOR` (plain glyphs). The
-assets are `go:embed`ded in `internal/logo/`, so the binary needs nothing on
-disk.
+The ASCII glyphs are tinted with the theme's title accent, except under the
+mono theme / `NO_COLOR` (plain glyphs); the `--version` banner is untinted
+(the CLI does not load the theme). The assets are `go:embed`ded in
+`internal/logo/`, so the binary needs nothing on disk.
 
 ## 12. The "leave in the background" hand-off
 

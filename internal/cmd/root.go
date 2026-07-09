@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -57,7 +56,7 @@ See docs/SPEC.md for the full specification.`,
 
 func rootRunE(cmd *cobra.Command, _ []string) error {
 	if showVersion {
-		printVersion(cmd.OutOrStdout(), isTerminal(os.Stdout))
+		printVersion(cmd.OutOrStdout())
 		return nil
 	}
 	if !forceStandalone {
