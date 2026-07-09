@@ -20,9 +20,9 @@ in that session ("where did these come from?").
 So an `enabled: true` tunnel sits idle in the standalone but starts in the
 daemon the moment the hand-off spawns it.
 
-## Decision needed (open)
+## Decision (resolved)
 
-Pick one before implementing:
+Options considered (decision recorded below):
 
 - **(A)** the standalone also auto-starts `enabled: true` tunnels on launch —
   recommended, consistent with the daemon and least surprising.

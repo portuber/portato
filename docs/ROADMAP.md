@@ -55,11 +55,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24, 25, 26 and 27–30 (post-MVP backlog) are planned in detail — 16, 18, 19, 20, 23, 24, 25 and 26 are done, the rest are pending (`[ ]`), to be started on an explicit command.
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–30 (post-MVP backlog) are planned in detail — all are done (`[x]`) except **17 (Windows)** and **21 (packaging)**, which are pending (`[ ]`) and blocked on external infrastructure.
 
 ## Current focus
 
-**Phases 0–16, 18, 19, 20, 24, 25 and 26 are `[x]`; phases 17, 21, 22 and 27–30 (the post-MVP backlog) are planned and pending (`[ ]`).** The single binary runs the smart launcher
+**Phases 0–16, 18–20 and 22–30 are `[x]`; phases 17 (Windows) and 21 (packaging) remain pending (`[ ]`), blocked on external infrastructure.** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -110,6 +110,22 @@ time-based (not just size-based) log rotation.
 - **Phase 12** — robust IPC socket discovery: the daemon advertises its socket path via a stable discovery file; clients read it (socket lives in `$TMPDIR` / `$XDG_RUNTIME_DIR`).
 - **Phase 13** — polish 2 (deferred phase-11 items): persistent rotated log file, the `/` tunnel-list filter, goreleaser release tooling.
 - **Phase 14** — duplicate the selected tunnel in the TUI (`Shift+C`): opens the Phase 10 editor in create mode, prefilled under a fresh `<name>-copy`; commits via `AddTunnel`.
+- **Phase 15** — light-theme color tuning: the light theme's surface colour is baked into every style so each row stays readable.
+- **Phase 16** — seamless hand-off via FD-passing: the standalone passes its already-bound local listeners to the spawned daemon over SCM_RIGHTS, so the local ports never go down across the transition (proved by `make e2e-handoff`).
+- **Phase 17** — Windows support (pending; blocked on a Windows environment).
+- **Phase 18** — IPC authorization token: a 32-byte bearer token layered on the `0600` socket; `--ipc-token off` disables.
+- **Phase 19** — identity passphrase storage: an in-memory cache backed by the OS keyring; `portato add-identity`/`forget-identity`.
+- **Phase 20** — CLI/UX polish: `--log-level`, `portato list --json`, SOCKS5 user/pass auth for `dynamic`, a fuzzy (subsequence) `/` filter.
+- **Phase 21** — packaging and releases (pending; blocked on a public git remote + tap/bucket).
+- **Phase 22** — robustness: a single-instance flock + systemd socket activation for the IPC socket.
+- **Phase 23** — TUI list column alignment.
+- **Phase 24** — TUI branding / logo banner.
+- **Phase 25** — easter egg: "pórtate bien" footer in `--help`.
+- **Phase 26** — fix: a renamed tunnel now restarts under its new name on reload.
+- **Phase 27** — `portato stop`: gracefully terminate the running daemon (SIGTERM via the marker PID).
+- **Phase 28** — config reload: `portato reload` CLI + a polling file watcher that auto-reloads `config.yaml` on change (keeps last-good on a parse error).
+- **Phase 29** — standalone/daemon enabled consistency: the standalone now auto-starts `enabled: true` tunnels on launch, matching the daemon.
+- **Phase 30** — TUI toggle vs passphrase: `space` toggles purely by state; `p` enters a passphrase for a blocked tunnel.
 
 ## Final MVP E2E (on completing Phase 6)
 
@@ -119,7 +135,7 @@ time-based (not just size-based) log rotation.
 4. `portato list` shows the tunnel as `○ Disabled`.
 5. `portato` (TUI) -> space -> `Connecting` -> `Connected`; `nc -z 127.0.0.1 <local>` succeeds, traffic flows.
 6. space again -> `Disabled`, the port is closed.
-7. **Hand-off:** `portato` with no daemon, space to enable the tunnel, `q`, answer `y` -> the daemon is spawned, the tunnel keeps running, `portato list` confirms it.
+7. **Hand-off:** `portato` with no daemon, space to enable the tunnel, `q`, answer `y` -> the daemon is spawned, the tunnel keeps running, `portato list` confirms it. (Seamless since Phase 16: the live local listeners are passed to the daemon, so the local port never goes down.)
 8. SSH server dropped -> auto-reconnect restores `Connected`.
 9. After a reboot/relogin — the daemon is up, the tunnels are `Disabled`.
 10. `portato uninstall` -> the service is removed cleanly.

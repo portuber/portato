@@ -53,6 +53,8 @@ portato list           -> CLI: a table of every tunnel's status (stdout)
 portato enable <name>  -> CLI: enable a tunnel on the daemon
 portato disable <name> -> CLI: disable a tunnel on the daemon
 portato restart <name> -> CLI: restart a tunnel
+portato reload         -> CLI: force the running daemon to re-read config.yaml (Phase 28)
+portato stop           -> CLI: gracefully stop the running daemon — SIGTERM via the marker PID (Phase 27)
 
 portato install        -> install system autostart (launchd / systemd --user)
 portato uninstall      -> remove autostart

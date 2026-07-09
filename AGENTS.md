@@ -27,12 +27,17 @@ internal/
   cmd/                cobra commands (root + subcommands)
   config/             YAML config load/save/validation (phase 1)
   forward/            tunnel engine, native SSH (phase 2)
+  fdpass/             SCM_RIGHTS listener transfer for the hand-off (phase 16)
   controller/         Controller interface + local/remote (phase 3+)
+  secret/             identity passphrase cache + OS keyring (phase 19)
   daemon/             HTTP server over unix socket (phase 4)
   client/             HTTP client over unix socket (phase 4)
+  ipctoken/           daemon IPC bearer token (phase 18)
   tui/                bubbletea UI (phase 3)
+  logo/               version/help logo banner (phase 24)
   service/            autostart: launchd/systemd (phase 6)
-  log/                slog setup (as needed)
+  log/                slog setup + rotating writer (phase 13)
+  sshtest/            in-process SSH server test fixture (phase 16 E2E)
 ```
 
 ## Build & verify
