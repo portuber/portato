@@ -7,10 +7,11 @@ depends_on: [13]
 
 ## Goal
 
-Distributable packages and a tag-triggered release pipeline: Homebrew,
-Scoop, and deb/rpm, on top of the existing goreleaser snapshot config — so
-users can `brew install`, `scoop install`, or install a Linux package, and a
-`git tag vX.Y.Z` cut produces all of them automatically.
+Distribute portato through four complementary channels — pre-built binaries on
+GitHub Releases (primary), `go install` from source, Homebrew (macOS), and
+Scoop/deb/rpm — driven by one goreleaser config, so a `git tag vX.Y.Z` cut
+publishes all of them automatically. Also add the project LICENSE (MIT) as the
+publishing prerequisite.
 
 ## Tasks
 
@@ -28,8 +29,14 @@ users can `brew install`, `scoop install`, or install a Linux package, and a
 - [ ] Version embedding: wire `main.version` / `main.commit` / `main.date`
       ldflags into the release builds (snapshot builds already inject
       placeholders).
-- [ ] README: an "Install" section — `brew`/`scoop`/deb/rpm + direct download
-      from the GitHub Release.
+- [ ] Add a `LICENSE` file (**MIT**) at the repo root — publishing prerequisite.
+      All dependencies are permissive (MIT / Apache-2.0 / BSD), there is no
+      copyleft and therefore no conflict; the only obligation is to retain the
+      deps' notices on redistribution (the same for any permissive choice).
+- [ ] README: an "Install" section listing all four channels —
+      `go install github.com/kipkaev55/portato/cmd/portato@latest` (note: requires
+      Go 1.25+), direct download from the GitHub Release,
+      `brew install <tap>/portato`, `scoop install portato`, deb/rpm.
 
 ## Definition of Done
 
@@ -51,6 +58,16 @@ goreleaser release --snapshot --clean      # builds all archives/packages locall
 
 ## Technical details
 
+- **Distribution channels (complementary, not either/or):** GitHub Releases
+  (no Go needed, primary) · `go install` (Go users/CI; needs Go 1.25+) ·
+  Homebrew (macOS UX) · Scoop (Windows, after Phase 17) · deb/rpm (Linux). All
+  unblock with one step — a **public git remote + the first `vX.Y.Z` tag**: the
+  Go module proxy serves `go install`, goreleaser publishes the rest.
+- **License:** MIT — permissive; every dependency is MIT / Apache-2.0 / BSD (no
+  copyleft), so there is no conflict and no obligation beyond retaining the
+  deps' notices on redistribution (the same for any permissive choice). MIT
+  needs no source-header comments and no NOTICE file; a single `LICENSE` at the
+  repo root (plus the license line in `go.mod`/README) is sufficient.
 - Requires the repo to be public and the Homebrew tap / Scoop bucket repos to
   exist (goreleaser pushes to them).
 - CI secrets: a GitHub PAT with push rights to the tap/bucket repos
