@@ -106,6 +106,22 @@ func waitForNotState(t *Tuber, notWant State, timeout time.Duration) bool {
 	return false
 }
 
+// waitForPortDown polls addr until a dial fails (the port closed) or timeout.
+// SSH closes a remote (-R) listener asynchronously, so the server-side port
+// takes a moment to disappear after Stop.
+func waitForPortDown(addr string, timeout time.Duration) bool {
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		c, err := net.Dial("tcp", addr)
+		if err != nil {
+			return true
+		}
+		_ = c.Close()
+		time.Sleep(20 * time.Millisecond)
+	}
+	return false
+}
+
 func TestTuberTrafficAndReconnect(t *testing.T) {
 	// Hermetic: ignore the host's ssh-agent so only the identity-file auth
 	// path is exercised.
@@ -466,13 +482,12 @@ func TestTuberRemoteTrafficAndReconnect(t *testing.T) {
 
 	ping("after-reconnect")
 
-	// Disable must tear the remote listener down: the server-side port closes.
+	// Disable must tear the remote listener down: the server-side port closes
+	// (async over SSH — poll until it's down).
 	if err := tun.Stop(); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}
-	c, err := net.Dial("tcp", remoteBind)
-	if err == nil {
-		c.Close()
+	if !waitForPortDown(remoteBind, 5*time.Second) {
 		t.Error("server-side port still reachable after Stop")
 	}
 }

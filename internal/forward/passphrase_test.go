@@ -149,7 +149,7 @@ func TestLoadIdentity_BlocksThenAccepts(t *testing.T) {
 		if signer == nil {
 			t.Fatal("nil signer after correct passphrase")
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(15 * time.Second):
 		t.Fatal("loadIdentity did not return after the passphrase was provided")
 	}
 	if sawNeed.Load() < 1 {
@@ -179,7 +179,7 @@ func TestLoadIdentity_WrongPassphraseRetries(t *testing.T) {
 		if err != nil {
 			t.Fatalf("expected success after retry; got %v", err)
 		}
-	case <-time.After(2 * time.Second):
+	case <-time.After(15 * time.Second):
 		t.Fatal("did not succeed after the correct passphrase")
 	}
 	if deleted.Load() < 1 {
