@@ -215,3 +215,8 @@ The source of truth lives in [`docs/`](./docs):
 - [`docs/SPEC.md`](./docs/SPEC.md) — technical specification (stack, architecture, config, IPC, TUI).
 - [`docs/ROADMAP.md`](./docs/ROADMAP.md) — phase status.
 - [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) — how phases are planned and implemented.
+
+## License
+
+Portato is licensed under the [MIT License](./LICENSE). All dependencies are
+permissive (MIT / Apache-2.0 / BSD); there is no copyleft.

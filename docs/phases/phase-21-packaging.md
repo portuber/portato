@@ -29,7 +29,7 @@ publishing prerequisite.
 - [ ] Version embedding: wire `main.version` / `main.commit` / `main.date`
       ldflags into the release builds (snapshot builds already inject
       placeholders).
-- [ ] Add a `LICENSE` file (**MIT**) at the repo root — publishing prerequisite.
+- [x] Add a `LICENSE` file (**MIT**) at the repo root — publishing prerequisite.
       All dependencies are permissive (MIT / Apache-2.0 / BSD), there is no
       copyleft and therefore no conflict; the only obligation is to retain the
       deps' notices on redistribution (the same for any permissive choice).
