@@ -24,6 +24,43 @@ The single binary works in several modes:
 | `portato doctor`             | Diagnose the setup (config, keys, agent, daemon, logs)             |
 | `portato version`            | Print the version                                                   |
 
+## Install
+
+All channels are built from the same release. *(Scoop/Windows is coming with
+Phase 17.)*
+
+**Homebrew** (macOS / Linuxbrew):
+
+```sh
+brew install --cask portuber/tap/portato
+```
+
+**Binary** — download the archive for your platform from the
+[latest release](https://github.com/portuber/portato/releases/latest), extract
+it, and put `portato` on your `PATH`:
+
+```sh
+tar -xzf portato_<version>_macOS_arm64.tar.gz
+install -m 0755 portato ~/.local/bin/portato
+portato version
+```
+
+**deb / rpm** — from the
+[latest release](https://github.com/portuber/portato/releases/latest):
+
+```sh
+sudo dpkg -i portato_<version>_linux_amd64.deb
+# or: sudo rpm -i portato_<version>_linux_amd64.rpm
+```
+
+**go install** (needs Go 1.25+):
+
+```sh
+go install github.com/portuber/portato/cmd/portato@latest
+```
+
+The version baked into the binary comes from the git tag at build time.
+
 ## Build
 
 ```sh
@@ -34,28 +71,18 @@ make vet     # go vet ./...
 make fmt     # gofmt -w .
 ```
 
-Requires Go 1.22+.
+Requires Go 1.25+.
 
 ## Releases
 
 Releases are built with [goreleaser](https://goreleaser.com) across the
-darwin/linux × amd64/arm64 matrix, producing per-target tarballs and a
-`checksums.txt`. To build a local snapshot (no publish, writes to `dist/`):
+darwin/linux × amd64/arm64 matrix, producing per-target tarballs, a Homebrew
+cask, deb/rpm packages, and a `checksums.txt`. To build a local snapshot (no
+publish, writes to `dist/`):
 
 ```sh
 make snapshot   # needs goreleaser: go install github.com/goreleaser/goreleaser/v2@latest
 ```
-
-Install from a released tarball by extracting it and putting the `portato`
-binary on your `PATH`:
-
-```sh
-tar -xzf portato_<version>_macOS_arm64.tar.gz
-install -m 0755 portato ~/.local/bin/portato
-portato version
-```
-
-The version baked into the binary comes from the git tag at build time.
 
 ## Status
 

@@ -39,7 +39,7 @@ publishing prerequisite.
       All dependencies are permissive (MIT / Apache-2.0 / BSD), there is no
       copyleft and therefore no conflict; the only obligation is to retain the
       deps' notices on redistribution (the same for any permissive choice).
-- [ ] README: an "Install" section listing the channels —
+- [x] README: an "Install" section listing the channels —
       `go install github.com/portuber/portato/cmd/portato@latest` (note: requires
       Go 1.25+), direct download from the GitHub Release,
       `brew install --cask portuber/tap/portato`, and deb/rpm. (Scoop is
