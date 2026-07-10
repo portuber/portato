@@ -10,7 +10,7 @@ import (
 )
 
 // TestPrintJSON covers the Phase 20 `portato list --json` path: the output is
-// valid JSON for 0/1/N tunnels, a nil slice renders as `[]` (not `null`), and
+// valid JSON for 0/1/N tubers, a nil slice renders as `[]` (not `null`), and
 // the first element's name round-trips so `jq '.[0].name'` works.
 func TestPrintJSON(t *testing.T) {
 	t.Run("nil renders as empty array", func(t *testing.T) {

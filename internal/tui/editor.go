@@ -10,18 +10,18 @@ import (
 	"github.com/portuber/portato/internal/controller"
 )
 
-// tunnelEditor is the Phase 10 form for creating/editing a tunnel. It is the
-// first sub-model in the TUI: the main Model holds a *tunnelEditor (nil when
+// tuberEditor is the Phase 10 form for creating/editing a tuber. It is the
+// first sub-model in the TUI: the main Model holds a *tuberEditor (nil when
 // inactive) and routes keys to it while it is open.
 //
 // The form edits the persistent fields only (name, type, ssh, local, remote,
-// identity). Enabled is carried through unchanged from the edited tunnel (or
+// identity). Enabled is carried through unchanged from the edited tuber (or
 // false for a new one) — it stays controlled by the space toggle in the list.
 // Passwords are never in the form: authentication is agent/identity only.
-type tunnelEditor struct {
+type tuberEditor struct {
 	mode     editorMode
 	original string // name being edited ("" for new); used for rename + uniqueness
-	enabled  bool   // preserved from the edited tunnel
+	enabled  bool   // preserved from the edited tuber
 
 	name     textinput.Model
 	ssh      textinput.Model
@@ -29,13 +29,13 @@ type tunnelEditor struct {
 	remote   textinput.Model
 	identity textinput.Model
 
-	typeIdx int // index into tunnelTypes
+	typeIdx int // index into tuberTypes
 
 	focus  int
 	width  int
 	height int
 
-	existing []string // current tunnel names, for uniqueness
+	existing []string // current tuber names, for uniqueness
 	ctrl     controller.Controller
 
 	errs   map[string]string
@@ -52,7 +52,7 @@ const (
 	modeNew
 )
 
-var tunnelTypes = []string{"local", "remote", "dynamic"}
+var tuberTypes = []string{"local", "remote", "dynamic"}
 
 const (
 	fName = iota
@@ -64,10 +64,10 @@ const (
 	fieldCount
 )
 
-// newTunnelEditor builds the form. For modeEdit, t is the current tunnel (its
+// newTuberEditor builds the form. For modeEdit, t is the current tuber (its
 // Enabled is preserved); existing lists the current names for uniqueness.
-func newTunnelEditor(mode editorMode, t config.Tunnel, existing []string, ctrl controller.Controller) *tunnelEditor {
-	e := &tunnelEditor{
+func newTuberEditor(mode editorMode, t config.Tuber, existing []string, ctrl controller.Controller) *tuberEditor {
+	e := &tuberEditor{
 		mode:     mode,
 		original: t.Name,
 		enabled:  t.Enabled,
@@ -76,14 +76,14 @@ func newTunnelEditor(mode editorMode, t config.Tunnel, existing []string, ctrl c
 		focus:    fName,
 		errs:     map[string]string{},
 	}
-	e.name = newInput(t.Name, "my-tunnel")
+	e.name = newInput(t.Name, "my-tuber")
 	e.ssh = newInput(t.SSH, "user@host:22")
 	e.local = newInput(t.Local, "5432 or 127.0.0.1:5432")
 	e.remote = newInput(t.Remote, "db:5432")
 	e.identity = newInput(t.Identity, "~/.ssh/id_ed25519 (optional)")
 
 	e.typeIdx = 0
-	for i, ty := range tunnelTypes {
+	for i, ty := range tuberTypes {
 		if ty == t.Type {
 			e.typeIdx = i
 			break
@@ -96,8 +96,8 @@ func newTunnelEditor(mode editorMode, t config.Tunnel, existing []string, ctrl c
 // applyTypePlaceholders tunes the remote/local hints to the selected type so
 // the form reflects each type's semantics (e.g. a -R remote may be a bare
 // port that binds loopback on the host).
-func (e *tunnelEditor) applyTypePlaceholders() {
-	switch tunnelTypes[e.typeIdx] {
+func (e *tuberEditor) applyTypePlaceholders() {
+	switch tuberTypes[e.typeIdx] {
 	case "remote":
 		e.remote.Placeholder = "9090 or 0.0.0.0:9090"
 		e.local.Placeholder = "127.0.0.1:9090"
@@ -111,8 +111,8 @@ func (e *tunnelEditor) applyTypePlaceholders() {
 }
 
 // typeNote is the one-line semantics hint shown under the Type field.
-func (e *tunnelEditor) typeNote() string {
-	switch tunnelTypes[e.typeIdx] {
+func (e *tuberEditor) typeNote() string {
+	switch tuberTypes[e.typeIdx] {
 	case "local":
 		return "local: listened here · remote: destination dialed on the host"
 	case "remote":
@@ -139,7 +139,7 @@ func newInput(value, placeholder string) textinput.Model {
 
 // update mutates the editor in place and returns any command (e.g. cursor
 // blink from focusing a text field).
-func (e *tunnelEditor) update(msg tea.Msg) tea.Cmd {
+func (e *tuberEditor) update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		e.width, e.height = msg.Width, msg.Height
@@ -160,7 +160,7 @@ func (e *tunnelEditor) update(msg tea.Msg) tea.Cmd {
 	return nil
 }
 
-func (e *tunnelEditor) handleKey(k tea.KeyPressMsg) tea.Cmd {
+func (e *tuberEditor) handleKey(k tea.KeyPressMsg) tea.Cmd {
 	switch k.String() {
 	case "ctrl+s":
 		e.trySave()
@@ -198,7 +198,7 @@ func (e *tunnelEditor) handleKey(k tea.KeyPressMsg) tea.Cmd {
 	return nil
 }
 
-func (e *tunnelEditor) textInputFor(idx int) *textinput.Model {
+func (e *tuberEditor) textInputFor(idx int) *textinput.Model {
 	switch idx {
 	case fName:
 		return &e.name
@@ -214,7 +214,7 @@ func (e *tunnelEditor) textInputFor(idx int) *textinput.Model {
 	return nil
 }
 
-func (e *tunnelEditor) setFocus(idx int) tea.Cmd {
+func (e *tuberEditor) setFocus(idx int) tea.Cmd {
 	if ti := e.textInputFor(e.focus); ti != nil {
 		ti.Blur()
 	}
@@ -225,15 +225,15 @@ func (e *tunnelEditor) setFocus(idx int) tea.Cmd {
 	return nil
 }
 
-func (e *tunnelEditor) cycleType(dir int) {
-	e.typeIdx = (e.typeIdx + dir + len(tunnelTypes)) % len(tunnelTypes)
+func (e *tuberEditor) cycleType(dir int) {
+	e.typeIdx = (e.typeIdx + dir + len(tuberTypes)) % len(tuberTypes)
 	e.applyTypePlaceholders()
 }
 
-func (e *tunnelEditor) tunnel() config.Tunnel {
-	return config.Tunnel{
+func (e *tuberEditor) tuber() config.Tuber {
+	return config.Tuber{
 		Name:     e.name.Value(),
-		Type:     tunnelTypes[e.typeIdx],
+		Type:     tuberTypes[e.typeIdx],
 		SSH:      e.ssh.Value(),
 		Local:    e.local.Value(),
 		Remote:   e.remote.Value(),
@@ -245,9 +245,9 @@ func (e *tunnelEditor) tunnel() config.Tunnel {
 // validate mirrors config.Validate per field so the form can highlight invalid
 // inputs before calling the controller. The controller/daemon validate again
 // (defence in depth).
-func (e *tunnelEditor) validate() map[string]string {
+func (e *tuberEditor) validate() map[string]string {
 	errs := map[string]string{}
-	t := e.tunnel()
+	t := e.tuber()
 
 	name := strings.TrimSpace(t.Name)
 	switch {
@@ -276,19 +276,19 @@ func (e *tunnelEditor) validate() map[string]string {
 	return errs
 }
 
-func (e *tunnelEditor) trySave() {
+func (e *tuberEditor) trySave() {
 	e.errs = e.validate()
 	if len(e.errs) > 0 {
 		e.status = "fix the highlighted fields"
 		return
 	}
 	e.errs = map[string]string{}
-	t := e.tunnel()
+	t := e.tuber()
 	var err error
 	if e.mode == modeNew {
-		err = e.ctrl.AddTunnel(t)
+		err = e.ctrl.AddTuber(t)
 	} else {
-		err = e.ctrl.UpdateTunnel(e.original, t)
+		err = e.ctrl.UpdateTuber(e.original, t)
 	}
 	if err != nil {
 		e.status = "error: " + err.Error()
@@ -298,11 +298,11 @@ func (e *tunnelEditor) trySave() {
 	e.done = true
 }
 
-func (e *tunnelEditor) view() string {
+func (e *tuberEditor) view() string {
 	var b strings.Builder
-	title := "New tunnel"
+	title := "New tuber"
 	if e.mode == modeEdit {
-		title = "Edit tunnel: " + e.original
+		title = "Edit tuber: " + e.original
 	}
 	b.WriteString(editorTitleStyle.Render(title))
 	b.WriteString("\n\n")
@@ -324,7 +324,7 @@ func (e *tunnelEditor) view() string {
 	return modalStyle.Render(b.String())
 }
 
-func (e *tunnelEditor) renderText(label string, ti *textinput.Model, idx int, key string) string {
+func (e *tuberEditor) renderText(label string, ti *textinput.Model, idx int, key string) string {
 	focused := e.focus == idx
 	lab := fmt.Sprintf("%-9s", label+":")
 	if focused {
@@ -339,7 +339,7 @@ func (e *tunnelEditor) renderText(label string, ti *textinput.Model, idx int, ke
 	return line + "\n"
 }
 
-func (e *tunnelEditor) renderType() string {
+func (e *tuberEditor) renderType() string {
 	focused := e.focus == fType
 	lab := fmt.Sprintf("%-9s", "Type:")
 	if focused {
@@ -347,7 +347,7 @@ func (e *tunnelEditor) renderType() string {
 	} else {
 		lab = dimStyle.Render(lab)
 	}
-	val := tunnelTypes[e.typeIdx]
+	val := tuberTypes[e.typeIdx]
 	if focused {
 		val = cursorStyle.Render(val) + "  " + dimStyle.Render("←/→")
 	} else {

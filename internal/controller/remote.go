@@ -25,9 +25,9 @@ type daemonClient interface {
 	Reload() error
 	Events(ctx context.Context) (io.ReadCloser, error)
 	Config() (*config.Config, error)
-	AddTunnel(t config.Tunnel) error
-	UpdateTunnel(name string, t config.Tunnel) error
-	DeleteTunnel(name string) error
+	AddTuber(t config.Tuber) error
+	UpdateTuber(name string, t config.Tuber) error
+	DeleteTuber(name string) error
 	Logs(name string) ([]routelog.Entry, error)
 	AcceptHost(name string) error
 	SetPassphrase(name, passphrase string) error
@@ -80,30 +80,30 @@ func (r *Remote) Reload() error             { return r.client.Reload() }
 // clients read it through the API rather than touching disk. Phase 10.
 func (r *Remote) Config() (*config.Config, error) { return r.client.Config() }
 
-func (r *Remote) AddTunnel(t config.Tunnel) error { return r.client.AddTunnel(t) }
+func (r *Remote) AddTuber(t config.Tuber) error { return r.client.AddTuber(t) }
 
-func (r *Remote) UpdateTunnel(name string, t config.Tunnel) error {
-	return r.client.UpdateTunnel(name, t)
+func (r *Remote) UpdateTuber(name string, t config.Tuber) error {
+	return r.client.UpdateTuber(name, t)
 }
 
-func (r *Remote) DeleteTunnel(name string) error { return r.client.DeleteTunnel(name) }
+func (r *Remote) DeleteTuber(name string) error { return r.client.DeleteTuber(name) }
 
 // Logs fetches the daemon's recent in-memory log entries for the TUI logs
 // screen. The daemon owns the ring buffer. Phase 11.
 func (r *Remote) Logs(name string) ([]routelog.Entry, error) { return r.client.Logs(name) }
 
-// AcceptHost asks the daemon to append the tunnel's pending unknown-host key
+// AcceptHost asks the daemon to append the tuber's pending unknown-host key
 // and restart it (Phase 11 TOFU prompt).
 func (r *Remote) AcceptHost(name string) error { return r.client.AcceptHost(name) }
 
-// AcceptPassphrase sends the tunnel's identity passphrase to the daemon, which
+// AcceptPassphrase sends the tuber's identity passphrase to the daemon, which
 // stores it and unblocks a dial waiting on it (Phase 19 passphrase prompt).
 func (r *Remote) AcceptPassphrase(name, passphrase string) error {
 	return r.client.SetPassphrase(name, passphrase)
 }
 
 // LiveListenerFiles is a no-op for the remote (attach) controller: it owns no
-// tunnels and therefore no local listeners to hand off. The hand-off only runs
+// tubers and therefore no local listeners to hand off. The hand-off only runs
 // in standalone mode, so this never participates; it exists to satisfy the
 // Controller interface.
 func (r *Remote) LiveListenerFiles() (map[string]*os.File, error) {

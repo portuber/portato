@@ -22,7 +22,7 @@ func restoreWatchSeams(t *testing.T) {
 	})
 }
 
-// newWatchTestServer builds a server over a temp config (one tunnel "db") with
+// newWatchTestServer builds a server over a temp config (one tuber "db") with
 // a fake engine and a file watcher wired to reloadFromWatch, ready to react to
 // edits of cfgPath. Returns the server, its engine and the captured log buffer.
 func newWatchTestServer(t *testing.T) (*Server, *fakeEngine, string, *bytes.Buffer) {
@@ -48,17 +48,17 @@ func newWatchTestServer(t *testing.T) (*Server, *fakeEngine, string, *bytes.Buff
 func feNames(fe *fakeEngine) []string {
 	fe.mu.Lock()
 	defer fe.mu.Unlock()
-	out := make([]string, 0, len(fe.cfg.Tunnels))
-	for _, t := range fe.cfg.Tunnels {
+	out := make([]string, 0, len(fe.cfg.Tubers))
+	for _, t := range fe.cfg.Tubers {
 		out = append(out, t.Name)
 	}
 	return out
 }
 
-func serverTunnelCount(s *Server) int {
+func serverTuberCount(s *Server) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return len(s.cfg.Tunnels)
+	return len(s.cfg.Tubers)
 }
 
 func TestWatcher_AppliesEdit(t *testing.T) {
@@ -68,9 +68,9 @@ func TestWatcher_AppliesEdit(t *testing.T) {
 
 	s, fe, cfgPath, _ := newWatchTestServer(t)
 
-	// Add a second tunnel and save.
+	// Add a second tuber and save.
 	cfg2 := testConfig()
-	cfg2.Tunnels = append(cfg2.Tunnels, config.Tunnel{
+	cfg2.Tubers = append(cfg2.Tubers, config.Tuber{
 		Name: "web", Type: "local", Local: "8080", Remote: "web:80", SSH: "u@h:22",
 	})
 	if err := cfg2.Save(cfgPath); err != nil {
@@ -78,8 +78,8 @@ func TestWatcher_AppliesEdit(t *testing.T) {
 	}
 
 	waitFor(func() bool { return len(feNames(fe)) == 2 }, time.Second)
-	if got := serverTunnelCount(s); got != 2 {
-		t.Errorf("server config after edit: %d tunnels, want 2", got)
+	if got := serverTuberCount(s); got != 2 {
+		t.Errorf("server config after edit: %d tubers, want 2", got)
 	}
 }
 
@@ -90,9 +90,9 @@ func TestWatcher_BadEditKeepsLastGood(t *testing.T) {
 
 	s, fe, cfgPath, logbuf := newWatchTestServer(t)
 
-	// First make a good edit to a known 2-tunnel state.
+	// First make a good edit to a known 2-tuber state.
 	cfg2 := testConfig()
-	cfg2.Tunnels = append(cfg2.Tunnels, config.Tunnel{
+	cfg2.Tubers = append(cfg2.Tubers, config.Tuber{
 		Name: "web", Type: "local", Local: "8080", Remote: "web:80", SSH: "u@h:22",
 	})
 	if err := cfg2.Save(cfgPath); err != nil {
@@ -101,17 +101,17 @@ func TestWatcher_BadEditKeepsLastGood(t *testing.T) {
 	waitFor(func() bool { return len(feNames(fe)) == 2 }, time.Second)
 
 	// Now write a syntactically broken config.
-	if err := os.WriteFile(cfgPath, []byte("tunnels:\n  - name: db\n    : : : bad yaml\n"), 0o600); err != nil {
+	if err := os.WriteFile(cfgPath, []byte("tubers:\n  - name: db\n    : : : bad yaml\n"), 0o600); err != nil {
 		t.Fatalf("write bad config: %v", err)
 	}
 	// Let the watcher detect, settle, attempt and skip.
 	time.Sleep(200 * time.Millisecond)
 
-	if got := serverTunnelCount(s); got != 2 {
-		t.Errorf("server config after bad edit: %d tunnels, want 2 (last-good)", got)
+	if got := serverTuberCount(s); got != 2 {
+		t.Errorf("server config after bad edit: %d tubers, want 2 (last-good)", got)
 	}
 	if n := len(feNames(fe)); n != 2 {
-		t.Errorf("engine after bad edit: %d tunnels, want 2 (last-good)", n)
+		t.Errorf("engine after bad edit: %d tubers, want 2 (last-good)", n)
 	}
 	if !bytes.Contains(logbuf.Bytes(), []byte("config reload skipped")) {
 		t.Errorf("expected a reload-skipped log line; got:\n%s", logbuf.String())
@@ -130,9 +130,9 @@ func TestWatcher_VanishSkipsReload(t *testing.T) {
 	}
 	time.Sleep(150 * time.Millisecond)
 
-	// No crash, last-good config (1 tunnel) survives.
-	if got := serverTunnelCount(s); got != 1 {
-		t.Errorf("server config after vanish: %d tunnels, want 1 (last-good)", got)
+	// No crash, last-good config (1 tuber) survives.
+	if got := serverTuberCount(s); got != 1 {
+		t.Errorf("server config after vanish: %d tubers, want 1 (last-good)", got)
 	}
 	if !bytes.Contains(logbuf.Bytes(), []byte("config vanished")) {
 		t.Errorf("expected a vanished log line; got:\n%s", logbuf.String())
@@ -164,10 +164,10 @@ func TestWatcher_CoalescesBurst(t *testing.T) {
 	// Fire several distinct writes back-to-back.
 	for i := 0; i < 4; i++ {
 		c := testConfig()
-		c.Tunnels = []config.Tunnel{{
+		c.Tubers = []config.Tuber{{
 			Name: "db", Type: "local", Local: "5500", Remote: "db:5432", SSH: "u@h:22",
 		}}
-		c.Tunnels[0].Local = "550" + string(rune('0'+i)) // vary content -> size/mtime differ
+		c.Tubers[0].Local = "550" + string(rune('0'+i)) // vary content -> size/mtime differ
 		_ = c.Save(cfgPath)
 		time.Sleep(3 * time.Millisecond)
 	}
@@ -187,6 +187,6 @@ func TestWatcher_CoalescesBurst(t *testing.T) {
 		t.Errorf("burst should coalesce to 1 reload, got %d", reloadsBefore)
 	}
 	if n := len(feNames(fe)); n != 1 {
-		t.Errorf("engine should have the final 1-tunnel config, got %d", n)
+		t.Errorf("engine should have the final 1-tuber config, got %d", n)
 	}
 }

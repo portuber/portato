@@ -20,11 +20,11 @@ type fakeClient struct {
 
 	enables, disables, restarts, reloads int
 
-	cfg       *config.Config
-	adds      []config.Tunnel
-	updates   []config.Tunnel
-	deletes   []string
-	muTunnels sync.Mutex
+	cfg      *config.Config
+	adds     []config.Tuber
+	updates  []config.Tuber
+	deletes  []string
+	muTubers sync.Mutex
 
 	mu      sync.Mutex
 	streams []io.ReadCloser
@@ -46,21 +46,21 @@ func (f *fakeClient) Config() (*config.Config, error) {
 	}
 	return f.cfg.Clone(), nil
 }
-func (f *fakeClient) AddTunnel(t config.Tunnel) error {
-	f.muTunnels.Lock()
-	defer f.muTunnels.Unlock()
+func (f *fakeClient) AddTuber(t config.Tuber) error {
+	f.muTubers.Lock()
+	defer f.muTubers.Unlock()
 	f.adds = append(f.adds, t)
 	return f.err
 }
-func (f *fakeClient) UpdateTunnel(name string, t config.Tunnel) error {
-	f.muTunnels.Lock()
-	defer f.muTunnels.Unlock()
+func (f *fakeClient) UpdateTuber(name string, t config.Tuber) error {
+	f.muTubers.Lock()
+	defer f.muTubers.Unlock()
 	f.updates = append(f.updates, t)
 	return f.err
 }
-func (f *fakeClient) DeleteTunnel(name string) error {
-	f.muTunnels.Lock()
-	defer f.muTunnels.Unlock()
+func (f *fakeClient) DeleteTuber(name string) error {
+	f.muTubers.Lock()
+	defer f.muTubers.Unlock()
 	f.deletes = append(f.deletes, name)
 	return f.err
 }

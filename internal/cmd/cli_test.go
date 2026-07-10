@@ -66,16 +66,16 @@ func newStubServer(t *testing.T, statuses []forward.Status) *stubServer {
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeStubJSON(t, w, map[string]bool{"ok": true})
 	})
-	mux.HandleFunc("GET /tunnels", func(w http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("GET /tubers", func(w http.ResponseWriter, _ *http.Request) {
 		writeStubJSON(t, w, statuses)
 	})
-	mux.HandleFunc("POST /tunnels/{name}/enable", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /tubers/{name}/enable", func(w http.ResponseWriter, r *http.Request) {
 		s.record(w, r, "enable", known)
 	})
-	mux.HandleFunc("POST /tunnels/{name}/disable", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /tubers/{name}/disable", func(w http.ResponseWriter, r *http.Request) {
 		s.record(w, r, "disable", known)
 	})
-	mux.HandleFunc("POST /tunnels/{name}/restart", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("POST /tubers/{name}/restart", func(w http.ResponseWriter, r *http.Request) {
 		s.record(w, r, "restart", known)
 	})
 	mux.HandleFunc("POST /reload", func(w http.ResponseWriter, _ *http.Request) {
@@ -99,10 +99,10 @@ func (s *stubServer) record(w http.ResponseWriter, r *http.Request, op string, k
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if _, ok := known[name]; !ok {
-		writeStubErr(s.t, w, http.StatusNotFound, "unknown tunnel %q", name)
+		writeStubErr(s.t, w, http.StatusNotFound, "unknown tuber %q", name)
 		return
 	}
-	resp := map[string]string{"tunnel": name}
+	resp := map[string]string{"tuber": name}
 	switch op {
 	case "enable":
 		s.enabled = append(s.enabled, name)
@@ -193,7 +193,7 @@ func TestList_ErrorIndicator(t *testing.T) {
 		t.Errorf("unexpected stderr: %q", errOut.String())
 	}
 	if !strings.Contains(out.String(), "✗") {
-		t.Errorf("error tunnel should render ✗ indicator (not ●)\ngot:\n%s", out.String())
+		t.Errorf("error tuber should render ✗ indicator (not ●)\ngot:\n%s", out.String())
 	}
 }
 
@@ -234,16 +234,16 @@ func TestEnableDisableRestart_ConfirmAndRPC(t *testing.T) {
 	}
 }
 
-func TestEnable_UnknownTunnel(t *testing.T) {
+func TestEnable_UnknownTuber(t *testing.T) {
 	s := newStubServer(t, sampleStatuses())
 	useStub(t, s)
 
 	c, out, errOut := captureCmd()
 	if err := enableRunE(c, []string{"nope"}); err == nil {
-		t.Fatal("expected error for unknown tunnel")
+		t.Fatal("expected error for unknown tuber")
 	}
-	if !strings.Contains(errOut.String(), "unknown tunnel") {
-		t.Errorf("stderr should mention unknown tunnel; got %q", errOut.String())
+	if !strings.Contains(errOut.String(), "unknown tuber") {
+		t.Errorf("stderr should mention unknown tuber; got %q", errOut.String())
 	}
 	if out.String() != "" {
 		t.Errorf("stdout should be empty on error; got %q", out.String())

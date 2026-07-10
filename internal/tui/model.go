@@ -28,26 +28,26 @@ type Model struct {
 	filtering bool
 
 	// confirmQuit shows the "leave running in background?" modal. Only raised
-	// in standalone mode when there are live tunnels.
+	// in standalone mode when there are live tubers.
 	confirmQuit bool
 	// handoffing marks the (brief) window after the user accepts the modal:
-	// the standalone process is handing its tunnels off to a spawned daemon.
+	// the standalone process is handing its tubers off to a spawned daemon.
 	handoffing bool
 	handoffErr string
 
-	// editor is the Phase 10 tunnel editor sub-model (nil when inactive).
-	editor *tunnelEditor
-	// confirmDelete shows the "delete tunnel?" modal.
+	// editor is the Phase 10 tuber editor sub-model (nil when inactive).
+	editor *tuberEditor
+	// confirmDelete shows the "delete tuber?" modal.
 	confirmDelete bool
 	deleteTarget  string
 
 	// confirmAccept shows the "accept unknown host key?" modal (Phase 11 TOFU).
-	// Raised by pressing space on a tunnel blocked by an unknown SSH host key.
+	// Raised by pressing space on a tuber blocked by an unknown SSH host key.
 	confirmAccept bool
 	acceptTarget  string
 
 	// enteringPassphrase shows the identity-passphrase prompt modal (Phase 19).
-	// Raised by pressing space on a tunnel whose dial is blocked on a
+	// Raised by pressing space on a tuber whose dial is blocked on a
 	// passphrase-protected identity (Status.PendingPassphrase). The input is
 	// masked; enter submits via Controller.AcceptPassphrase, esc cancels.
 	// passphraseAttempts counts submits so a wrong passphrase shows a retry hint.
@@ -57,11 +57,11 @@ type Model struct {
 	passphraseAttempts int
 	// dismissedPending is the pending-prompt key (a passphrase path or a host
 	// line) the user cancelled with esc, so the auto-open on tick does not
-	// re-pop the same prompt endlessly. Cleared once the cursor's tunnel has no
+	// re-pop the same prompt endlessly. Cleared once the cursor's tuber has no
 	// pending prompt. A manual space still reopens it on demand. Phase 19 UX.
 	dismissedPending string
 
-	// logs is the Phase 11 per-tunnel log screen sub-model (nil when inactive).
+	// logs is the Phase 11 per-tuber log screen sub-model (nil when inactive).
 	logs *logsView
 
 	cfgPath string
@@ -117,9 +117,9 @@ func waitForChange(ch <-chan struct{}) tea.Cmd {
 
 // redrawTickMsg drives a purely local re-render every second. It does NOT fetch
 // from the controller — its only purpose is to refresh time-based display
-// fields (uptime) while a tunnel sits in a steady state (Connected/Off) and
+// fields (uptime) while a tuber sits in a steady state (Connected/Off) and
 // produces no state-change events. This keeps the Phase 9 "no idle daemon
-// load" guarantee intact: there is no per-second /tunnels request, just a
+// load" guarantee intact: there is no per-second /tubers request, just a
 // cheap local redraw.
 type redrawTickMsg struct{}
 

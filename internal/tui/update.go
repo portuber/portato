@@ -28,8 +28,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.list = m.ctrl.List()
 		m.clampCursor()
-		// Auto-open a pending prompt for the tunnel under the cursor: pressing
-		// space once to enable a tunnel that then blocks on a passphrase / an
+		// Auto-open a pending prompt for the tuber under the cursor: pressing
+		// space once to enable a tuber that then blocks on a passphrase / an
 		// unknown host should surface the prompt without a second keypress.
 		// Skipped while the user is busy (another modal/editor/filter) or after
 		// they dismissed this exact prompt (esc) — otherwise it would reopen
@@ -45,7 +45,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.passphraseAttempts = 0
 			m.passphraseInput.SetValue("")
 		}
-		// Forget a stale dismissal once the cursor's tunnel has no pending
+		// Forget a stale dismissal once the cursor's tuber has no pending
 		// prompt, so a future block on it auto-opens again.
 		if m.hasCurrent() && pendingKey(m.list[m.cursor]) == "" {
 			m.dismissedPending = ""
@@ -59,7 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// without fetching from the controller. Re-arm; the change-waiter is
 		// an independent pending command. See redrawTickMsg in model.go.
 		// The logs screen (transient modal) does re-fetch here — acceptable:
-		// it is not the idle tunnel-status path Phase 9 made push-driven.
+		// it is not the idle tuber-status path Phase 9 made push-driven.
 		if m.logs != nil {
 			m.logs.refresh()
 		}
@@ -150,7 +150,7 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.handoffing {
 			return m, nil
 		}
-		if m.attach || !m.hasLiveTunnels() {
+		if m.attach || !m.hasLiveTubers() {
 			m.quit = true
 			return m, tea.Quit
 		}
@@ -216,15 +216,15 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleDeleteConfirm dispatches the "delete tunnel?" modal keys. y deletes
-// (and stops the tunnel via the engine reload); n/enter/esc cancel.
+// handleDeleteConfirm dispatches the "delete tuber?" modal keys. y deletes
+// (and stops the tuber via the engine reload); n/enter/esc cancel.
 func (m Model) handleDeleteConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch k.String() {
 	case "y":
 		name := m.deleteTarget
 		m.confirmDelete = false
 		m.deleteTarget = ""
-		_ = m.ctrl.DeleteTunnel(name)
+		_ = m.ctrl.DeleteTuber(name)
 		m.list = m.ctrl.List()
 		m.clampCursor()
 	case "n", "enter", "esc":
@@ -235,7 +235,7 @@ func (m Model) handleDeleteConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleAcceptConfirm dispatches the "accept unknown host key?" modal keys.
-// y/a appends the key (Controller.AcceptHost) and restarts the tunnel;
+// y/a appends the key (Controller.AcceptHost) and restarts the tuber;
 // n/enter/esc dismiss the modal without changing anything. Phase 11 TOFU.
 func (m Model) handleAcceptConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch k.String() {
@@ -287,7 +287,7 @@ func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// pendingPassphraseFor reports whether the tunnel named name currently has a
+// pendingPassphraseFor reports whether the tuber named name currently has a
 // pending passphrase need in the status snapshot. Drives the modal auto-close.
 func pendingPassphraseFor(list []controller.Status, name string) bool {
 	for _, s := range list {
@@ -298,7 +298,7 @@ func pendingPassphraseFor(list []controller.Status, name string) bool {
 	return false
 }
 
-// pendingKey returns a stable identifier for whatever prompt a tunnel is
+// pendingKey returns a stable identifier for whatever prompt a tuber is
 // blocked on (a passphrase path or a host-key line), or "" when it is not
 // blocked. Used so a dismissed prompt is not auto-reopened until it changes.
 func pendingKey(s controller.Status) string {
@@ -311,7 +311,7 @@ func pendingKey(s controller.Status) string {
 	return ""
 }
 
-// pendingKeyForName looks up pendingKey for a tunnel by name in a snapshot.
+// pendingKeyForName looks up pendingKey for a tuber by name in a snapshot.
 func pendingKeyForName(list []controller.Status, name string) string {
 	for _, s := range list {
 		if s.Name == name {
@@ -330,7 +330,7 @@ func (m Model) isBusy() bool {
 }
 
 // autoOpenIfPending surfaces a pending passphrase / unknown-host prompt for the
-// tunnel under the cursor without requiring a second keypress (Phase 19 UX). It
+// tuber under the cursor without requiring a second keypress (Phase 19 UX). It
 // is a no-op when the user is busy or has dismissed this exact prompt. Returns
 // a command (the masked-input blink) when it opens the passphrase modal.
 func (m Model) autoOpenIfPending() (Model, tea.Cmd) {
@@ -350,7 +350,7 @@ func (m Model) autoOpenIfPending() (Model, tea.Cmd) {
 	return m, nil
 }
 
-// openPassphraseModal arms the identity-passphrase modal for the named tunnel
+// openPassphraseModal arms the identity-passphrase modal for the named tuber
 // (resetting the masked input and the attempt counter) and returns the
 // masked-input focus command. Shared by the manual `p` affordance and the tick
 // auto-open. Phase 30.
@@ -362,17 +362,17 @@ func (m Model) openPassphraseModal(name string) (Model, tea.Cmd) {
 	return m, m.passphraseInput.Focus()
 }
 
-// openEditor builds the tunnel editor form. For edit mode the current tunnel
+// openEditor builds the tuber editor form. For edit mode the current tuber
 // is fetched via Config() (the daemon owns the raw fields; Status only has the
 // resolved local address). Returns a nil editor if the config can't be read.
-func openEditor(ctrl controller.Controller, edit bool, selected string, width, height int) (*tunnelEditor, tea.Cmd) {
+func openEditor(ctrl controller.Controller, edit bool, selected string, width, height int) (*tuberEditor, tea.Cmd) {
 	cfg, err := ctrl.Config()
 	if err != nil || cfg == nil {
 		return nil, nil
 	}
 	var names []string
-	var existing config.Tunnel
-	for _, t := range cfg.Tunnels {
+	var existing config.Tuber
+	for _, t := range cfg.Tubers {
 		names = append(names, t.Name)
 		if edit && t.Name == selected {
 			existing = t
@@ -382,26 +382,26 @@ func openEditor(ctrl controller.Controller, edit bool, selected string, width, h
 	if edit {
 		mode = modeEdit
 	}
-	e := newTunnelEditor(mode, existing, names, ctrl)
+	e := newTuberEditor(mode, existing, names, ctrl)
 	e.width, e.height = width, height
 	return e, e.setFocus(fName)
 }
 
 // openDuplicateEditor opens the Phase 10 editor in create mode, prefilled from
-// the selected tunnel under a fresh "<name>-copy" name with Enabled=false. It
-// commits via AddTunnel (not UpdateTunnel) when saved, so the source tunnel is
+// the selected tuber under a fresh "<name>-copy" name with Enabled=false. It
+// commits via AddTuber (not UpdateTuber) when saved, so the source tuber is
 // untouched — the "same SSH host, a second local port" convenience becomes a
 // keystroke plus a small edit. Returns a nil editor when the config can't be
 // read or the source is no longer present (mirrors openEditor's cfg-error path).
-func openDuplicateEditor(ctrl controller.Controller, selected string, width, height int) (*tunnelEditor, tea.Cmd) {
+func openDuplicateEditor(ctrl controller.Controller, selected string, width, height int) (*tuberEditor, tea.Cmd) {
 	cfg, err := ctrl.Config()
 	if err != nil || cfg == nil {
 		return nil, nil
 	}
 	var names []string
-	var src config.Tunnel
+	var src config.Tuber
 	found := false
-	for _, t := range cfg.Tunnels {
+	for _, t := range cfg.Tubers {
 		names = append(names, t.Name)
 		if t.Name == selected {
 			src = t
@@ -413,7 +413,7 @@ func openDuplicateEditor(ctrl controller.Controller, selected string, width, hei
 	}
 	src.Name = freshName(selected, names)
 	src.Enabled = false
-	e := newTunnelEditor(modeNew, src, names, ctrl)
+	e := newTuberEditor(modeNew, src, names, ctrl)
 	e.original = ""
 	e.width, e.height = width, height
 	return e, e.setFocus(fName)
@@ -462,7 +462,7 @@ func (m Model) handleFilterKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		(&m).clampCursor()
 		return m, nil
 	case "ctrl+c":
-		if m.attach || !m.hasLiveTunnels() {
+		if m.attach || !m.hasLiveTubers() {
 			m.quit = true
 			return m, tea.Quit
 		}
@@ -503,7 +503,7 @@ func (m Model) handoffCmd() tea.Cmd {
 	}
 }
 
-func (m Model) hasLiveTunnels() bool {
+func (m Model) hasLiveTubers() bool {
 	for _, s := range m.list {
 		switch s.State {
 		case controller.Connecting, controller.Connected, controller.Reconnecting:
@@ -513,7 +513,7 @@ func (m Model) hasLiveTunnels() bool {
 	return false
 }
 
-// matches reports whether a tunnel passes the `/` filter. The query is matched
+// matches reports whether a tuber passes the `/` filter. The query is matched
 // fzf-style (case-insensitive subsequence via fuzzysearch) against the name,
 // type and endpoint; an exact substring still hits as a fallback so an
 // unfuzzy-but-contiguous token keeps matching (Phase 20). An empty query
@@ -535,7 +535,7 @@ func (m Model) matches(s controller.Status) bool {
 		strings.Contains(strings.ToLower(s.Endpoint()), q)
 }
 
-// visibleCount returns how many tunnels currently pass the filter, for the
+// visibleCount returns how many tubers currently pass the filter, for the
 // filter line's matched/total count.
 func (m Model) visibleCount() int {
 	n := 0

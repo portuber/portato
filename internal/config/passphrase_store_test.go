@@ -13,7 +13,7 @@ func TestIdentityPassphraseStore_Load(t *testing.T) {
 defaults:
   identity: ~/.ssh/id
   identity_passphrase_store: true
-tunnels:
+tubers:
   - name: t1
     type: local
     local: 9090
@@ -34,7 +34,7 @@ tunnels:
 		p := writeConfigFile(t, dir, "config.yaml", `
 defaults:
   identity: ~/.ssh/id
-tunnels:
+tubers:
   - name: t1
     type: local
     local: 9090
@@ -59,7 +59,7 @@ func TestIdentityPassphraseStore_RoundTrip(t *testing.T) {
 defaults:
   identity: ~/.ssh/id
   identity_passphrase_store: true
-tunnels:
+tubers:
   - name: t1
     type: local
     local: 9090

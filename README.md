@@ -115,7 +115,7 @@ so a reverse forward exposes your local service through the server. Use an
 explicit host for loopback-only (`127.0.0.1:port`) or a specific interface:
 
 ```yaml
-tunnels:
+tubers:
   - name: pull-redis
     type: remote
     remote: 16379        # listened on the server on all interfaces (*:16379)
@@ -137,7 +137,7 @@ host side, so you can reach any internal address through the bastion without a
 forward per port:
 
 ```yaml
-tunnels:
+tubers:
   - name: socks
     type: dynamic
     local: 1080          # SOCKS5 proxy -> 127.0.0.1:1080

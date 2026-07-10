@@ -16,7 +16,7 @@ import (
 const (
 	defaultSSHPort = 22
 	defaultHost    = "127.0.0.1"
-	// remoteWildcard is the host a type=remote tunnel requests on the SSH
+	// remoteWildcard is the host a type=remote tuber requests on the SSH
 	// server when `remote` has no explicit host (a bare port or ":port"). It
 	// binds all interfaces (so a reverse forward is publicly reachable by
 	// default, the common "expose my local service through the server" case)
@@ -30,7 +30,7 @@ const (
 
 type Config struct {
 	Defaults Defaults `yaml:"defaults" json:"defaults"`
-	Tunnels  []Tunnel `yaml:"tunnels" json:"tunnels"`
+	Tubers   []Tuber  `yaml:"tubers" json:"tubers"`
 }
 
 type Defaults struct {
@@ -39,9 +39,9 @@ type Defaults struct {
 	AcceptNewHosts bool   `yaml:"accept_new_hosts" json:"accept_new_hosts"`
 
 	// Socks5User/Socks5Password are the default SOCKS5 user/pass authentication
-	// for type=dynamic tunnels (Phase 20). A tunnel may override per-name. When
+	// for type=dynamic tubers (Phase 20). A tuber may override per-name. When
 	// both are empty the SOCKS proxy stays open (NoAuth) — preserving the
-	// pre-Phase-20 behaviour. Only honoured by type=dynamic tunnels.
+	// pre-Phase-20 behaviour. Only honoured by type=dynamic tubers.
 	Socks5User     string `yaml:"socks5_user" json:"socks5_user"`
 	Socks5Password string `yaml:"socks5_password" json:"socks5_password"`
 
@@ -75,7 +75,7 @@ type LogConfig struct {
 	Retain int `yaml:"retain" json:"retain"`
 }
 
-type Tunnel struct {
+type Tuber struct {
 	Name     string `yaml:"name" json:"name"`
 	Type     string `yaml:"type" json:"type"`
 	Local    string `yaml:"local" json:"local"`
@@ -84,9 +84,9 @@ type Tunnel struct {
 	Identity string `yaml:"identity" json:"identity"`
 	Enabled  bool   `yaml:"enabled" json:"enabled"`
 
-	// Socks5User/Socks5Password override Defaults for type=dynamic tunnels
-	// (Phase 20). A tunnel-level pair wins over the defaults pair; an empty
-	// tunnel-level value falls back to defaults. NoAuth when both resolve empty.
+	// Socks5User/Socks5Password override Defaults for type=dynamic tubers
+	// (Phase 20). A tuber-level pair wins over the defaults pair; an empty
+	// tuber-level value falls back to defaults. NoAuth when both resolve empty.
 	Socks5User     string `yaml:"socks5_user" json:"socks5_user"`
 	Socks5Password string `yaml:"socks5_password" json:"socks5_password"`
 
@@ -129,39 +129,39 @@ func Load(path string) (*Config, error) {
 
 func (c *Config) Validate() error {
 	seen := make(map[string]struct{})
-	for i := range c.Tunnels {
-		t := &c.Tunnels[i]
+	for i := range c.Tubers {
+		t := &c.Tubers[i]
 		if strings.TrimSpace(t.Name) == "" {
-			return fmt.Errorf("tunnel #%d: name is empty", i+1)
+			return fmt.Errorf("tuber #%d: name is empty", i+1)
 		}
 		if !validName(t.Name) {
-			return fmt.Errorf("tunnel %q: name must be alphanumeric, dashes or underscores", t.Name)
+			return fmt.Errorf("tuber %q: name must be alphanumeric, dashes or underscores", t.Name)
 		}
 		if _, ok := seen[t.Name]; ok {
-			return fmt.Errorf("tunnel %q: duplicate name", t.Name)
+			return fmt.Errorf("tuber %q: duplicate name", t.Name)
 		}
 		seen[t.Name] = struct{}{}
 		switch t.Type {
 		case "local", "remote", "dynamic":
 		default:
-			return fmt.Errorf("tunnel %q: type %q not supported (supported: local, remote, dynamic)", t.Name, t.Type)
+			return fmt.Errorf("tuber %q: type %q not supported (supported: local, remote, dynamic)", t.Name, t.Type)
 		}
 		// local is required for every type: for local/dynamic it is the listen
 		// address (a bare port expands to 127.0.0.1:port); for remote it is the
 		// address server-side connections are forwarded to here.
 		if strings.TrimSpace(t.Local) == "" {
-			return fmt.Errorf("tunnel %q: local is empty", t.Name)
+			return fmt.Errorf("tuber %q: local is empty", t.Name)
 		}
 		// remote is the destination dialed on the host (local) or the address
-		// listened on the host (remote). A dynamic (-D) tunnel has no remote.
+		// listened on the host (remote). A dynamic (-D) tuber has no remote.
 		if t.Type != "dynamic" && strings.TrimSpace(t.Remote) == "" {
-			return fmt.Errorf("tunnel %q: remote is empty", t.Name)
+			return fmt.Errorf("tuber %q: remote is empty", t.Name)
 		}
 		if strings.TrimSpace(t.Host) == "" {
-			return fmt.Errorf("tunnel %q: ssh host is empty", t.Name)
+			return fmt.Errorf("tuber %q: ssh host is empty", t.Name)
 		}
 		if t.Port < 1 || t.Port > 65535 {
-			return fmt.Errorf("tunnel %q: ssh port %d out of range (1-65535)", t.Name, t.Port)
+			return fmt.Errorf("tuber %q: ssh port %d out of range (1-65535)", t.Name, t.Port)
 		}
 	}
 	return nil
@@ -204,7 +204,7 @@ func exampleConfig() *Config {
 			KnownHosts:     "~/.ssh/known_hosts",
 			AcceptNewHosts: false,
 		},
-		Tunnels: []Tunnel{
+		Tubers: []Tuber{
 			{
 				Name:    "db-stage",
 				Type:    "local",
@@ -218,8 +218,8 @@ func exampleConfig() *Config {
 }
 
 func (c *Config) prepare() {
-	for i := range c.Tunnels {
-		t := &c.Tunnels[i]
+	for i := range c.Tubers {
+		t := &c.Tubers[i]
 		if strings.TrimSpace(t.Type) == "" {
 			t.Type = "local"
 		}
@@ -229,16 +229,16 @@ func (c *Config) prepare() {
 	}
 }
 
-func (t Tunnel) ListenAddr() string {
+func (t Tuber) ListenAddr() string {
 	return normalizeAddrPort(t.Local, defaultHost)
 }
 
-// RemoteListenAddr is the address a type=remote tunnel listens on, on the SSH
+// RemoteListenAddr is the address a type=remote tuber listens on, on the SSH
 // server side. A bare port or ":port" binds all interfaces via remoteWildcard
 // ("*:port"); an explicit host (127.0.0.1, 0.0.0.0, [::], a public IP, …) is
 // used as written. A non-loopback bind requires GatewayPorts
 // yes|clientspecified in sshd_config.
-func (t Tunnel) RemoteListenAddr() string {
+func (t Tuber) RemoteListenAddr() string {
 	return normalizeRemoteAddr(t.Remote)
 }
 
@@ -285,7 +285,7 @@ func normalizeAddrPort(s, defaultH string) string {
 	return net.JoinHostPort(defaultH, s)
 }
 
-func (t Tunnel) ResolvedIdentity(d Defaults) string {
+func (t Tuber) ResolvedIdentity(d Defaults) string {
 	if strings.TrimSpace(t.Identity) != "" {
 		return expandTilde(t.Identity)
 	}
@@ -295,11 +295,11 @@ func (t Tunnel) ResolvedIdentity(d Defaults) string {
 	return ""
 }
 
-// ResolvedSocks5User returns the SOCKS5 username a type=dynamic tunnel should
-// authenticate with: the tunnel-level value wins, otherwise the defaults value
+// ResolvedSocks5User returns the SOCKS5 username a type=dynamic tuber should
+// authenticate with: the tuber-level value wins, otherwise the defaults value
 // (Phase 20). Empty means no auth (a password alone is meaningless — see
 // ResolvedSocks5Creds).
-func (t Tunnel) ResolvedSocks5User(d Defaults) string {
+func (t Tuber) ResolvedSocks5User(d Defaults) string {
 	if strings.TrimSpace(t.Socks5User) != "" {
 		return t.Socks5User
 	}
@@ -307,7 +307,7 @@ func (t Tunnel) ResolvedSocks5User(d Defaults) string {
 }
 
 // ResolvedSocks5Password mirrors ResolvedSocks5User for the password half.
-func (t Tunnel) ResolvedSocks5Password(d Defaults) string {
+func (t Tuber) ResolvedSocks5Password(d Defaults) string {
 	if strings.TrimSpace(t.Socks5Password) != "" {
 		return t.Socks5Password
 	}
@@ -405,7 +405,7 @@ func expandTilde(p string) string {
 // keyring exactly the way the dial does, so the two never disagree.
 func ExpandTilde(p string) string { return expandTilde(p) }
 
-type tunnelRaw struct {
+type tuberRaw struct {
 	Name           string `yaml:"name"`
 	Type           string `yaml:"type"`
 	Local          any    `yaml:"local"`
@@ -417,8 +417,8 @@ type tunnelRaw struct {
 	Socks5Password string `yaml:"socks5_password"`
 }
 
-func (t *Tunnel) UnmarshalYAML(value *yaml.Node) error {
-	var raw tunnelRaw
+func (t *Tuber) UnmarshalYAML(value *yaml.Node) error {
+	var raw tuberRaw
 	if err := value.Decode(&raw); err != nil {
 		return err
 	}
@@ -442,7 +442,7 @@ func (t *Tunnel) UnmarshalYAML(value *yaml.Node) error {
 	case string:
 		t.Local = v
 	default:
-		return fmt.Errorf("tunnel %q: local must be a port number or host:port", raw.Name)
+		return fmt.Errorf("tuber %q: local must be a port number or host:port", raw.Name)
 	}
 	return nil
 }

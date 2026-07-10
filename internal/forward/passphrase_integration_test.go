@@ -40,9 +40,9 @@ func writePassphraseIdentity(t *testing.T, passphrase string) (string, ssh.Publi
 	return p, authorizedKey
 }
 
-// waitForPendingPassphrase polls until the tunnel reports a pending passphrase
+// waitForPendingPassphrase polls until the tuber reports a pending passphrase
 // need (the dial is blocked in provider.Wait), or times out.
-func waitForPendingPassphrase(t *testing.T, tun *Tunnel, timeout time.Duration) bool {
+func waitForPendingPassphrase(t *testing.T, tun *Tuber, timeout time.Duration) bool {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -73,7 +73,7 @@ func TestPassphraseIdentity_ConnectsNoAgent(t *testing.T) {
 		t.Fatalf("seed store: %v", err)
 	}
 
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name: "pp", Type: "local", Local: "0", Remote: "127.0.0.1:1",
 		SSH: "u@" + srv.Addr(), Identity: idPath,
 		User: "u", Host: "127.0.0.1", Port: srv.Port,
@@ -82,7 +82,7 @@ func TestPassphraseIdentity_ConnectsNoAgent(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), store)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), store)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestPassphraseIdentity_ConnectsNoAgent(t *testing.T) {
 // TestPassphraseIdentity_BlocksThenProvided asserts the blocking-dial path
 // against a real handshake: with no passphrase available the dial blocks and
 // surfaces PendingPassphrase; providing it via the store unblocks the dial and
-// the tunnel connects (no agent).
+// the tuber connects (no agent).
 func TestPassphraseIdentity_BlocksThenProvided(t *testing.T) {
 	t.Setenv("SSH_AUTH_SOCK", "")
 
@@ -109,7 +109,7 @@ func TestPassphraseIdentity_BlocksThenProvided(t *testing.T) {
 
 	store := secret.NewStore(secret.NewMemBackend(), func() bool { return false }) // empty: dial must block
 
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name: "pp", Type: "local", Local: "0", Remote: "127.0.0.1:1",
 		SSH: "u@" + srv.Addr(), Identity: idPath,
 		User: "u", Host: "127.0.0.1", Port: srv.Port,
@@ -118,7 +118,7 @@ func TestPassphraseIdentity_BlocksThenProvided(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), store)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), store)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -160,7 +160,7 @@ func TestPassphraseIdentity_WrongThenRight(t *testing.T) {
 
 	store := secret.NewStore(secret.NewMemBackend(), func() bool { return false })
 
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name: "pp", Type: "local", Local: "0", Remote: fmt.Sprintf("127.0.0.1:%d", srv.Port),
 		SSH: "u@" + srv.Addr(), Identity: idPath,
 		User: "u", Host: "127.0.0.1", Port: srv.Port,
@@ -169,7 +169,7 @@ func TestPassphraseIdentity_WrongThenRight(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), store)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), store)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}

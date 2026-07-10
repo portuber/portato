@@ -59,12 +59,12 @@ func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routel
 
 func (l *Local) List() []Status { return l.engine.List() }
 
-// StartEnabled starts every tunnel whose config has Enabled == true. The
+// StartEnabled starts every tuber whose config has Enabled == true. The
 // standalone launcher calls this right after building the controller so its
 // initial state matches the daemon's boot-time StartEnabledWith (SPEC §6): an
-// enabled:true tunnel is up in both modes, and a hand-off to the daemon brings
-// up the same set instead of surprise new tunnels. Not on the Controller
-// interface — attach mode never needs it (the daemon already owns its tunnels).
+// enabled:true tuber is up in both modes, and a hand-off to the daemon brings
+// up the same set instead of surprise new tubers. Not on the Controller
+// interface — attach mode never needs it (the daemon already owns its tubers).
 func (l *Local) StartEnabled() {
 	l.engine.StartEnabled()
 }
@@ -76,10 +76,10 @@ func (l *Local) LiveListenerFiles() (map[string]*os.File, error) {
 	return l.engine.LiveListenerFiles()
 }
 
-// Enable starts a tunnel and persists enabled=true to the config file. This
+// Enable starts a tuber and persists enabled=true to the config file. This
 // is the standalone-side mirror of the daemon's enable handler and the
 // invariant the standalone->daemon hand-off relies on (SPEC §6): the config
-// on disk is always the source of truth for which tunnels should be up.
+// on disk is always the source of truth for which tubers should be up.
 func (l *Local) Enable(name string) error {
 	if err := l.engine.Enable(name); err != nil {
 		return err
@@ -88,7 +88,7 @@ func (l *Local) Enable(name string) error {
 	return l.cfg.Save(l.cfgPath)
 }
 
-// Disable stops a tunnel and persists enabled=false to the config file.
+// Disable stops a tuber and persists enabled=false to the config file.
 func (l *Local) Disable(name string) error {
 	if err := l.engine.Disable(name); err != nil {
 		return err
@@ -116,38 +116,38 @@ func (l *Local) Config() (*config.Config, error) {
 	return l.cfg.Clone(), nil
 }
 
-// AddTunnel validates the new tunnel against the current config, then applies
+// AddTuber validates the new tuber against the current config, then applies
 // a comment-preserving append to the YAML file and reloads. The file is not
 // written unless validation passes.
-func (l *Local) AddTunnel(t config.Tunnel) error {
-	if _, err := l.cfg.WithTunnelAdded(t); err != nil {
+func (l *Local) AddTuber(t config.Tuber) error {
+	if _, err := l.cfg.WithTuberAdded(t); err != nil {
 		return err
 	}
-	if err := config.AddTunnelNode(l.cfgPath, t); err != nil {
+	if err := config.AddTuberNode(l.cfgPath, t); err != nil {
 		return err
 	}
 	return l.Reload()
 }
 
-// UpdateTunnel replaces the tunnel named name with t (rename allowed): validate
+// UpdateTuber replaces the tuber named name with t (rename allowed): validate
 // the prospective config, patch the file, reload.
-func (l *Local) UpdateTunnel(name string, t config.Tunnel) error {
-	if _, err := l.cfg.WithTunnelReplaced(name, t); err != nil {
+func (l *Local) UpdateTuber(name string, t config.Tuber) error {
+	if _, err := l.cfg.WithTuberReplaced(name, t); err != nil {
 		return err
 	}
-	if err := config.ReplaceTunnelNode(l.cfgPath, name, t); err != nil {
+	if err := config.ReplaceTuberNode(l.cfgPath, name, t); err != nil {
 		return err
 	}
 	return l.Reload()
 }
 
-// DeleteTunnel removes the tunnel named name: validate, patch, reload. If the
-// tunnel is active, the engine reload stops and drops it.
-func (l *Local) DeleteTunnel(name string) error {
-	if _, err := l.cfg.WithTunnelRemoved(name); err != nil {
+// DeleteTuber removes the tuber named name: validate, patch, reload. If the
+// tuber is active, the engine reload stops and drops it.
+func (l *Local) DeleteTuber(name string) error {
+	if _, err := l.cfg.WithTuberRemoved(name); err != nil {
 		return err
 	}
-	if err := config.DeleteTunnelNode(l.cfgPath, name); err != nil {
+	if err := config.DeleteTuberNode(l.cfgPath, name); err != nil {
 		return err
 	}
 	return l.Reload()
@@ -159,7 +159,7 @@ func (l *Local) Logs(name string) ([]routelog.Entry, error) {
 	return l.ring.Lines(name), nil
 }
 
-// AcceptHost appends the tunnel's pending unknown-host key to known_hosts and
+// AcceptHost appends the tuber's pending unknown-host key to known_hosts and
 // restarts it (Phase 11 TOFU). The pending line was captured by the SSH
 // host-key callback at rejection time and carried through Status.
 func (l *Local) AcceptHost(name string) error {
@@ -175,7 +175,7 @@ func (l *Local) AcceptHost(name string) error {
 }
 
 // pendingHostLine finds the captured known_hosts line for name in a status
-// snapshot. Returns "" when the tunnel has no pending key.
+// snapshot. Returns "" when the tuber has no pending key.
 func pendingHostLine(statuses []forward.Status, name string) string {
 	for _, st := range statuses {
 		if st.Name == name {
@@ -185,9 +185,9 @@ func pendingHostLine(statuses []forward.Status, name string) string {
 	return ""
 }
 
-// AcceptPassphrase stores the passphrase for the tunnel's identity and unblocks
+// AcceptPassphrase stores the passphrase for the tuber's identity and unblocks
 // a dial waiting on it (Phase 19). The identity path is the one the dial
-// reported pending (Status.PendingPassphrase), falling back to the tunnel's
+// reported pending (Status.PendingPassphrase), falling back to the tuber's
 // resolved identity. No Restart: the blocked dial wakes on the store.
 func (l *Local) AcceptPassphrase(name, passphrase string) error {
 	if l.secrets == nil {
@@ -204,15 +204,15 @@ func (l *Local) AcceptPassphrase(name, passphrase string) error {
 }
 
 // identityPathFor resolves the identity path a passphrase applies to: the path
-// the dial reported pending (Status.PendingPassphrase), or the tunnel's
-// resolved identity from config. "" when the tunnel has no identity.
+// the dial reported pending (Status.PendingPassphrase), or the tuber's
+// resolved identity from config. "" when the tuber has no identity.
 func identityPathFor(statuses []forward.Status, cfg *config.Config, name string) string {
 	for _, st := range statuses {
 		if st.Name == name && st.PendingPassphrase != "" {
 			return st.PendingPassphrase
 		}
 	}
-	for _, t := range cfg.Tunnels {
+	for _, t := range cfg.Tubers {
 		if t.Name == name {
 			return t.ResolvedIdentity(cfg.Defaults)
 		}
@@ -221,9 +221,9 @@ func identityPathFor(statuses []forward.Status, cfg *config.Config, name string)
 }
 
 func (l *Local) setEnabled(name string, enabled bool) {
-	for i := range l.cfg.Tunnels {
-		if l.cfg.Tunnels[i].Name == name {
-			l.cfg.Tunnels[i].Enabled = enabled
+	for i := range l.cfg.Tubers {
+		if l.cfg.Tubers[i].Name == name {
+			l.cfg.Tubers[i].Enabled = enabled
 			return
 		}
 	}
@@ -232,7 +232,7 @@ func (l *Local) setEnabled(name string, enabled bool) {
 // Changes returns a push channel fed by the Engine's event broker (Phase 9).
 // A forwarder goroutine copies Engine signals into an owned, drop-old channel
 // so the channel can be closed cleanly on Close(). No polling ticker: every
-// tunnel state transition reaches the TUI instantly.
+// tuber state transition reaches the TUI instantly.
 func (l *Local) Changes() <-chan struct{} {
 	l.initOnce.Do(func() {
 		l.changes = make(chan struct{}, 1)

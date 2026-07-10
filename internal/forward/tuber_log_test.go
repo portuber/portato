@@ -10,7 +10,7 @@ import (
 	routelog "github.com/portuber/portato/internal/log"
 )
 
-// TestSetStateErrLogsToRing guards the visibility fix: a tunnel failure set via
+// TestSetStateErrLogsToRing guards the visibility fix: a tuber failure set via
 // setStateErr must reach the log ring (and thus the TUI `l` screen and the
 // rotated file) — not just the truncated Status.Error field in the list row.
 // The motivating case was a remote-listen error ("listen 0.0.0.0:9090 on
@@ -22,7 +22,7 @@ func TestSetStateErrLogsToRing(t *testing.T) {
 	}
 	defer closer.Close()
 
-	tn := NewTunnel(context.Background(), tunnelCfg("db"), config.Defaults{}, logger, nil)
+	tn := NewTuber(context.Background(), tuberCfg("db"), config.Defaults{}, logger, nil)
 	const msg = "listen 0.0.0.0:9090 on server: boom"
 	tn.setStateErr(Error, msg)
 
@@ -31,8 +31,8 @@ func TestSetStateErrLogsToRing(t *testing.T) {
 		t.Fatalf("ring captured %d entries for db, want 1: %+v", len(entries), entries)
 	}
 	e := entries[0]
-	if e.Tunnel != "db" {
-		t.Errorf("entry tunnel = %q, want db", e.Tunnel)
+	if e.Tuber != "db" {
+		t.Errorf("entry tuber = %q, want db", e.Tuber)
 	}
 	if e.Msg != msg {
 		t.Errorf("entry msg = %q, want %q", e.Msg, msg)
@@ -51,10 +51,10 @@ func TestSetStateErrLogsToRing(t *testing.T) {
 	}
 }
 
-// TestSetStateErrNilLogSafe ensures a Tunnel built without a logger (as some
+// TestSetStateErrNilLogSafe ensures a Tuber built without a logger (as some
 // unit tests do) does not panic when setStateErr logs.
 func TestSetStateErrNilLogSafe(t *testing.T) {
-	tn := &Tunnel{baseCtx: context.Background(), cfg: tunnelCfg("x")}
+	tn := &Tuber{baseCtx: context.Background(), cfg: tuberCfg("x")}
 	tn.setStateErr(Error, "boom") // must not panic
 	if got := tn.Status().State; got != Error {
 		t.Errorf("state = %v, want Error", got)

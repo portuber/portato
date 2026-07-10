@@ -8,7 +8,7 @@ import (
 
 var disableCmd = &cobra.Command{
 	Use:           "disable <name>",
-	Short:         "Disable a tunnel on the daemon",
+	Short:         "Disable a tuber on the daemon",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,

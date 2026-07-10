@@ -16,7 +16,7 @@ import (
 
 var forwardCmd = &cobra.Command{
 	Use:    "forward <name>",
-	Short:  "Start a single tunnel in the foreground (debug helper)",
+	Short:  "Start a single tuber in the foreground (debug helper)",
 	Hidden: true,
 	Args:   cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -30,8 +30,8 @@ var forwardCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
 		}
-		if !hasTunnel(cfg, name) {
-			return fmt.Errorf("tunnel %q not found in config", name)
+		if !hasTuber(cfg, name) {
+			return fmt.Errorf("tuber %q not found in config", name)
 		}
 
 		log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelDebug}))
@@ -71,8 +71,8 @@ var forwardCmd = &cobra.Command{
 	},
 }
 
-func hasTunnel(cfg *config.Config, name string) bool {
-	for _, t := range cfg.Tunnels {
+func hasTuber(cfg *config.Config, name string) bool {
+	for _, t := range cfg.Tubers {
 		if t.Name == name {
 			return true
 		}

@@ -89,7 +89,7 @@ func TestFilter_FuzzyMatchesTypeAndEndpoint(t *testing.T) {
 		t.Error("fuzzy should match the 'dynamic' type via subsequence 'dymc'")
 	}
 
-	// Endpoint-only match: a tunnel whose name and type share no chars with
+	// Endpoint-only match: a tuber whose name and type share no chars with
 	// the query, but whose endpoint ("zz ← lonely-host:9") does.
 	m.filter.SetValue("lnlyhst")
 	s := controller.Status{Name: "zz", Type: "remote", Local: "1", Remote: "lonely-host:9"}

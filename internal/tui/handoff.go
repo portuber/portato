@@ -86,7 +86,7 @@ var probeSocket = func() bool {
 	return client.New(socket).HealthzCtx(ctx) == nil
 }
 
-// handoffToDaemon moves the standalone's live tunnels to a detached daemon. It
+// handoffToDaemon moves the standalone's live tubers to a detached daemon. It
 // first tries the seamless Phase 16 FD hand-off -- passing the already-bound
 // local listeners to the spawned daemon so the local ports never go down and the
 // daemon never rebinds. If that is unavailable (no live local listeners, or any
@@ -213,7 +213,7 @@ func openTransferSocket() (string, net.Listener, error) {
 	return path, ln, nil
 }
 
-// buildOffers pairs each live listener fd with its tunnel name and type (the
+// buildOffers pairs each live listener fd with its tuber name and type (the
 // type carried in the Header lets the daemon sanity-check it). Types come from
 // the controller's status snapshot.
 func buildOffers(files map[string]*os.File, statuses []controller.Status) []fdpass.Offer {

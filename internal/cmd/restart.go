@@ -8,7 +8,7 @@ import (
 
 var restartCmd = &cobra.Command{
 	Use:           "restart <name>",
-	Short:         "Restart a tunnel (down then up) on the daemon",
+	Short:         "Restart a tuber (down then up) on the daemon",
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,

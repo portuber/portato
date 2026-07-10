@@ -10,19 +10,19 @@ import (
 	"testing"
 )
 
-func TestRingHandler_CapturesTunnelAttrAndFilters(t *testing.T) {
+func TestRingHandler_CapturesTuberAttrAndFilters(t *testing.T) {
 	var buf bytes.Buffer
 	ring := NewRing()
 	base := slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug})
 	h := ringHandler{base: base, ring: ring}
 	logger := slog.New(h)
 
-	// WithAttrs persists the tunnel attr across records (this is how the
-	// engine's per-tunnel sub-logger is built: log.With("tunnel", name)).
-	tn := logger.With("tunnel", "db")
+	// WithAttrs persists the tuber attr across records (this is how the
+	// engine's per-tuber sub-logger is built: log.With("tuber", name)).
+	tn := logger.With("tuber", "db")
 	tn.Info("connected")
 	tn.Debug("keepalive ok")
-	logger.Info("daemon started") // no tunnel attr
+	logger.Info("daemon started") // no tuber attr
 
 	all := ring.Lines("")
 	if len(all) != 3 {
@@ -34,8 +34,8 @@ func TestRingHandler_CapturesTunnelAttrAndFilters(t *testing.T) {
 		t.Fatalf("Lines(db) = %d entries, want 2", len(db))
 	}
 	for _, e := range db {
-		if e.Tunnel != "db" {
-			t.Errorf("filtered entry tunnel = %q, want db", e.Tunnel)
+		if e.Tuber != "db" {
+			t.Errorf("filtered entry tuber = %q, want db", e.Tuber)
 		}
 	}
 	if db[0].Msg != "connected" || db[1].Msg != "keepalive ok" {
@@ -55,13 +55,13 @@ func TestRingHandler_PerCallAttr(t *testing.T) {
 	ring := NewRing()
 	h := ringHandler{base: slog.NewTextHandler(io.Discard, nil), ring: ring}
 	logger := slog.New(h)
-	logger.Info("msg", "tunnel", "alpha")
+	logger.Info("msg", "tuber", "alpha")
 	if e := ring.Lines("alpha"); len(e) != 1 || e[0].Msg != "msg" {
 		t.Fatalf("per-call attr not captured: %+v", ring.Lines("alpha"))
 	}
 }
 
-// TestRingHandler_RendersAttrs proves the non-tunnel record attributes are
+// TestRingHandler_RendersAttrs proves the non-tuber record attributes are
 // captured into Entry.Attrs as "k=v" (e.g. dest / err), so the logs screen
 // can show connection context instead of a bare message.
 func TestRingHandler_RendersAttrs(t *testing.T) {
@@ -69,9 +69,9 @@ func TestRingHandler_RendersAttrs(t *testing.T) {
 	h := ringHandler{base: slog.NewTextHandler(io.Discard, nil), ring: ring}
 	logger := slog.New(h)
 
-	// Per-tunnel sub-logger: the tunnel attr is routed to Entry.Tunnel and
+	// Per-tuber sub-logger: the tuber attr is routed to Entry.Tuber and
 	// must NOT appear in Attrs.
-	tn := logger.With("tunnel", "db")
+	tn := logger.With("tuber", "db")
 	tn.Warn("socks5 dial failed", "dest", "ipinfo.po:443", "err", errors.New("no such host"))
 
 	got := ring.Lines("db")
@@ -79,8 +79,8 @@ func TestRingHandler_RendersAttrs(t *testing.T) {
 		t.Fatalf("Lines(db) = %d entries, want 1", len(got))
 	}
 	e := got[0]
-	if e.Tunnel != "db" {
-		t.Errorf("Tunnel = %q, want db", e.Tunnel)
+	if e.Tuber != "db" {
+		t.Errorf("Tuber = %q, want db", e.Tuber)
 	}
 	if !strings.Contains(e.Attrs, "dest=ipinfo.po:443") {
 		t.Errorf("Attrs %q missing dest=ipinfo.po:443", e.Attrs)
@@ -88,15 +88,15 @@ func TestRingHandler_RendersAttrs(t *testing.T) {
 	if !strings.Contains(e.Attrs, "err=no such host") {
 		t.Errorf("Attrs %q missing err=no such host", e.Attrs)
 	}
-	if strings.Contains(e.Attrs, "tunnel=") {
-		t.Errorf("tunnel must not appear in Attrs: %q", e.Attrs)
+	if strings.Contains(e.Attrs, "tuber=") {
+		t.Errorf("tuber must not appear in Attrs: %q", e.Attrs)
 	}
 }
 
 func TestRing_DropsOldestOnOverflow(t *testing.T) {
 	ring := NewRing()
 	for i := 0; i < ringCap+50; i++ {
-		ring.Append(Entry{Msg: "m", Tunnel: "x"})
+		ring.Append(Entry{Msg: "m", Tuber: "x"})
 	}
 	if got := len(ring.Lines("")); got != ringCap {
 		t.Fatalf("ring size = %d, want %d", got, ringCap)

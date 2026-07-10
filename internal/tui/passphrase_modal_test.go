@@ -105,9 +105,9 @@ func TestPassphraseModal_AutoCloseOnAccept(t *testing.T) {
 }
 
 // TestPassphraseModal_SpaceDisablesPending is the Phase 30 regression: pressing
-// space on a connecting / passphrase-pending tunnel must DISABLE it (call
+// space on a connecting / passphrase-pending tuber must DISABLE it (call
 // Disable via the controller), not open the modal. Previously space was trapped
-// into opening the passphrase prompt, so a blocked tunnel could never be turned
+// into opening the passphrase prompt, so a blocked tuber could never be turned
 // off.
 func TestPassphraseModal_SpaceDisablesPending(t *testing.T) {
 	f := newFake(controller.Status{
@@ -119,13 +119,13 @@ func TestPassphraseModal_SpaceDisablesPending(t *testing.T) {
 	next, _ := m.handleKey(specialKey(tea.KeySpace))
 	mm := next.(Model)
 	if mm.enteringPassphrase {
-		t.Fatal("space on a passphrase-pending tunnel must not open the modal")
+		t.Fatal("space on a passphrase-pending tuber must not open the modal")
 	}
 	if len(f.disabled) != 1 || f.disabled[0] != "db" {
-		t.Errorf("space should disable the pending tunnel; got disabled=%v", f.disabled)
+		t.Errorf("space should disable the pending tuber; got disabled=%v", f.disabled)
 	}
 	if len(f.enabled) != 0 {
-		t.Errorf("space must not enable a pending tunnel; got enabled=%v", f.enabled)
+		t.Errorf("space must not enable a pending tuber; got enabled=%v", f.enabled)
 	}
 }
 

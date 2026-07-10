@@ -27,8 +27,8 @@ var addIdentityCmd = &cobra.Command{
 (macOS Keychain / Linux Secret Service / Windows Credential Manager) so a
 passphrase-protected key connects without ssh-agent.
 
-The path is keyed exactly as the tunnels reference it (~ is expanded), so it
-must match the identity configured for a tunnel. If the daemon is running, it
+The path is keyed exactly as the tubers reference it (~ is expanded), so it
+must match the identity configured for a tuber. If the daemon is running, it
 is notified so any dial currently waiting for the passphrase resumes
 immediately.`,
 	Args:          cobra.ExactArgs(1),
@@ -42,7 +42,7 @@ var forgetIdentityCmd = &cobra.Command{
 	Short: "Remove a stored SSH identity passphrase from the OS keyring",
 	Long: `Delete the passphrase stored for an identity path from the OS keyring
 (and the running daemon's cache, if any). The path must match the identity
-configured for a tunnel (~ is expanded the same way).`,
+configured for a tuber (~ is expanded the same way).`,
 	Args:          cobra.ExactArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,

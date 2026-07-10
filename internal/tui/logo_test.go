@@ -44,7 +44,7 @@ func TestEmptyListSplashShowsLogo(t *testing.T) {
 	if !hasBraille(out) {
 		t.Errorf("empty list on a tall terminal should render the logo\n%s", out)
 	}
-	if !strings.Contains(out, "no tunnels") {
+	if !strings.Contains(out, "no tubers") {
 		t.Errorf("splash should still show the hint line\n%s", out)
 	}
 }
@@ -131,7 +131,7 @@ func TestSmallHeightOmitsLogo(t *testing.T) {
 	if hasBraille(out) {
 		t.Errorf("short terminal should omit the logo\n%s", out)
 	}
-	if !strings.Contains(out, "no tunnels") {
+	if !strings.Contains(out, "no tubers") {
 		t.Errorf("short terminal should still show the hint\n%s", out)
 	}
 }

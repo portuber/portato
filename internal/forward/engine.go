@@ -12,24 +12,24 @@ import (
 	"github.com/portuber/portato/internal/config"
 )
 
-type tunneler interface {
+type tuberer interface {
 	Start(ctx context.Context) error
-	// StartWith starts the tunnel reusing a pre-bound listener (passed in during
-	// a hand-off) instead of binding its own. Local/dynamic tunnels only.
+	// StartWith starts the tuber reusing a pre-bound listener (passed in during
+	// a hand-off) instead of binding its own. Local/dynamic tubers only.
 	StartWith(ctx context.Context, ln net.Listener) error
 	Stop() error
 	Restart() error
-	// Reconfigure updates a tunnel's config/defaults in place; it restarts the
-	// tunnel only if it is currently running. Used by Engine.Reload.
-	Reconfigure(cfg config.Tunnel, def config.Defaults) error
+	// Reconfigure updates a tuber's config/defaults in place; it restarts the
+	// tuber only if it is currently running. Used by Engine.Reload.
+	Reconfigure(cfg config.Tuber, def config.Defaults) error
 	Status() Status
-	// ListenerFile returns a dup'd fd for the tunnel's local listener, or
+	// ListenerFile returns a dup'd fd for the tuber's local listener, or
 	// ErrNoListener when there is nothing to pass (stopped / type=remote).
 	// Drives the standalone->daemon hand-off FD transfer (Phase 16).
 	ListenerFile() (*os.File, error)
 }
 
-// Engine is a thread-safe manager of a set of tunnels derived from a Config.
+// Engine is a thread-safe manager of a set of tubers derived from a Config.
 // It is the seam that localController (Phase 3) and daemon (Phase 4) build on.
 type Engine struct {
 	mu       sync.RWMutex
@@ -37,14 +37,14 @@ type Engine struct {
 	cfg      *config.Config
 	log      *slog.Logger
 	defaults config.Defaults
-	tunnels  map[string]tunneler
-	configs  map[string]config.Tunnel
-	factory  func(config.Tunnel, config.Defaults, *slog.Logger) tunneler
-	// provider (Phase 19) supplies identity passphrases to every tunnel; nil
+	tubers   map[string]tuberer
+	configs  map[string]config.Tuber
+	factory  func(config.Tuber, config.Defaults, *slog.Logger) tuberer
+	// provider (Phase 19) supplies identity passphrases to every tuber; nil
 	// disables passphrase support. Set once at construction.
 	provider PassphraseProvider
 
-	// Event broker (Phase 9): every tunnel state change fans out to
+	// Event broker (Phase 9): every tuber state change fans out to
 	// subscribers as a non-blocking "something changed" signal. The local
 	// controller subscribes directly; the daemon's /events stream forwards
 	// the same signal over SSE.
@@ -57,7 +57,7 @@ type Engine struct {
 // latest state on the next List() — the right trade-off for a UI redraw tick.
 const subscriberBuffer = 16
 
-// Subscribe returns a channel that receives struct{}{} on every tunnel state
+// Subscribe returns a channel that receives struct{}{} on every tuber state
 // change, plus an unsubscribe func that must be called to stop delivery. Safe
 // for concurrent use; notify never blocks (drop-old on a full buffer).
 func (e *Engine) Subscribe() (<-chan struct{}, func()) {
@@ -79,7 +79,7 @@ func (e *Engine) Subscribe() (<-chan struct{}, func()) {
 	return ch, unsub
 }
 
-// notify fans a change signal to every subscriber. Called by tunnels (via the
+// notify fans a change signal to every subscriber. Called by tubers (via the
 // onChange callback wired in the factory) and internally after engine-level
 // mutations. Non-blocking: a full subscriber buffer drops the oldest signal.
 func (e *Engine) notify() {
@@ -93,8 +93,8 @@ func (e *Engine) notify() {
 	e.subMu.RUnlock()
 }
 
-// NewEngine builds an Engine with all tunnels constructed but not started.
-// provider (optional, Phase 19) supplies identity passphrases to the tunnels;
+// NewEngine builds an Engine with all tubers constructed but not started.
+// provider (optional, Phase 19) supplies identity passphrases to the tubers;
 // nil disables passphrase support (passphrase-protected keys need an agent).
 func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger, provider PassphraseProvider) *Engine {
 	if log == nil {
@@ -108,12 +108,12 @@ func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger, provid
 		cfg:      cfg,
 		log:      log,
 		defaults: cfg.Defaults,
-		tunnels:  make(map[string]tunneler),
-		configs:  make(map[string]config.Tunnel),
+		tubers:   make(map[string]tuberer),
+		configs:  make(map[string]config.Tuber),
 		provider: provider,
 	}
-	e.factory = func(t config.Tunnel, d config.Defaults, l *slog.Logger) tunneler {
-		tn := NewTunnel(ctx, t, d, l, e.provider)
+	e.factory = func(t config.Tuber, d config.Defaults, l *slog.Logger) tuberer {
+		tn := NewTuber(ctx, t, d, l, e.provider)
 		tn.onChange = e.notify
 		return tn
 	}
@@ -122,11 +122,11 @@ func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger, provid
 }
 
 func (e *Engine) buildAll() {
-	for _, t := range e.cfg.Tunnels {
-		if _, ok := e.tunnels[t.Name]; ok {
+	for _, t := range e.cfg.Tubers {
+		if _, ok := e.tubers[t.Name]; ok {
 			continue
 		}
-		e.tunnels[t.Name] = e.factory(t, e.cfg.Defaults, e.log)
+		e.tubers[t.Name] = e.factory(t, e.cfg.Defaults, e.log)
 		e.configs[t.Name] = t
 	}
 }
@@ -134,7 +134,7 @@ func (e *Engine) buildAll() {
 func (e *Engine) Enable(name string) error {
 	tn, ok := e.lookup(name)
 	if !ok {
-		return fmt.Errorf("unknown tunnel %q", name)
+		return fmt.Errorf("unknown tuber %q", name)
 	}
 	return tn.Start(e.ctx)
 }
@@ -142,7 +142,7 @@ func (e *Engine) Enable(name string) error {
 func (e *Engine) Disable(name string) error {
 	tn, ok := e.lookup(name)
 	if !ok {
-		return fmt.Errorf("unknown tunnel %q", name)
+		return fmt.Errorf("unknown tuber %q", name)
 	}
 	return tn.Stop()
 }
@@ -150,7 +150,7 @@ func (e *Engine) Disable(name string) error {
 func (e *Engine) Restart(name string) error {
 	tn, ok := e.lookup(name)
 	if !ok {
-		return fmt.Errorf("unknown tunnel %q", name)
+		return fmt.Errorf("unknown tuber %q", name)
 	}
 	return tn.Restart()
 }
@@ -170,13 +170,13 @@ func (e *Engine) DownAll() {
 // StopAll is an alias for DownAll used at engine shutdown.
 func (e *Engine) StopAll() { e.DownAll() }
 
-// StartEnabled starts every tunnel whose config has Enabled == true.
+// StartEnabled starts every tuber whose config has Enabled == true.
 func (e *Engine) StartEnabled() {
 	e.mu.RLock()
-	jobs := make([]tunneler, 0)
-	for _, t := range e.cfg.Tunnels {
+	jobs := make([]tuberer, 0)
+	for _, t := range e.cfg.Tubers {
 		if t.Enabled {
-			if tn, ok := e.tunnels[t.Name]; ok {
+			if tn, ok := e.tubers[t.Name]; ok {
 				jobs = append(jobs, tn)
 			}
 		}
@@ -187,26 +187,26 @@ func (e *Engine) StartEnabled() {
 	}
 }
 
-// StartEnabledWith starts every enabled tunnel, reusing a pre-bound listener
-// from adopted (keyed by tunnel name) where present -- the standalone->daemon
+// StartEnabledWith starts every enabled tuber, reusing a pre-bound listener
+// from adopted (keyed by tuber name) where present -- the standalone->daemon
 // hand-off adoption path (Phase 16) -- and binding normally for the rest. Any
-// adopted listener whose tunnel is unknown or disabled is closed so its port
+// adopted listener whose tuber is unknown or disabled is closed so its port
 // does not leak; StartWith errors (e.g. an adopted listener for a type=remote
-// tunnel, which has no local listener) are logged, not fatal.
+// tuber, which has no local listener) are logged, not fatal.
 func (e *Engine) StartEnabledWith(adopted map[string]net.Listener) {
 	e.mu.RLock()
 	type job struct {
-		tn   tunneler
+		tn   tuberer
 		ln   net.Listener // nil -> bind normally
 		name string
 	}
 	jobs := make([]job, 0)
 	used := make(map[string]bool)
-	for _, t := range e.cfg.Tunnels {
+	for _, t := range e.cfg.Tubers {
 		if !t.Enabled {
 			continue
 		}
-		tn, ok := e.tunnels[t.Name]
+		tn, ok := e.tubers[t.Name]
 		if !ok {
 			continue
 		}
@@ -220,7 +220,7 @@ func (e *Engine) StartEnabledWith(adopted map[string]net.Listener) {
 	for _, j := range jobs {
 		if j.ln != nil {
 			if err := j.tn.StartWith(e.ctx, j.ln); err != nil {
-				e.log.Warn("adopted listener rejected; falling back to bind", "tunnel", j.name, "err", err)
+				e.log.Warn("adopted listener rejected; falling back to bind", "tuber", j.name, "err", err)
 				_ = j.tn.Start(e.ctx)
 			}
 		} else {
@@ -231,25 +231,25 @@ func (e *Engine) StartEnabledWith(adopted map[string]net.Listener) {
 	// disabled): leaving them open would leak the port on the daemon side.
 	for name, ln := range adopted {
 		if !used[name] {
-			e.log.Warn("closing unused adopted listener", "tunnel", name)
+			e.log.Warn("closing unused adopted listener", "tuber", name)
 			_ = ln.Close()
 		}
 	}
 }
 
-// List returns a snapshot of all tunnel statuses, in config order.
+// List returns a snapshot of all tuber statuses, in config order.
 func (e *Engine) List() []Status {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	out := make([]Status, 0, len(e.tunnels))
-	seen := make(map[string]bool, len(e.tunnels))
-	for _, t := range e.cfg.Tunnels {
-		if tn, ok := e.tunnels[t.Name]; ok {
+	out := make([]Status, 0, len(e.tubers))
+	seen := make(map[string]bool, len(e.tubers))
+	for _, t := range e.cfg.Tubers {
+		if tn, ok := e.tubers[t.Name]; ok {
 			out = append(out, tn.Status())
 			seen[t.Name] = true
 		}
 	}
-	for name, tn := range e.tunnels {
+	for name, tn := range e.tubers {
 		if !seen[name] {
 			out = append(out, tn.Status())
 		}
@@ -258,9 +258,9 @@ func (e *Engine) List() []Status {
 }
 
 // LiveListenerFiles returns one dup'd listener fd per running local/dynamic
-// tunnel, keyed by tunnel name, for the standalone->daemon hand-off (Phase 16).
-// Stopped tunnels and type=remote tunnels (no local listener) are skipped via
-// ErrNoListener; a running local/dynamic tunnel that fails to produce its fd is
+// tuber, keyed by tuber name, for the standalone->daemon hand-off (Phase 16).
+// Stopped tubers and type=remote tubers (no local listener) are skipped via
+// ErrNoListener; a running local/dynamic tuber that fails to produce its fd is
 // a hard error, since omitting it would leave the daemon without that listener
 // and reintroduce the port-availability gap the hand-off is meant to remove.
 // The caller owns each returned *os.File and must close it (typically after the
@@ -269,8 +269,8 @@ func (e *Engine) LiveListenerFiles() (map[string]*os.File, error) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
 	out := make(map[string]*os.File)
-	for _, t := range e.cfg.Tunnels {
-		tn, ok := e.tunnels[t.Name]
+	for _, t := range e.cfg.Tubers {
+		tn, ok := e.tubers[t.Name]
 		if !ok {
 			continue
 		}
@@ -286,9 +286,9 @@ func (e *Engine) LiveListenerFiles() (map[string]*os.File, error) {
 	return out, nil
 }
 
-// Reload applies a new config: tunnels no longer present are stopped and
-// removed, new tunnels are added (and started if enabled), and changed
-// tunnels are restarted.
+// Reload applies a new config: tubers no longer present are stopped and
+// removed, new tubers are added (and started if enabled), and changed
+// tubers are restarted.
 func (e *Engine) Reload(cfg *config.Config) {
 	e.mu.Lock()
 	defer e.mu.Unlock()
@@ -298,63 +298,63 @@ func (e *Engine) Reload(cfg *config.Config) {
 	e.cfg = cfg
 	e.defaults = cfg.Defaults
 
-	newSet := make(map[string]config.Tunnel, len(cfg.Tunnels))
-	for _, t := range cfg.Tunnels {
+	newSet := make(map[string]config.Tuber, len(cfg.Tubers))
+	for _, t := range cfg.Tubers {
 		newSet[t.Name] = t
 	}
 
-	for name, tn := range e.tunnels {
+	for name, tn := range e.tubers {
 		if _, ok := newSet[name]; !ok {
 			_ = tn.Stop()
-			delete(e.tunnels, name)
+			delete(e.tubers, name)
 		}
 	}
 
-	newConfigs := make(map[string]config.Tunnel, len(cfg.Tunnels))
+	newConfigs := make(map[string]config.Tuber, len(cfg.Tubers))
 	for name, t := range newSet {
 		newConfigs[name] = t
 		old, existed := oldConfigs[name]
 		if !existed {
 			tn := e.factory(t, cfg.Defaults, e.log)
-			e.tunnels[name] = tn
+			e.tubers[name] = tn
 			if t.Enabled {
 				_ = tn.Start(e.ctx)
 			}
 			continue
 		}
-		if tunnelChanged(old, t) || oldDefaults != cfg.Defaults {
-			// Reconfigure (not bare Restart): update the tunnel's cfg so Status()
+		if tuberChanged(old, t) || oldDefaults != cfg.Defaults {
+			// Reconfigure (not bare Restart): update the tuber's cfg so Status()
 			// reflects the new Local/Remote, and restart only if it was running —
-			// editing an off tunnel must not start it.
-			_ = e.tunnels[name].Reconfigure(t, cfg.Defaults)
+			// editing an off tuber must not start it.
+			_ = e.tubers[name].Reconfigure(t, cfg.Defaults)
 		}
 	}
 	e.configs = newConfigs
-	// Reload reshapes the tunnel set; ensure subscribers refresh even when
-	// the change is only an added/removed Off tunnel (no per-tunnel notify).
+	// Reload reshapes the tuber set; ensure subscribers refresh even when
+	// the change is only an added/removed Off tuber (no per-tuber notify).
 	e.notify()
 }
 
-func (e *Engine) lookup(name string) (tunneler, bool) {
+func (e *Engine) lookup(name string) (tuberer, bool) {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	tn, ok := e.tunnels[name]
+	tn, ok := e.tubers[name]
 	return tn, ok
 }
 
-func (e *Engine) snapshot() []tunneler {
+func (e *Engine) snapshot() []tuberer {
 	e.mu.RLock()
 	defer e.mu.RUnlock()
-	out := make([]tunneler, 0, len(e.tunnels))
-	for _, tn := range e.tunnels {
+	out := make([]tuberer, 0, len(e.tubers))
+	for _, tn := range e.tubers {
 		out = append(out, tn)
 	}
 	return out
 }
 
-// tunnelChanged reports whether connection-relevant fields differ.
-// Enabled is intentionally excluded: toggling it must not restart a tunnel.
-func tunnelChanged(a, b config.Tunnel) bool {
+// tuberChanged reports whether connection-relevant fields differ.
+// Enabled is intentionally excluded: toggling it must not restart a tuber.
+func tuberChanged(a, b config.Tuber) bool {
 	if a.Name != b.Name || a.Type != b.Type {
 		return true
 	}

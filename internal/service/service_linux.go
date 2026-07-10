@@ -50,7 +50,7 @@ func (l *linuxInstaller) Install(o Options) (string, error) {
 	// socket-activates the service. The service Requires+After the socket, so
 	// when it starts systemd hands it the listening fd (LISTEN_FDS) instead of
 	// the daemon binding its own; on a boot start the service still runs (manages
-	// tunnels), it just serves on the inherited socket. Phase 22.
+	// tubers), it just serves on the inherited socket. Phase 22.
 	if _, err := l.exec("systemctl", "--user", "enable", "--now", linuxSocketUnit); err != nil {
 		return "", fmt.Errorf("enable socket unit: %w", err)
 	}

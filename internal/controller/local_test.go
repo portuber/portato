@@ -10,7 +10,7 @@ import (
 	"github.com/portuber/portato/internal/forward"
 )
 
-const oneTunnel = "  - name: t1\n    type: local\n    local: \"19999\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+const oneTuber = "  - name: t1\n    type: local\n    local: \"19999\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 
 func writeConfigFile(t *testing.T, body string) string {
 	t.Helper()
@@ -23,7 +23,7 @@ func writeConfigFile(t *testing.T, body string) string {
 }
 
 func TestLocal_ListOrderAndState(t *testing.T) {
-	body := "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n" +
+	body := "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n" +
 		"  - name: alpha\n    type: local\n    local: \"19991\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n" +
 		"  - name: beta\n    type: local\n    local: \"19992\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 	p := writeConfigFile(t, body)
@@ -45,21 +45,21 @@ func TestLocal_ListOrderAndState(t *testing.T) {
 	_ = l.Close()
 }
 
-func TestLocal_UnknownTunnelErrors(t *testing.T) {
-	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
+func TestLocal_UnknownTuberErrors(t *testing.T) {
+	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n"+oneTuber)
 	cfg := mustLoad(t, p)
 	l := NewLocal(cfg, p, nil, nil)
 
 	for _, fn := range []func(string) error{l.Enable, l.Disable, l.Restart} {
 		if err := fn("nope"); err == nil {
-			t.Errorf("expected error for unknown tunnel")
+			t.Errorf("expected error for unknown tuber")
 		}
 	}
 	_ = l.Close()
 }
 
-func TestLocal_ReloadAddsTunnel(t *testing.T) {
-	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
+func TestLocal_ReloadAddsTuber(t *testing.T) {
+	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n"+oneTuber)
 	cfg := mustLoad(t, p)
 	l := NewLocal(cfg, p, nil, nil)
 
@@ -67,7 +67,7 @@ func TestLocal_ReloadAddsTunnel(t *testing.T) {
 		t.Fatalf("initial List len = %d, want 1", got)
 	}
 
-	second := "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n" + oneTunnel +
+	second := "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n" + oneTuber +
 		"  - name: t2\n    type: local\n    local: \"19998\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 	if err := os.WriteFile(p, []byte(second), 0o600); err != nil {
 		t.Fatalf("rewrite config: %v", err)
@@ -82,11 +82,11 @@ func TestLocal_ReloadAddsTunnel(t *testing.T) {
 }
 
 func TestLocal_ReloadBadConfig(t *testing.T) {
-	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
+	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n"+oneTuber)
 	cfg := mustLoad(t, p)
 	l := NewLocal(cfg, p, nil, nil)
 
-	if err := os.WriteFile(p, []byte("tunnels:\n  - name: bad name\n"), 0o600); err != nil {
+	if err := os.WriteFile(p, []byte("tubers:\n  - name: bad name\n"), 0o600); err != nil {
 		t.Fatalf("rewrite config: %v", err)
 	}
 	if err := l.Reload(); err == nil {
@@ -99,7 +99,7 @@ func TestLocal_ReloadBadConfig(t *testing.T) {
 }
 
 func TestLocal_EnableDisablePersists(t *testing.T) {
-	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
+	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n"+oneTuber)
 	cfg := mustLoad(t, p)
 	l := NewLocal(cfg, p, nil, nil)
 	defer l.Close()
@@ -107,20 +107,20 @@ func TestLocal_EnableDisablePersists(t *testing.T) {
 	if err := l.Enable("t1"); err != nil {
 		t.Fatalf("Enable: %v", err)
 	}
-	if reloaded := mustLoad(t, p); !reloaded.Tunnels[0].Enabled {
+	if reloaded := mustLoad(t, p); !reloaded.Tubers[0].Enabled {
 		t.Errorf("after Enable, config on disk has enabled=false; want true (hand-off invariant)")
 	}
 
 	if err := l.Disable("t1"); err != nil {
 		t.Fatalf("Disable: %v", err)
 	}
-	if reloaded := mustLoad(t, p); reloaded.Tunnels[0].Enabled {
+	if reloaded := mustLoad(t, p); reloaded.Tubers[0].Enabled {
 		t.Errorf("after Disable, config on disk has enabled=true; want false")
 	}
 }
 
 func TestLocal_EnableUnknownDoesNotPersist(t *testing.T) {
-	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
+	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n"+oneTuber)
 	before, err := os.ReadFile(p)
 	if err != nil {
 		t.Fatalf("read config: %v", err)
@@ -142,7 +142,7 @@ func TestLocal_EnableUnknownDoesNotPersist(t *testing.T) {
 }
 
 func TestLocal_ChangesPushesAndCloses(t *testing.T) {
-	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n"+oneTunnel)
+	p := writeConfigFile(t, "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n"+oneTuber)
 	cfg := mustLoad(t, p)
 	l := NewLocal(cfg, p, nil, nil)
 	defer l.Close()
@@ -160,12 +160,12 @@ func TestLocal_ChangesPushesAndCloses(t *testing.T) {
 }
 
 // TestLocal_StartEnabledStartsOnlyEnabled verifies the standalone launch path:
-// StartEnabled starts the tunnel whose config has Enabled == true and leaves the
-// disabled one Off. Tunnel.Start binds the local listener and sets Connecting
+// StartEnabled starts the tuber whose config has Enabled == true and leaves the
+// disabled one Off. Tuber.Start binds the local listener and sets Connecting
 // synchronously (Error only if the bind fails), so the assertion needs no
-// polling — the enabled tunnel is never Off right after the call.
+// polling — the enabled tuber is never Off right after the call.
 func TestLocal_StartEnabledStartsOnlyEnabled(t *testing.T) {
-	body := "defaults:\n  identity: ~/.ssh/id_ed25519\ntunnels:\n" +
+	body := "defaults:\n  identity: ~/.ssh/id_ed25519\ntubers:\n" +
 		"  - name: on\n    type: local\n    local: \"19994\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n    enabled: true\n" +
 		"  - name: off\n    type: local\n    local: \"19995\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 	p := writeConfigFile(t, body)
@@ -203,8 +203,8 @@ func mustLoad(t *testing.T, p string) *config.Config {
 }
 
 // TestPendingHostLineLookup exercises the helper behind AcceptHost (Phase 11
-// TOFU): it finds the captured known_hosts line for a tunnel, and returns ""
-// for an unknown tunnel or one without a pending key.
+// TOFU): it finds the captured known_hosts line for a tuber, and returns ""
+// for an unknown tuber or one without a pending key.
 func TestPendingHostLineLookup(t *testing.T) {
 	statuses := []forward.Status{
 		{Name: "a", PendingHostLine: "a ssh-ed25519 AAAA"},
@@ -222,9 +222,9 @@ func TestPendingHostLineLookup(t *testing.T) {
 }
 
 // TestLocal_AcceptHostNoPending proves AcceptHost fails cleanly when the
-// tunnel has no captured key (e.g. it was never rejected).
+// tuber has no captured key (e.g. it was never rejected).
 func TestLocal_AcceptHostNoPending(t *testing.T) {
-	p := writeConfigFile(t, "tunnels:\n  - name: t1\n    type: local\n    local: \"19993\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n")
+	p := writeConfigFile(t, "tubers:\n  - name: t1\n    type: local\n    local: \"19993\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n")
 	cfg := mustLoad(t, p)
 	l := NewLocal(cfg, p, nil, nil)
 	if err := l.AcceptHost("t1"); err == nil {

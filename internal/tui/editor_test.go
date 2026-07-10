@@ -10,21 +10,21 @@ import (
 func newEditorFake() *fakeCtrl {
 	f := newFake()
 	f.cfg = &config.Config{
-		Tunnels: []config.Tunnel{
+		Tubers: []config.Tuber{
 			{Name: "db", Type: "local", Local: "5432", Remote: "db:5432", SSH: "u@h:22"},
 		},
 	}
 	return f
 }
 
-func editorForEdit(f *fakeCtrl) *tunnelEditor {
-	e := newTunnelEditor(modeEdit, f.cfg.Tunnels[0], []string{"db"}, f)
+func editorForEdit(f *fakeCtrl) *tuberEditor {
+	e := newTuberEditor(modeEdit, f.cfg.Tubers[0], []string{"db"}, f)
 	e.setFocus(fName)
 	return e
 }
 
-func editorForNew(f *fakeCtrl) *tunnelEditor {
-	e := newTunnelEditor(modeNew, config.Tunnel{}, []string{"db"}, f)
+func editorForNew(f *fakeCtrl) *tuberEditor {
+	e := newTuberEditor(modeNew, config.Tuber{}, []string{"db"}, f)
 	e.setFocus(fName)
 	return e
 }
@@ -35,14 +35,14 @@ func TestEditor_PrefillsFromExisting(t *testing.T) {
 	if e.name.Value() != "db" || e.ssh.Value() != "u@h:22" || e.local.Value() != "5432" {
 		t.Errorf("editor not prefilled: name=%q ssh=%q local=%q", e.name.Value(), e.ssh.Value(), e.local.Value())
 	}
-	if tunnelTypes[e.typeIdx] != "local" {
-		t.Errorf("type idx = %d (%s), want local", e.typeIdx, tunnelTypes[e.typeIdx])
+	if tuberTypes[e.typeIdx] != "local" {
+		t.Errorf("type idx = %d (%s), want local", e.typeIdx, tuberTypes[e.typeIdx])
 	}
 }
 
 func TestEditor_Validate_RequiredFields(t *testing.T) {
 	f := newEditorFake()
-	e := newTunnelEditor(modeNew, config.Tunnel{}, []string{}, f)
+	e := newTuberEditor(modeNew, config.Tuber{}, []string{}, f)
 
 	errs := e.validate()
 	if _, ok := errs["name"]; !ok {
@@ -72,7 +72,7 @@ func TestEditor_Validate_DuplicateName(t *testing.T) {
 	e.ssh.SetValue("u@h:22")
 	e.remote.SetValue("x:1")
 	if errs := e.validate(); errs["name"] == "" {
-		t.Error("duplicate name should be flagged for new tunnel")
+		t.Error("duplicate name should be flagged for new tuber")
 	}
 }
 
@@ -115,11 +115,11 @@ func TestEditor_Validate_NonDynamicRequiresRemote(t *testing.T) {
 
 func TestEditor_Validate_LocalRequiredForAllTypes(t *testing.T) {
 	f := newEditorFake()
-	for _, ty := range tunnelTypes {
+	for _, ty := range tuberTypes {
 		e := editorForNew(f)
 		e.name.SetValue("x")
 		e.ssh.SetValue("u@h:22")
-		e.typeIdx = indexOf(tunnelTypes, ty)
+		e.typeIdx = indexOf(tuberTypes, ty)
 		e.local.SetValue("")
 		e.remote.SetValue("r:1") // valid for non-dynamic; unused for dynamic
 		if errs := e.validate(); errs["local"] == "" {
@@ -132,7 +132,7 @@ func TestEditor_Validate_LocalRequiredForAllTypes(t *testing.T) {
 	}
 }
 
-func TestEditor_SaveNew_CallsAddTunnel(t *testing.T) {
+func TestEditor_SaveNew_CallsAddTuber(t *testing.T) {
 	f := newEditorFake()
 	e := editorForNew(f)
 	e.name.SetValue("web")
@@ -146,11 +146,11 @@ func TestEditor_SaveNew_CallsAddTunnel(t *testing.T) {
 		t.Fatalf("expected saved+done, got done=%v saved=%v status=%q", e.done, e.saved, e.status)
 	}
 	if len(f.adds) != 1 || f.adds[0].Name != "web" {
-		t.Errorf("AddTunnel not called correctly: %+v", f.adds)
+		t.Errorf("AddTuber not called correctly: %+v", f.adds)
 	}
 }
 
-func TestEditor_SaveEdit_CallsUpdateTunnel(t *testing.T) {
+func TestEditor_SaveEdit_CallsUpdateTuber(t *testing.T) {
 	f := newEditorFake()
 	e := editorForEdit(f) // editing "db"
 	e.local.SetValue("9999")
@@ -161,7 +161,7 @@ func TestEditor_SaveEdit_CallsUpdateTunnel(t *testing.T) {
 		t.Fatalf("expected saved+done, status=%q errs=%v", e.status, e.errs)
 	}
 	if len(f.updates) != 1 || f.updates[0].Local != "9999" {
-		t.Errorf("UpdateTunnel not called correctly: %+v", f.updates)
+		t.Errorf("UpdateTuber not called correctly: %+v", f.updates)
 	}
 }
 
@@ -174,7 +174,7 @@ func TestEditor_SaveInvalid_DoesNotSave(t *testing.T) {
 		t.Error("invalid save should not mark saved/done")
 	}
 	if len(f.adds) != 0 {
-		t.Errorf("AddTunnel should not be called on invalid, got %+v", f.adds)
+		t.Errorf("AddTuber should not be called on invalid, got %+v", f.adds)
 	}
 }
 
@@ -217,8 +217,8 @@ func TestEditor_TypeCycling(t *testing.T) {
 	start := e.typeIdx
 
 	e.handleKey(keyPress("right"))
-	if e.typeIdx != (start+1)%len(tunnelTypes) {
-		t.Errorf("right: typeIdx=%d want %d", e.typeIdx, (start+1)%len(tunnelTypes))
+	if e.typeIdx != (start+1)%len(tuberTypes) {
+		t.Errorf("right: typeIdx=%d want %d", e.typeIdx, (start+1)%len(tuberTypes))
 	}
 	e.handleKey(keyPress("left"))
 	if e.typeIdx != start {
@@ -231,32 +231,32 @@ func TestEditor_TypePlaceholdersAreContextual(t *testing.T) {
 	e := editorForNew(f)
 
 	// remote type: remote is a bare port or host:port on the host side.
-	e.typeIdx = indexOf(tunnelTypes, "remote")
+	e.typeIdx = indexOf(tuberTypes, "remote")
 	e.applyTypePlaceholders()
 	if e.remote.Placeholder != "9090 or 0.0.0.0:9090" {
 		t.Errorf("remote placeholder = %q", e.remote.Placeholder)
 	}
 
 	// dynamic type: remote is unused.
-	e.typeIdx = indexOf(tunnelTypes, "dynamic")
+	e.typeIdx = indexOf(tuberTypes, "dynamic")
 	e.applyTypePlaceholders()
 	if e.remote.Placeholder != "unused" {
 		t.Errorf("dynamic remote placeholder = %q", e.remote.Placeholder)
 	}
 
 	// cycling updates the placeholder too.
-	e.typeIdx = indexOf(tunnelTypes, "local")
+	e.typeIdx = indexOf(tuberTypes, "local")
 	e.cycleType(1) // -> remote
-	if tunnelTypes[e.typeIdx] != "remote" || e.remote.Placeholder != "9090 or 0.0.0.0:9090" {
-		t.Errorf("cycle to remote: type=%s placeholder=%q", tunnelTypes[e.typeIdx], e.remote.Placeholder)
+	if tuberTypes[e.typeIdx] != "remote" || e.remote.Placeholder != "9090 or 0.0.0.0:9090" {
+		t.Errorf("cycle to remote: type=%s placeholder=%q", tuberTypes[e.typeIdx], e.remote.Placeholder)
 	}
 }
 
 func TestEditor_TypeNoteNonEmpty(t *testing.T) {
 	f := newEditorFake()
 	e := editorForNew(f)
-	for _, ty := range tunnelTypes {
-		e.typeIdx = indexOf(tunnelTypes, ty)
+	for _, ty := range tuberTypes {
+		e.typeIdx = indexOf(tuberTypes, ty)
 		if e.typeNote() == "" {
 			t.Errorf("type %s has empty note", ty)
 		}

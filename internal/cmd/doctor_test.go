@@ -32,7 +32,7 @@ func TestDoctor_PassesOnHealthyConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	cfgPath := filepath.Join(dir, "config.yaml")
-	body := "defaults:\n  identity: " + id + "\ntunnels:\n  - name: t1\n    type: local\n    local: \"19995\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	body := "defaults:\n  identity: " + id + "\ntubers:\n  - name: t1\n    type: local\n    local: \"19995\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestDoctor_PassesOnHealthyConfig(t *testing.T) {
 func TestDoctor_FailsOnMissingIdentity(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")
-	body := "defaults:\n  identity: " + filepath.Join(dir, "nope") + "\ntunnels:\n  - name: t1\n    type: local\n    local: \"19996\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	body := "defaults:\n  identity: " + filepath.Join(dir, "nope") + "\ntubers:\n  - name: t1\n    type: local\n    local: \"19996\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -71,7 +71,7 @@ func TestDoctor_FailsOnMissingIdentity(t *testing.T) {
 func TestDoctor_FailsOnBadConfig(t *testing.T) {
 	dir := t.TempDir()
 	cfgPath := filepath.Join(dir, "config.yaml")
-	if err := os.WriteFile(cfgPath, []byte("tunnels:\n  - name: x\n    type: bogus\n"), 0o600); err != nil {
+	if err := os.WriteFile(cfgPath, []byte("tubers:\n  - name: x\n    type: bogus\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runDoctor(t, cfgPath)
@@ -98,7 +98,7 @@ func TestDoctor_ReportsLogPathAndRotation(t *testing.T) {
 	withLogPaths(t, daemonLog)
 
 	cfgPath := filepath.Join(dir, "config.yaml")
-	body := "tunnels:\n  - name: t1\n    type: local\n    local: \"19997\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	body := "tubers:\n  - name: t1\n    type: local\n    local: \"19997\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestDoctor_ReportsNoRotationYet(t *testing.T) {
 	withLogPaths(t, daemonLog)
 
 	cfgPath := filepath.Join(dir, "config.yaml")
-	body := "tunnels:\n  - name: t1\n    type: local\n    local: \"19998\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	body := "tubers:\n  - name: t1\n    type: local\n    local: \"19998\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func withLogPaths(t *testing.T, paths ...string) {
 func writeMinimalConfig(t *testing.T, dir string) string {
 	t.Helper()
 	cfgPath := filepath.Join(dir, "config.yaml")
-	body := "tunnels:\n  - name: t1\n    type: local\n    local: \"20001\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	body := "tubers:\n  - name: t1\n    type: local\n    local: \"20001\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
 	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
 		t.Fatal(err)
 	}

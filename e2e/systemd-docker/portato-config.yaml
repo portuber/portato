@@ -2,7 +2,7 @@ defaults:
   identity: /home/appuser/.ssh/id_ed25519
   known_hosts: /home/appuser/.ssh/known_hosts
   accept_new_hosts: true
-tunnels:
+tubers:
   - name: echo
     type: local
     local: "18080"

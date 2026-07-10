@@ -95,51 +95,51 @@ func (c *Client) HealthzCtx(ctx context.Context) error {
 	return nil
 }
 
-// List returns the current status of every tunnel.
+// List returns the current status of every tuber.
 func (c *Client) List() ([]forward.Status, error) {
 	var out []forward.Status
-	if err := c.get("/tunnels", &out); err != nil {
+	if err := c.get("/tubers", &out); err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// Enable turns a tunnel on (the daemon persists enabled=true to the config).
+// Enable turns a tuber on (the daemon persists enabled=true to the config).
 func (c *Client) Enable(name string) error {
-	_, err := c.post(fmt.Sprintf("/tunnels/%s/enable", name))
+	_, err := c.post(fmt.Sprintf("/tubers/%s/enable", name))
 	return err
 }
 
-// Disable turns a tunnel off (persists enabled=false).
+// Disable turns a tuber off (persists enabled=false).
 func (c *Client) Disable(name string) error {
-	_, err := c.post(fmt.Sprintf("/tunnels/%s/disable", name))
+	_, err := c.post(fmt.Sprintf("/tubers/%s/disable", name))
 	return err
 }
 
-// Restart stops and starts a tunnel without changing its persisted state.
+// Restart stops and starts a tuber without changing its persisted state.
 func (c *Client) Restart(name string) error {
-	_, err := c.post(fmt.Sprintf("/tunnels/%s/restart", name))
+	_, err := c.post(fmt.Sprintf("/tubers/%s/restart", name))
 	return err
 }
 
-// AcceptHost appends the tunnel's pending unknown-host key to known_hosts on
-// the daemon and restarts the tunnel (Phase 11 TOFU prompt).
+// AcceptHost appends the tuber's pending unknown-host key to known_hosts on
+// the daemon and restarts the tuber (Phase 11 TOFU prompt).
 func (c *Client) AcceptHost(name string) error {
-	_, err := c.post(fmt.Sprintf("/tunnels/%s/accept-host", name))
+	_, err := c.post(fmt.Sprintf("/tubers/%s/accept-host", name))
 	return err
 }
 
-// SetPassphrase sends the tunnel's identity passphrase to the daemon, which
+// SetPassphrase sends the tuber's identity passphrase to the daemon, which
 // stores it (in-memory cache, plus the OS keyring when identity_passphrase_store
 // is on) and unblocks a dial waiting on it. Sent over the authenticated 0600
 // unix socket (Phase 18), like socks5_password. Phase 19.
 func (c *Client) SetPassphrase(name, passphrase string) error {
-	return c.sendBody(http.MethodPost, fmt.Sprintf("/tunnels/%s/passphrase", name),
+	return c.sendBody(http.MethodPost, fmt.Sprintf("/tubers/%s/passphrase", name),
 		map[string]string{"passphrase": passphrase})
 }
 
 // AddIdentity tells the daemon to store a passphrase for an identity PATH (not a
-// tunnel), loading it into the cache and waking any dial blocked on it. Used by
+// tuber), loading it into the cache and waking any dial blocked on it. Used by
 // `portato add-identity` after it has written the keyring out-of-band. Phase 19.
 func (c *Client) AddIdentity(path, passphrase string) error {
 	return c.sendBody(http.MethodPost, "/identities",
@@ -180,23 +180,23 @@ func (c *Client) Config() (*config.Config, error) {
 	return &cfg, nil
 }
 
-// AddTunnel asks the daemon to create a tunnel (validates, persists, reloads).
-func (c *Client) AddTunnel(t config.Tunnel) error {
-	return c.sendBody(http.MethodPost, "/tunnels", t)
+// AddTuber asks the daemon to create a tuber (validates, persists, reloads).
+func (c *Client) AddTuber(t config.Tuber) error {
+	return c.sendBody(http.MethodPost, "/tubers", t)
 }
 
-// UpdateTunnel asks the daemon to replace the tunnel named name with t.
-func (c *Client) UpdateTunnel(name string, t config.Tunnel) error {
-	return c.sendBody(http.MethodPut, fmt.Sprintf("/tunnels/%s", name), t)
+// UpdateTuber asks the daemon to replace the tuber named name with t.
+func (c *Client) UpdateTuber(name string, t config.Tuber) error {
+	return c.sendBody(http.MethodPut, fmt.Sprintf("/tubers/%s", name), t)
 }
 
-// DeleteTunnel asks the daemon to remove the tunnel named name.
-func (c *Client) DeleteTunnel(name string) error {
-	return c.sendBody(http.MethodDelete, fmt.Sprintf("/tunnels/%s", name), nil)
+// DeleteTuber asks the daemon to remove the tuber named name.
+func (c *Client) DeleteTuber(name string) error {
+	return c.sendBody(http.MethodDelete, fmt.Sprintf("/tubers/%s", name), nil)
 }
 
-// Logs fetches the recent in-memory log entries for a tunnel from the daemon's
-// ring buffer (Phase 11). An empty name returns every tunnel's entries.
+// Logs fetches the recent in-memory log entries for a tuber from the daemon's
+// ring buffer (Phase 11). An empty name returns every tuber's entries.
 func (c *Client) Logs(name string) ([]routelog.Entry, error) {
 	path := "/logs"
 	if name != "" {
@@ -264,7 +264,7 @@ func (c *Client) post(path string) (map[string]string, error) {
 }
 
 // sendBody issues a request with an optional JSON body and returns an error on
-// a non-2xx response. Used by the tunnel mutation endpoints (Phase 10).
+// a non-2xx response. Used by the tuber mutation endpoints (Phase 10).
 func (c *Client) sendBody(method, path string, body any) error {
 	var r io.Reader
 	if body != nil {

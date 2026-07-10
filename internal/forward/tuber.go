@@ -29,11 +29,11 @@ const (
 // surfaced via the ServeConn return value through slog (see handleDynamicConn).
 var socks5SilencedLogger = log.New(io.Discard, "", 0)
 
-// Tunnel manages one local (-L) SSH port forward: it owns the local listener,
+// Tuber manages one local (-L) SSH port forward: it owns the local listener,
 // the SSH client (with reconnect), and the per-connection copy loops.
-type Tunnel struct {
+type Tuber struct {
 	baseCtx  context.Context
-	cfg      config.Tunnel
+	cfg      config.Tuber
 	defaults config.Defaults
 	log      *slog.Logger
 
@@ -70,26 +70,26 @@ type Tunnel struct {
 
 // notifyChange propagates a state transition to the Engine broker. Called
 // only by the goroutine that just changed t.state, after releasing t.mu.
-func (t *Tunnel) notifyChange() {
+func (t *Tuber) notifyChange() {
 	if t.onChange != nil {
 		t.onChange()
 	}
 }
 
-// NewTunnel constructs a tunnel. baseCtx is reused for manual Restart. provider
+// NewTuber constructs a tuber. baseCtx is reused for manual Restart. provider
 // (optional) enables passphrase-protected identity loading (Phase 19).
-func NewTunnel(baseCtx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger, provider PassphraseProvider) *Tunnel {
+func NewTuber(baseCtx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, provider PassphraseProvider) *Tuber {
 	if log == nil {
 		log = slog.Default()
 	}
 	if baseCtx == nil {
 		baseCtx = context.Background()
 	}
-	return &Tunnel{
+	return &Tuber{
 		baseCtx:  baseCtx,
 		cfg:      cfg,
 		defaults: def,
-		log:      log.With("tunnel", cfg.Name),
+		log:      log.With("tuber", cfg.Name),
 		provider: provider,
 	}
 }
@@ -100,14 +100,14 @@ func NewTunnel(baseCtx context.Context, cfg config.Tunnel, def config.Defaults, 
 // For type=remote there is no local listener — it is bound on the server after
 // each successful SSH dial inside runRemote, so Start always succeeds and
 // connect/listen errors surface via the state machine.
-func (t *Tunnel) Start(ctx context.Context) error {
+func (t *Tuber) Start(ctx context.Context) error {
 	if ctx == nil {
 		ctx = t.baseCtx
 	}
 	t.mu.Lock()
 	if t.running {
 		t.mu.Unlock()
-		return errors.New("tunnel already running")
+		return errors.New("tuber already running")
 	}
 
 	if t.cfg.Type == "remote" {
@@ -149,18 +149,18 @@ func (t *Tunnel) Start(ctx context.Context) error {
 }
 
 // StartWith is like Start but adopts a pre-bound listener (handed in during a
-// standalone->daemon hand-off) instead of binding its own. The tunnel takes
+// standalone->daemon hand-off) instead of binding its own. The tuber takes
 // ownership of ln and closes it on Stop. Only valid for the local-listener
-// types (local/dynamic); a type=remote tunnel has no local listener to adopt.
+// types (local/dynamic); a type=remote tuber has no local listener to adopt.
 // Phase 16.
-func (t *Tunnel) StartWith(ctx context.Context, ln net.Listener) error {
+func (t *Tuber) StartWith(ctx context.Context, ln net.Listener) error {
 	if ctx == nil {
 		ctx = t.baseCtx
 	}
 	t.mu.Lock()
 	if t.running {
 		t.mu.Unlock()
-		return errors.New("tunnel already running")
+		return errors.New("tuber already running")
 	}
 	if t.cfg.Type == "remote" {
 		t.mu.Unlock()
@@ -182,7 +182,7 @@ func (t *Tunnel) StartWith(ctx context.Context, ln net.Listener) error {
 }
 
 // Stop tears down the listener and SSH client and blocks until the run loop exits.
-func (t *Tunnel) Stop() error {
+func (t *Tuber) Stop() error {
 	t.mu.Lock()
 	if !t.running {
 		t.mu.Unlock()
@@ -219,19 +219,19 @@ func (t *Tunnel) Stop() error {
 }
 
 // Restart performs a synchronous Stop followed by Start.
-func (t *Tunnel) Restart() error {
+func (t *Tuber) Restart() error {
 	if err := t.Stop(); err != nil {
 		return err
 	}
 	return t.Start(t.baseCtx)
 }
 
-// Reconfigure swaps the tunnel's config and defaults in place. If the tunnel is
+// Reconfigure swaps the tuber's config and defaults in place. If the tuber is
 // currently running, it is restarted so the new endpoints/auth take effect;
 // otherwise it stays stopped, but Status() already reflects the new fields.
-// Used by Engine.Reload so editing a tunnel updates its displayed Local/Remote
-// without starting a tunnel that was off (and without leaving a stale cfg).
-func (t *Tunnel) Reconfigure(cfg config.Tunnel, def config.Defaults) error {
+// Used by Engine.Reload so editing a tuber updates its displayed Local/Remote
+// without starting a tuber that was off (and without leaving a stale cfg).
+func (t *Tuber) Reconfigure(cfg config.Tuber, def config.Defaults) error {
 	t.mu.Lock()
 	running := t.running
 	t.cfg = cfg
@@ -243,7 +243,7 @@ func (t *Tunnel) Reconfigure(cfg config.Tunnel, def config.Defaults) error {
 	return nil
 }
 
-func (t *Tunnel) Status() Status {
+func (t *Tuber) Status() Status {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return Status{
@@ -264,7 +264,7 @@ func (t *Tunnel) Status() Status {
 // recordUnknownHost is the hostKeySink wired into dialSSH: it remembers the
 // rejected key so Status can surface it for the TUI TOFU prompt. Called from
 // the dial goroutine; t.mu is taken here.
-func (t *Tunnel) recordUnknownHost(host, fingerprint, line string) {
+func (t *Tuber) recordUnknownHost(host, fingerprint, line string) {
 	t.mu.Lock()
 	t.pendingHost = host
 	t.pendingFingerprint = fingerprint
@@ -275,7 +275,7 @@ func (t *Tunnel) recordUnknownHost(host, fingerprint, line string) {
 // clearPendingHost forgets a previously recorded unknown host key. Called at
 // the start of each dial attempt so a stale entry does not outlive the
 // rejection that produced it.
-func (t *Tunnel) clearPendingHost() {
+func (t *Tuber) clearPendingHost() {
 	t.mu.Lock()
 	t.pendingHost = ""
 	t.pendingFingerprint = ""
@@ -287,7 +287,7 @@ func (t *Tunnel) clearPendingHost() {
 // passphrase (path != "") so Status.PendingPassphrase surfaces it for the UI to
 // prompt, or clears it (path == "") once the passphrase is accepted. Called
 // from the dial goroutine.
-func (t *Tunnel) passphraseSink(path string) {
+func (t *Tuber) passphraseSink(path string) {
 	t.mu.Lock()
 	t.pendingPassphrase = path
 	t.mu.Unlock()
@@ -298,7 +298,7 @@ func (t *Tunnel) passphraseSink(path string) {
 // start of each dial so a stale entry does not outlive the attempt that
 // produced it (e.g. the identity changed, or the dial failed for another
 // reason).
-func (t *Tunnel) clearPendingPassphrase() {
+func (t *Tuber) clearPendingPassphrase() {
 	t.mu.Lock()
 	if t.pendingPassphrase == "" {
 		t.mu.Unlock()
@@ -311,25 +311,25 @@ func (t *Tunnel) clearPendingPassphrase() {
 
 // PendingHostLine returns the known_hosts line for the last rejected unknown
 // host (and ok=false when there is none). AcceptHost (controller) reads it.
-func (t *Tunnel) PendingHostLine() (line string, ok bool) {
+func (t *Tuber) PendingHostLine() (line string, ok bool) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.pendingHostLine, t.pendingHostLine != ""
 }
 
-// ErrNoListener is returned by ListenerFile when the tunnel has no local
+// ErrNoListener is returned by ListenerFile when the tuber has no local
 // listener to hand off: it is stopped, or type=remote (whose listener is bound
 // on the SSH server, not locally). LiveListenerFiles treats it as "skip this
-// tunnel" rather than a failure.
-var ErrNoListener = errors.New("tunnel has no local listener to pass")
+// tuber" rather than a failure.
+var ErrNoListener = errors.New("tuber has no local listener to pass")
 
-// ListenerFile returns a duplicated file descriptor for the tunnel's local
+// ListenerFile returns a duplicated file descriptor for the tuber's local
 // listener, for passing to the spawned daemon during the standalone->daemon
-// hand-off (Phase 16). File dups the fd; the tunnel's own listener stays open
-// and keeps accepting until Close. Returns ErrNoListener when the tunnel is
+// hand-off (Phase 16). File dups the fd; the tuber's own listener stays open
+// and keeps accepting until Close. Returns ErrNoListener when the tuber is
 // stopped or has no local listener (type=remote); any other failure is a hard
 // error.
-func (t *Tunnel) ListenerFile() (*os.File, error) {
+func (t *Tuber) ListenerFile() (*os.File, error) {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	if !t.running || t.listener == nil || t.cfg.Type == "remote" {
@@ -342,7 +342,7 @@ func (t *Tunnel) ListenerFile() (*os.File, error) {
 	return tcp.File()
 }
 
-func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{}) {
+func (t *Tuber) run(ctx context.Context, ln net.Listener, done chan<- struct{}) {
 	defer close(done)
 	go t.acceptLoop(ctx, ln)
 
@@ -372,7 +372,7 @@ func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{})
 		t.state = Connected
 		t.mu.Unlock()
 		t.notifyChange()
-		t.log.Info("tunnel connected")
+		t.log.Info("tuber connected")
 
 		t.serveConnected(ctx, client)
 
@@ -387,14 +387,14 @@ func (t *Tunnel) run(ctx context.Context, ln net.Listener, done chan<- struct{})
 			return
 		}
 		t.setState(Reconnecting)
-		t.log.Info("tunnel disconnected, reconnecting")
+		t.log.Info("tuber disconnected, reconnecting")
 		if !t.sleep(ctx, nextBackoff(attempt)) {
 			return
 		}
 	}
 }
 
-func (t *Tunnel) acceptLoop(ctx context.Context, ln net.Listener) {
+func (t *Tuber) acceptLoop(ctx context.Context, ln net.Listener) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -416,7 +416,7 @@ func (t *Tunnel) acceptLoop(ctx context.Context, ln net.Listener) {
 	}
 }
 
-func (t *Tunnel) handleConn(client *ssh.Client, conn net.Conn) {
+func (t *Tuber) handleConn(client *ssh.Client, conn net.Conn) {
 	remote, err := client.Dial("tcp", t.cfg.Remote)
 	if err != nil {
 		t.log.Warn("dial remote failed", "remote", t.cfg.Remote, "err", err)
@@ -429,10 +429,10 @@ func (t *Tunnel) handleConn(client *ssh.Client, conn net.Conn) {
 
 // handleDynamicConn serves a type=dynamic (-D) connection: the inbound conn is a
 // SOCKS5 client, and each requested destination is dialed through the SSH client
-// on the server side. When socks5_user/socks5_password are configured (tunnel
+// on the server side. When socks5_user/socks5_password are configured (tuber
 // or defaults), the proxy requires user/pass authentication; otherwise NoAuth
 // (loopback bind only) — preserving the pre-Phase-20 behaviour (Phase 20).
-func (t *Tunnel) handleDynamicConn(client *ssh.Client, conn net.Conn) {
+func (t *Tuber) handleDynamicConn(client *ssh.Client, conn net.Conn) {
 	srv, err := socks5.New(&socks5.Config{
 		Logger:      socks5SilencedLogger,
 		Resolver:    loggingResolver{inner: socks5.DNSResolver{}, log: t.log},
@@ -489,11 +489,11 @@ func (r loggingResolver) Resolve(ctx context.Context, name string) (context.Cont
 	return c, ip, nil
 }
 
-// runRemote is the reconnect loop for a type=remote (-R) tunnel. The listener
+// runRemote is the reconnect loop for a type=remote (-R) tuber. The listener
 // is bound on the SSH server via client.Listen, so it is created right after
 // each successful dial and torn down when the client drops. The
 // dial/backoff/keepalive scaffolding is shared with run.
-func (t *Tunnel) runRemote(ctx context.Context, done chan<- struct{}) {
+func (t *Tuber) runRemote(ctx context.Context, done chan<- struct{}) {
 	defer close(done)
 	attempt := 0
 	for {
@@ -534,7 +534,7 @@ func (t *Tunnel) runRemote(ctx context.Context, done chan<- struct{}) {
 		t.state = Connected
 		t.mu.Unlock()
 		t.notifyChange()
-		t.log.Info("remote tunnel connected", "bind", bindAddr)
+		t.log.Info("remote tuber connected", "bind", bindAddr)
 
 		t.serveRemoteConnected(ctx, client, ln)
 
@@ -549,18 +549,18 @@ func (t *Tunnel) runRemote(ctx context.Context, done chan<- struct{}) {
 			return
 		}
 		t.setState(Reconnecting)
-		t.log.Info("remote tunnel disconnected, reconnecting")
+		t.log.Info("remote tuber disconnected, reconnecting")
 		if !t.sleep(ctx, nextBackoff(attempt)) {
 			return
 		}
 	}
 }
 
-// serveRemoteConnected blocks while a remote tunnel's SSH session is alive. It
+// serveRemoteConnected blocks while a remote tuber's SSH session is alive. It
 // runs the keepalive loop and the server-side accept loop in parallel, and
 // returns when the client drops or the context is cancelled (Stop). The remote
 // listener is closed here to unblock the accept loop.
-func (t *Tunnel) serveRemoteConnected(ctx context.Context, client *ssh.Client, ln net.Listener) {
+func (t *Tuber) serveRemoteConnected(ctx context.Context, client *ssh.Client, ln net.Listener) {
 	stopKA := make(chan struct{})
 	kaExited := make(chan struct{})
 	go func() {
@@ -592,7 +592,7 @@ func (t *Tunnel) serveRemoteConnected(ctx context.Context, client *ssh.Client, l
 
 // remoteAcceptLoop accepts connections arriving on the server-side listener
 // (opened via client.Listen) and forwards each to the local address.
-func (t *Tunnel) remoteAcceptLoop(ln net.Listener) {
+func (t *Tuber) remoteAcceptLoop(ln net.Listener) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -602,7 +602,7 @@ func (t *Tunnel) remoteAcceptLoop(ln net.Listener) {
 	}
 }
 
-func (t *Tunnel) handleRemoteConn(conn net.Conn) {
+func (t *Tuber) handleRemoteConn(conn net.Conn) {
 	target := t.cfg.ListenAddr()
 	local, err := net.Dial("tcp", target)
 	if err != nil {
@@ -631,7 +631,7 @@ func pipe(a, b io.ReadWriteCloser) {
 	<-done
 }
 
-func (t *Tunnel) serveConnected(ctx context.Context, client *ssh.Client) {
+func (t *Tuber) serveConnected(ctx context.Context, client *ssh.Client) {
 	stopKA := make(chan struct{})
 	kaExited := make(chan struct{})
 	go func() {
@@ -653,7 +653,7 @@ func (t *Tunnel) serveConnected(ctx context.Context, client *ssh.Client) {
 	<-kaExited
 }
 
-func (t *Tunnel) keepaliveLoop(ctx context.Context, client *ssh.Client, stop <-chan struct{}) {
+func (t *Tuber) keepaliveLoop(ctx context.Context, client *ssh.Client, stop <-chan struct{}) {
 	ticker := time.NewTicker(keepaliveInterval)
 	defer ticker.Stop()
 	for {
@@ -686,14 +686,14 @@ func keepaliveOnce(client *ssh.Client) error {
 	}
 }
 
-func (t *Tunnel) setState(s State) {
+func (t *Tuber) setState(s State) {
 	t.mu.Lock()
 	t.state = s
 	t.mu.Unlock()
 	t.notifyChange()
 }
 
-func (t *Tunnel) setStateErr(s State, msg string) {
+func (t *Tuber) setStateErr(s State, msg string) {
 	t.mu.Lock()
 	t.state = s
 	t.errMsg = msg
@@ -702,14 +702,14 @@ func (t *Tunnel) setStateErr(s State, msg string) {
 	// screen and the rotated log file — otherwise the truncated Status.Error in
 	// the list row is the only place the message appears, and a remote-listen
 	// failure (e.g. "listen 0.0.0.0:9090 on server: …") is invisible. A nil log
-	// is tolerated for tests that build a Tunnel literal without a logger.
+	// is tolerated for tests that build a Tuber literal without a logger.
 	if t.log != nil {
 		t.log.Error(msg)
 	}
 	t.notifyChange()
 }
 
-func (t *Tunnel) sleep(ctx context.Context, d time.Duration) bool {
+func (t *Tuber) sleep(ctx context.Context, d time.Duration) bool {
 	timer := time.NewTimer(d)
 	defer timer.Stop()
 	select {

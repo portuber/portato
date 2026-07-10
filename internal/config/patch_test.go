@@ -12,7 +12,7 @@ defaults:
   identity: ~/.ssh/id_ed25519
   known_hosts: ~/.ssh/known_hosts
 # manage production access here
-tunnels:
+tubers:
   - name: keep-me  # do not lose this comment
     type: local
     local: 5432
@@ -37,15 +37,15 @@ func writeTmpConfig(t *testing.T, content string) string {
 	return p
 }
 
-func TestAddTunnelNode_AppendsAndPreservesComments(t *testing.T) {
+func TestAddTuberNode_AppendsAndPreservesComments(t *testing.T) {
 	p := writeTmpConfig(t, commentedConfig)
 
-	added := Tunnel{
+	added := Tuber{
 		Name: "new-one", Type: "dynamic",
 		Local: "1080", SSH: "deploy@bastion:22",
 	}
-	if err := AddTunnelNode(p, added); err != nil {
-		t.Fatalf("AddTunnelNode: %v", err)
+	if err := AddTuberNode(p, added); err != nil {
+		t.Fatalf("AddTuberNode: %v", err)
 	}
 
 	data, _ := os.ReadFile(p)
@@ -67,46 +67,46 @@ func TestAddTunnelNode_AppendsAndPreservesComments(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load after add: %v", err)
 	}
-	if len(c.Tunnels) != 3 {
-		t.Fatalf("expected 3 tunnels, got %d", len(c.Tunnels))
+	if len(c.Tubers) != 3 {
+		t.Fatalf("expected 3 tubers, got %d", len(c.Tubers))
 	}
-	last := c.Tunnels[2]
+	last := c.Tubers[2]
 	if last.Name != "new-one" || last.Type != "dynamic" || last.ListenAddr() != "127.0.0.1:1080" {
-		t.Errorf("added tunnel mismatch: %+v", last)
+		t.Errorf("added tuber mismatch: %+v", last)
 	}
 }
 
-func TestAddTunnelNode_CreatesTunnelsSequence(t *testing.T) {
+func TestAddTuberNode_CreatesTubersSequence(t *testing.T) {
 	p := writeTmpConfig(t, "defaults:\n  identity: ~/.ssh/id\n")
-	added := Tunnel{Name: "solo", Type: "local", Local: "1", Remote: "h:1", SSH: "u@h:22"}
-	if err := AddTunnelNode(p, added); err != nil {
-		t.Fatalf("AddTunnelNode: %v", err)
+	added := Tuber{Name: "solo", Type: "local", Local: "1", Remote: "h:1", SSH: "u@h:22"}
+	if err := AddTuberNode(p, added); err != nil {
+		t.Fatalf("AddTuberNode: %v", err)
 	}
 	c, err := Load(p)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if len(c.Tunnels) != 1 || c.Tunnels[0].Name != "solo" {
-		t.Errorf("expected solo tunnel, got %+v", c.Tunnels)
+	if len(c.Tubers) != 1 || c.Tubers[0].Name != "solo" {
+		t.Errorf("expected solo tuber, got %+v", c.Tubers)
 	}
 }
 
-func TestReplaceTunnelNode_RewritesAndPreservesOthers(t *testing.T) {
+func TestReplaceTuberNode_RewritesAndPreservesOthers(t *testing.T) {
 	p := writeTmpConfig(t, commentedConfig)
 
-	repl := Tunnel{
+	repl := Tuber{
 		Name: "edit-me", Type: "dynamic",
 		Local: "1080", SSH: "deploy@bastion:22",
 	}
-	if err := ReplaceTunnelNode(p, "edit-me", repl); err != nil {
-		t.Fatalf("ReplaceTunnelNode: %v", err)
+	if err := ReplaceTuberNode(p, "edit-me", repl); err != nil {
+		t.Fatalf("ReplaceTuberNode: %v", err)
 	}
 
 	data, _ := os.ReadFile(p)
 	out := string(data)
 	for _, want := range []string{
 		"# top-of-file comment",
-		"# do not lose this comment", // untouched tunnel keeps its comment
+		"# do not lose this comment", // untouched tuber keeps its comment
 		"type: dynamic",
 	} {
 		if !strings.Contains(out, want) {
@@ -118,43 +118,43 @@ func TestReplaceTunnelNode_RewritesAndPreservesOthers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load after replace: %v", err)
 	}
-	if len(c.Tunnels) != 2 {
-		t.Fatalf("expected 2 tunnels, got %d", len(c.Tunnels))
+	if len(c.Tubers) != 2 {
+		t.Fatalf("expected 2 tubers, got %d", len(c.Tubers))
 	}
-	if c.Tunnels[1].Type != "dynamic" || c.Tunnels[1].Name != "edit-me" {
-		t.Errorf("replaced tunnel mismatch: %+v", c.Tunnels[1])
+	if c.Tubers[1].Type != "dynamic" || c.Tubers[1].Name != "edit-me" {
+		t.Errorf("replaced tuber mismatch: %+v", c.Tubers[1])
 	}
 }
 
-func TestReplaceTunnelNode_Rename(t *testing.T) {
+func TestReplaceTuberNode_Rename(t *testing.T) {
 	p := writeTmpConfig(t, commentedConfig)
-	repl := Tunnel{Name: "renamed", Type: "local", Local: "1", Remote: "h:1", SSH: "u@h:22"}
-	if err := ReplaceTunnelNode(p, "edit-me", repl); err != nil {
-		t.Fatalf("ReplaceTunnelNode: %v", err)
+	repl := Tuber{Name: "renamed", Type: "local", Local: "1", Remote: "h:1", SSH: "u@h:22"}
+	if err := ReplaceTuberNode(p, "edit-me", repl); err != nil {
+		t.Fatalf("ReplaceTuberNode: %v", err)
 	}
 	c, err := Load(p)
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	names := []string{c.Tunnels[0].Name, c.Tunnels[1].Name}
+	names := []string{c.Tubers[0].Name, c.Tubers[1].Name}
 	if names[0] != "keep-me" || names[1] != "renamed" {
 		t.Errorf("rename: got %v", names)
 	}
 }
 
-func TestReplaceTunnelNode_NotFound(t *testing.T) {
+func TestReplaceTuberNode_NotFound(t *testing.T) {
 	p := writeTmpConfig(t, commentedConfig)
-	err := ReplaceTunnelNode(p, "nope", Tunnel{Name: "x"})
+	err := ReplaceTuberNode(p, "nope", Tuber{Name: "x"})
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected not-found error, got %v", err)
 	}
 }
 
-func TestDeleteTunnelNode_RemovesAndPreservesOthers(t *testing.T) {
+func TestDeleteTuberNode_RemovesAndPreservesOthers(t *testing.T) {
 	p := writeTmpConfig(t, commentedConfig)
 
-	if err := DeleteTunnelNode(p, "edit-me"); err != nil {
-		t.Fatalf("DeleteTunnelNode: %v", err)
+	if err := DeleteTuberNode(p, "edit-me"); err != nil {
+		t.Fatalf("DeleteTuberNode: %v", err)
 	}
 
 	data, _ := os.ReadFile(p)
@@ -172,65 +172,65 @@ func TestDeleteTunnelNode_RemovesAndPreservesOthers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load after delete: %v", err)
 	}
-	if len(c.Tunnels) != 1 || c.Tunnels[0].Name != "keep-me" {
-		t.Errorf("expected only keep-me, got %+v", c.Tunnels)
+	if len(c.Tubers) != 1 || c.Tubers[0].Name != "keep-me" {
+		t.Errorf("expected only keep-me, got %+v", c.Tubers)
 	}
 }
 
-func TestDeleteTunnelNode_NotFound(t *testing.T) {
+func TestDeleteTuberNode_NotFound(t *testing.T) {
 	p := writeTmpConfig(t, commentedConfig)
-	err := DeleteTunnelNode(p, "nope")
+	err := DeleteTuberNode(p, "nope")
 	if err == nil || !strings.Contains(err.Error(), "not found") {
 		t.Errorf("expected not-found error, got %v", err)
 	}
 }
 
-func TestWithTunnelAdded_DuplicateRejected(t *testing.T) {
+func TestWithTuberAdded_DuplicateRejected(t *testing.T) {
 	c, err := Load(writeTmpConfig(t, commentedConfig))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	dup := Tunnel{Name: "keep-me", Type: "local", Local: "1", Remote: "h:1", SSH: "u@h:22"}
-	if _, err := c.WithTunnelAdded(dup); err == nil {
+	dup := Tuber{Name: "keep-me", Type: "local", Local: "1", Remote: "h:1", SSH: "u@h:22"}
+	if _, err := c.WithTuberAdded(dup); err == nil {
 		t.Error("expected duplicate-name validation error")
 	}
 	// The original config must be untouched (clone semantics).
-	if len(c.Tunnels) != 2 {
-		t.Errorf("original config mutated: %d tunnels", len(c.Tunnels))
+	if len(c.Tubers) != 2 {
+		t.Errorf("original config mutated: %d tubers", len(c.Tubers))
 	}
 }
 
-func TestWithTunnelReplaced_AllowsKeepingName(t *testing.T) {
+func TestWithTuberReplaced_AllowsKeepingName(t *testing.T) {
 	c, err := Load(writeTmpConfig(t, commentedConfig))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	repl := Tunnel{Name: "edit-me", Type: "dynamic", Local: "1080", SSH: "u@h:22"}
-	out, err := c.WithTunnelReplaced("edit-me", repl)
+	repl := Tuber{Name: "edit-me", Type: "dynamic", Local: "1080", SSH: "u@h:22"}
+	out, err := c.WithTuberReplaced("edit-me", repl)
 	if err != nil {
-		t.Fatalf("WithTunnelReplaced: %v", err)
+		t.Fatalf("WithTuberReplaced: %v", err)
 	}
-	if out.Tunnels[1].Type != "dynamic" {
-		t.Errorf("replaced type = %q", out.Tunnels[1].Type)
+	if out.Tubers[1].Type != "dynamic" {
+		t.Errorf("replaced type = %q", out.Tubers[1].Type)
 	}
-	if len(c.Tunnels) != 2 || c.Tunnels[1].Type != "remote" {
-		t.Errorf("original config mutated: %+v", c.Tunnels[1])
+	if len(c.Tubers) != 2 || c.Tubers[1].Type != "remote" {
+		t.Errorf("original config mutated: %+v", c.Tubers[1])
 	}
 }
 
-func TestWithTunnelRemoved(t *testing.T) {
+func TestWithTuberRemoved(t *testing.T) {
 	c, err := Load(writeTmpConfig(t, commentedConfig))
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	out, err := c.WithTunnelRemoved("edit-me")
+	out, err := c.WithTuberRemoved("edit-me")
 	if err != nil {
-		t.Fatalf("WithTunnelRemoved: %v", err)
+		t.Fatalf("WithTuberRemoved: %v", err)
 	}
-	if len(out.Tunnels) != 1 || out.Tunnels[0].Name != "keep-me" {
-		t.Errorf("got %+v", out.Tunnels)
+	if len(out.Tubers) != 1 || out.Tubers[0].Name != "keep-me" {
+		t.Errorf("got %+v", out.Tubers)
 	}
-	if _, err := c.WithTunnelRemoved("nope"); err == nil {
+	if _, err := c.WithTuberRemoved("nope"); err == nil {
 		t.Error("expected not-found error")
 	}
 }

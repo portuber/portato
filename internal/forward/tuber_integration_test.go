@@ -84,7 +84,7 @@ func startTestAgent(t *testing.T, priv any) (sock string, cleanup func()) {
 	return sock, func() { _ = ln.Close() }
 }
 
-func waitForState(t *Tunnel, want State, timeout time.Duration) bool {
+func waitForState(t *Tuber, want State, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		if t.Status().State == want {
@@ -95,7 +95,7 @@ func waitForState(t *Tunnel, want State, timeout time.Duration) bool {
 	return t.Status().State == want
 }
 
-func waitForNotState(t *Tunnel, notWant State, timeout time.Duration) bool {
+func waitForNotState(t *Tuber, notWant State, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		if t.Status().State != notWant {
@@ -106,7 +106,7 @@ func waitForNotState(t *Tunnel, notWant State, timeout time.Duration) bool {
 	return false
 }
 
-func TestTunnelTrafficAndReconnect(t *testing.T) {
+func TestTuberTrafficAndReconnect(t *testing.T) {
 	// Hermetic: ignore the host's ssh-agent so only the identity-file auth
 	// path is exercised.
 	t.Setenv("SSH_AUTH_SOCK", "")
@@ -137,7 +137,7 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 	localPort := freePort(t)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
 
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name:     "t-test",
 		Type:     "local",
 		Local:    strconv.Itoa(localPort),
@@ -152,7 +152,7 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -187,10 +187,10 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 	ping("first")
 
 	// Kill the SSH server (drop active conns + close listener) and confirm
-	// the tunnel self-heals via the reconnect loop.
+	// the tuber self-heals via the reconnect loop.
 	srv.Stop()
 	if !waitForNotState(tun, Connected, 5*time.Second) {
-		t.Fatal("tunnel stayed Connected after server kill")
+		t.Fatal("tuber stayed Connected after server kill")
 	}
 
 	srv.Restart()
@@ -212,11 +212,11 @@ func TestTunnelTrafficAndReconnect(t *testing.T) {
 	}
 }
 
-// TestTunnelHonoursKnownHostKeyType guards against golang/go#36126: the server
+// TestTuberHonoursKnownHostKeyType guards against golang/go#36126: the server
 // offers both ECDSA (preferred by x/crypto's default order) and ED25519, but
 // known_hosts only has the ED25519 key. The client must negotiate the key type
 // it already trusts instead of bailing out with "host key mismatch".
-func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
+func TestTuberHonoursKnownHostKeyType(t *testing.T) {
 	t.Setenv("SSH_AUTH_SOCK", "")
 
 	echoAddr, stopEcho := startEcho(t)
@@ -250,7 +250,7 @@ func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
 
 	localPort := freePort(t)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name:     "kh-test",
 		Type:     "local",
 		Local:    strconv.Itoa(localPort),
@@ -265,7 +265,7 @@ func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -295,12 +295,12 @@ func TestTunnelHonoursKnownHostKeyType(t *testing.T) {
 	}
 }
 
-// TestTunnelAuthViaAgent exercises the ssh-agent auth path end-to-end: the
-// tunnel has no identity file, so authentication must come from the in-process
+// TestTuberAuthViaAgent exercises the ssh-agent auth path end-to-end: the
+// tuber has no identity file, so authentication must come from the in-process
 // agent. Guards against the "use of closed network connection" bug where the
 // agent connection was closed before the lazy signers signed during the
 // handshake.
-func TestTunnelAuthViaAgent(t *testing.T) {
+func TestTuberAuthViaAgent(t *testing.T) {
 	echoAddr, stopEcho := startEcho(t)
 	defer stopEcho()
 
@@ -321,7 +321,7 @@ func TestTunnelAuthViaAgent(t *testing.T) {
 	knownHosts := filepath.Join(t.TempDir(), "known_hosts")
 	localPort := freePort(t)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name:   "agent-test",
 		Type:   "local",
 		Local:  strconv.Itoa(localPort),
@@ -336,7 +336,7 @@ func TestTunnelAuthViaAgent(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -366,11 +366,11 @@ func TestTunnelAuthViaAgent(t *testing.T) {
 	}
 }
 
-// TestTunnelRemoteTrafficAndReconnect exercises a type=remote (-R) tunnel end
+// TestTuberRemoteTrafficAndReconnect exercises a type=remote (-R) tuber end
 // to end: the port is listened on the server side (via ssh.Client.Listen), and
 // traffic is forwarded back to a local echo server. It also confirms the
 // remote listener is re-established after an sshd drop/restart.
-func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
+func TestTuberRemoteTrafficAndReconnect(t *testing.T) {
 	t.Setenv("SSH_AUTH_SOCK", "")
 
 	echoAddr, stopEcho := startEcho(t)
@@ -396,13 +396,13 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 	srv.Start()
 	defer srv.Stop()
 
-	// The port the remote tunnel will bind on the server side (loopback): the
+	// The port the remote tuber will bind on the server side (loopback): the
 	// test sshd is a Go listener that cannot bind the "*" wildcard a bare port
 	// now expands to, so the test requests loopback explicitly.
 	remotePort := freePort(t)
 	remoteBind := fmt.Sprintf("127.0.0.1:%d", remotePort)
 
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name:     "r-test",
 		Type:     "remote",
 		Local:    echoAddr,                                // forward server-side conns to the local echo
@@ -417,7 +417,7 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -453,10 +453,10 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 	ping("first")
 
 	// Kill the SSH server and confirm the remote listener is re-bound after
-	// the tunnel self-heals.
+	// the tuber self-heals.
 	srv.Stop()
 	if !waitForNotState(tun, Connected, 5*time.Second) {
-		t.Fatal("tunnel stayed Connected after server kill")
+		t.Fatal("tuber stayed Connected after server kill")
 	}
 	srv.Restart()
 	if !waitForState(tun, Connected, 15*time.Second) {
@@ -478,7 +478,7 @@ func TestTunnelRemoteTrafficAndReconnect(t *testing.T) {
 }
 
 // socks5Dial performs a minimal SOCKS5 no-auth CONNECT handshake against proxy
-// and returns the established connection tunneled to dst (IPv4 host:port). It
+// and returns the established connection tubered to dst (IPv4 host:port). It
 // avoids pulling in a SOCKS5 client dependency just for this test.
 func socks5Dial(t *testing.T, proxy, dst string) net.Conn {
 	t.Helper()
@@ -541,11 +541,11 @@ func socks5Dial(t *testing.T, proxy, dst string) net.Conn {
 	return conn
 }
 
-// TestTunnelDynamicTrafficAndReconnect exercises a type=dynamic (-D) tunnel end
+// TestTuberDynamicTrafficAndReconnect exercises a type=dynamic (-D) tuber end
 // to end: a SOCKS5 proxy on local whose per-connection dial is routed through
 // the SSH client. A hand-rolled SOCKS5 client CONNECTs to an echo server via
 // the proxy; the connection is re-established after an sshd drop/restart.
-func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
+func TestTuberDynamicTrafficAndReconnect(t *testing.T) {
 	t.Setenv("SSH_AUTH_SOCK", "")
 
 	echoAddr, stopEcho := startEcho(t)
@@ -574,7 +574,7 @@ func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
 	localPort := freePort(t)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
 
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name:     "d-test",
 		Type:     "dynamic",
 		Local:    strconv.Itoa(localPort),
@@ -589,7 +589,7 @@ func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -623,7 +623,7 @@ func TestTunnelDynamicTrafficAndReconnect(t *testing.T) {
 	// Kill the SSH server and confirm the SOCKS proxy self-heals.
 	srv.Stop()
 	if !waitForNotState(tun, Connected, 5*time.Second) {
-		t.Fatal("tunnel stayed Connected after server kill")
+		t.Fatal("tuber stayed Connected after server kill")
 	}
 	srv.Restart()
 	if !waitForState(tun, Connected, 15*time.Second) {

@@ -33,30 +33,30 @@ var ipcTokenDisabled bool
 // from the root command's daemon run when --ipc-token off / the env var is set.
 func SetIpcTokenDisabled(disabled bool) { ipcTokenDisabled = disabled }
 
-// tunneler is the subset of *forward.Engine the server depends on. Kept
+// tuberer is the subset of *forward.Engine the server depends on. Kept
 // unexported so the concrete Engine stays the production type while tests
 // can substitute a fake (the SSH path itself is covered in the forward pkg).
-type tunneler interface {
+type tuberer interface {
 	List() []forward.Status
 	Enable(name string) error
 	Disable(name string) error
 	Restart(name string) error
 	Reload(*config.Config)
 	StartEnabled()
-	// StartEnabledWith starts enabled tunnels, reusing pre-bound listeners
+	// StartEnabledWith starts enabled tubers, reusing pre-bound listeners
 	// handed in during a standalone->daemon hand-off (Phase 16) where present
 	// and binding normally for the rest.
 	StartEnabledWith(adopted map[string]net.Listener)
 	StopAll()
-	// Subscribe returns a channel that fires on every tunnel state change
+	// Subscribe returns a channel that fires on every tuber state change
 	// plus an unsubscribe func. Drives the GET /events SSE stream (Phase 9).
 	Subscribe() (<-chan struct{}, func())
 }
 
-// Server is the background daemon: it owns the tunnel Engine and exposes it
+// Server is the background daemon: it owns the tuber Engine and exposes it
 // over an HTTP server bound to a unix-domain socket (SPEC §6).
 type Server struct {
-	engine     tunneler
+	engine     tuberer
 	cfg        *config.Config
 	cfgPath    string
 	socketPath string
@@ -197,7 +197,7 @@ func resolveListenSocket() (string, error) {
 	return RuntimeSocketPath()
 }
 
-func newServer(engine tunneler, cfg *config.Config, cfgPath, socketPath, markerPath string, log *slog.Logger, ring *routelog.Ring) *Server {
+func newServer(engine tuberer, cfg *config.Config, cfgPath, socketPath, markerPath string, log *slog.Logger, ring *routelog.Ring) *Server {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Server{
 		engine:     engine,
@@ -222,7 +222,7 @@ func (s *Server) SetAdopted(adopted map[string]net.Listener) { s.adopted = adopt
 
 // Start binds the socket (or serves on a service-manager-activated listener),
 // writes the discovery marker (advertising the socket path + PID), starts the
-// enabled tunnels and serves HTTP until ctx is cancelled (or serving fails). It
+// enabled tubers and serves HTTP until ctx is cancelled (or serving fails). It
 // always shuts down cleanly on return. SPEC §6.
 func (s *Server) Start(ctx context.Context) error {
 	ln, err := s.openListener()
@@ -306,7 +306,7 @@ func (s *Server) openListener() (net.Listener, error) {
 	return ln, nil
 }
 
-// Shutdown stops the HTTP server, tears down all tunnels and removes the
+// Shutdown stops the HTTP server, tears down all tubers and removes the
 // socket and the discovery marker. Safe to call once.
 func (s *Server) Shutdown() error {
 	s.shutdownOnce.Do(func() {
@@ -345,21 +345,21 @@ func (s *Server) cleanup() {
 func (s *Server) routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
-	mux.HandleFunc("GET /tunnels", s.handleList)
+	mux.HandleFunc("GET /tubers", s.handleList)
 	mux.HandleFunc("GET /events", s.handleEvents)
 	mux.HandleFunc("GET /logs", s.handleLogs)
-	mux.HandleFunc("POST /tunnels/{name}/enable", s.handleEnable)
-	mux.HandleFunc("POST /tunnels/{name}/disable", s.handleDisable)
-	mux.HandleFunc("POST /tunnels/{name}/restart", s.handleRestart)
-	mux.HandleFunc("POST /tunnels/{name}/accept-host", s.handleAcceptHost)
-	mux.HandleFunc("POST /tunnels/{name}/passphrase", s.handlePassphrase)
+	mux.HandleFunc("POST /tubers/{name}/enable", s.handleEnable)
+	mux.HandleFunc("POST /tubers/{name}/disable", s.handleDisable)
+	mux.HandleFunc("POST /tubers/{name}/restart", s.handleRestart)
+	mux.HandleFunc("POST /tubers/{name}/accept-host", s.handleAcceptHost)
+	mux.HandleFunc("POST /tubers/{name}/passphrase", s.handlePassphrase)
 	mux.HandleFunc("POST /identities", s.handleSetIdentity)
 	mux.HandleFunc("DELETE /identities", s.handleForgetIdentity)
 	mux.HandleFunc("POST /reload", s.handleReload)
 	mux.HandleFunc("GET /config", s.handleGetConfig)
-	mux.HandleFunc("POST /tunnels", s.handleAddTunnel)
-	mux.HandleFunc("PUT /tunnels/{name}", s.handleUpdateTunnel)
-	mux.HandleFunc("DELETE /tunnels/{name}", s.handleDeleteTunnel)
+	mux.HandleFunc("POST /tubers", s.handleAddTuber)
+	mux.HandleFunc("PUT /tubers/{name}", s.handleUpdateTuber)
+	mux.HandleFunc("DELETE /tubers/{name}", s.handleDeleteTuber)
 	if s.token == "" {
 		return mux
 	}
@@ -389,9 +389,9 @@ func (s *Server) handleList(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.engine.List())
 }
 
-// handleLogs returns the recent in-memory log entries for a tunnel from the
-// daemon's ring buffer. Optional ?name= filters by tunnel; without it every
-// tunnel's entries are returned. Nil-safe: a daemon with no ring returns an
+// handleLogs returns the recent in-memory log entries for a tuber from the
+// daemon's ring buffer. Optional ?name= filters by tuber; without it every
+// tuber's entries are returned. Nil-safe: a daemon with no ring returns an
 // empty list. Phase 11 (TUI logs screen).
 func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
@@ -403,9 +403,9 @@ func (s *Server) handleLogs(w http.ResponseWriter, r *http.Request) {
 // hygiene, but it lets a stalled client detect a dead stream promptly.
 const eventHeartbeat = 15 * time.Second
 
-// handleEvents streams tunnel state-change signals to the client as SSE
+// handleEvents streams tuber state-change signals to the client as SSE
 // (Server-Sent Events). Each signal is a signal-only `data: {}` frame: the
-// client reacts by re-fetching GET /tunnels. The stream stays open until the
+// client reacts by re-fetching GET /tubers. The stream stays open until the
 // client disconnects (context done) or serving ends. SPEC §6 (Phase 9).
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
@@ -459,8 +459,8 @@ func (s *Server) handleEnable(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.hasTunnel(name) {
-		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
 		return
 	}
 	if !s.isUp(name) {
@@ -474,15 +474,15 @@ func (s *Server) handleEnable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "persist config: %v", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "enabled", "tunnel": name})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "enabled", "tuber": name})
 }
 
 func (s *Server) handleDisable(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.hasTunnel(name) {
-		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
 		return
 	}
 	if err := s.engine.Disable(name); err != nil {
@@ -494,33 +494,33 @@ func (s *Server) handleDisable(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "persist config: %v", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "disabled", "tunnel": name})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "disabled", "tuber": name})
 }
 
 func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.hasTunnel(name) {
-		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
 		return
 	}
 	if err := s.engine.Restart(name); err != nil {
 		writeError(w, http.StatusInternalServerError, "restart: %v", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "restarted", "tunnel": name})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "restarted", "tuber": name})
 }
 
-// handleAcceptHost appends the tunnel's pending unknown-host key (captured by
-// the SSH host-key callback) to known_hosts and restarts it, so the tunnel
+// handleAcceptHost appends the tuber's pending unknown-host key (captured by
+// the SSH host-key callback) to known_hosts and restarts it, so the tuber
 // connects on the next dial. Phase 11 TUI TOFU prompt.
 func (s *Server) handleAcceptHost(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.hasTunnel(name) {
-		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
 		return
 	}
 	line := ""
@@ -543,13 +543,13 @@ func (s *Server) handleAcceptHost(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "restart: %v", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "accepted", "tunnel": name})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "accepted", "tuber": name})
 }
 
-// handlePassphrase stores the submitted passphrase for the tunnel's identity
+// handlePassphrase stores the submitted passphrase for the tuber's identity
 // and unblocks a dial waiting on it (Phase 19). The identity path is the one
 // the dial reported pending (Status.PendingPassphrase), falling back to the
-// tunnel's resolved identity. No Restart: the blocked dial wakes on the store.
+// tuber's resolved identity. No Restart: the blocked dial wakes on the store.
 // The passphrase is sent over the authenticated 0600 unix socket, like
 // socks5_password; nothing is written to disk in plaintext (cache + keyring).
 func (s *Server) handlePassphrase(w http.ResponseWriter, r *http.Request) {
@@ -563,15 +563,15 @@ func (s *Server) handlePassphrase(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.hasTunnel(name) {
-		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
 		return
 	}
 	if s.secrets == nil {
 		writeError(w, http.StatusInternalServerError, "passphrase storage unavailable")
 		return
 	}
-	path := identityPathForTunnel(s.engine.List(), s.cfg, name)
+	path := identityPathForTuber(s.engine.List(), s.cfg, name)
 	if path == "" {
 		writeError(w, http.StatusConflict, "no identity to store a passphrase for %q", name)
 		return
@@ -580,19 +580,19 @@ func (s *Server) handlePassphrase(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "store passphrase: %v", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "stored", "tunnel": name})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "stored", "tuber": name})
 }
 
-// identityPathForTunnel resolves the identity path a passphrase applies to: the
-// path the dial reported pending (Status.PendingPassphrase), or the tunnel's
-// resolved identity from config. "" when the tunnel has no identity.
-func identityPathForTunnel(statuses []forward.Status, cfg *config.Config, name string) string {
+// identityPathForTuber resolves the identity path a passphrase applies to: the
+// path the dial reported pending (Status.PendingPassphrase), or the tuber's
+// resolved identity from config. "" when the tuber has no identity.
+func identityPathForTuber(statuses []forward.Status, cfg *config.Config, name string) string {
 	for _, st := range statuses {
 		if st.Name == name && st.PendingPassphrase != "" {
 			return st.PendingPassphrase
 		}
 	}
-	for _, t := range cfg.Tunnels {
+	for _, t := range cfg.Tubers {
 		if t.Name == name {
 			return t.ResolvedIdentity(cfg.Defaults)
 		}
@@ -600,7 +600,7 @@ func identityPathForTunnel(statuses []forward.Status, cfg *config.Config, name s
 	return ""
 }
 
-// handleSetIdentity stores a passphrase for an identity PATH (not a tunnel):
+// handleSetIdentity stores a passphrase for an identity PATH (not a tuber):
 // `portato add-identity <path>` writes the keyring out-of-band and then POSTs
 // here so the daemon loads it into its cache and wakes any dial blocked waiting
 // on it. No Restart: a blocked dial wakes on the store; a backoff dial reads the
@@ -666,7 +666,7 @@ func (s *Server) handleReload(w http.ResponseWriter, _ *http.Request) {
 }
 
 // applyReload re-reads the config from disk, applies it to the engine and
-// swaps the server's in-memory copy. Shared by POST /reload and the tunnel
+// swaps the server's in-memory copy. Shared by POST /reload and the tuber
 // mutation handlers (which patch the file first, then reload). Phase 10.
 func (s *Server) applyReload() error {
 	cfg, err := config.Load(s.cfgPath)
@@ -683,7 +683,7 @@ func (s *Server) applyReload() error {
 // manual (POST /reload, 'portato reload') and automatic (file watch) reloads
 // share one code path. It returns applyReload's error so the caller decides
 // how to log; on a parse error applyReload returns before swapping s.cfg, so
-// the last-good config and the running tunnels survive a bad edit. Phase 28.
+// the last-good config and the running tubers survive a bad edit. Phase 28.
 func (s *Server) reloadFromWatch() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -700,25 +700,25 @@ func (s *Server) handleGetConfig(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, s.cfg)
 }
 
-// handleAddTunnel creates a tunnel: validate the prospective config, then
+// handleAddTuber creates a tuber: validate the prospective config, then
 // apply a comment-preserving append to the YAML file and reload.
-func (s *Server) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
-	t, err := decodeTunnel(r)
+func (s *Server) handleAddTuber(w http.ResponseWriter, r *http.Request) {
+	t, err := decodeTuber(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "%v", err)
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.hasTunnel(t.Name) {
-		writeError(w, http.StatusConflict, "tunnel %q already exists", t.Name)
+	if s.hasTuber(t.Name) {
+		writeError(w, http.StatusConflict, "tuber %q already exists", t.Name)
 		return
 	}
-	if _, err := s.cfg.WithTunnelAdded(t); err != nil {
+	if _, err := s.cfg.WithTuberAdded(t); err != nil {
 		writeError(w, http.StatusBadRequest, "%v", err)
 		return
 	}
-	if err := config.AddTunnelNode(s.cfgPath, t); err != nil {
+	if err := config.AddTuberNode(s.cfgPath, t); err != nil {
 		writeError(w, http.StatusInternalServerError, "persist: %v", err)
 		return
 	}
@@ -726,29 +726,29 @@ func (s *Server) handleAddTunnel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "reload: %v", err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"status": "created", "tunnel": t.Name})
+	writeJSON(w, http.StatusCreated, map[string]string{"status": "created", "tuber": t.Name})
 }
 
-// handleUpdateTunnel replaces the tunnel named {name} with the body (rename
+// handleUpdateTuber replaces the tuber named {name} with the body (rename
 // allowed): validate the prospective config, patch the file, reload.
-func (s *Server) handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
+func (s *Server) handleUpdateTuber(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
-	t, err := decodeTunnel(r)
+	t, err := decodeTuber(r)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "%v", err)
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.hasTunnel(name) {
-		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
 		return
 	}
-	if _, err := s.cfg.WithTunnelReplaced(name, t); err != nil {
+	if _, err := s.cfg.WithTuberReplaced(name, t); err != nil {
 		writeError(w, http.StatusBadRequest, "%v", err)
 		return
 	}
-	if err := config.ReplaceTunnelNode(s.cfgPath, name, t); err != nil {
+	if err := config.ReplaceTuberNode(s.cfgPath, name, t); err != nil {
 		writeError(w, http.StatusInternalServerError, "persist: %v", err)
 		return
 	}
@@ -756,24 +756,24 @@ func (s *Server) handleUpdateTunnel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "reload: %v", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "updated", "tunnel": t.Name})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated", "tuber": t.Name})
 }
 
-// handleDeleteTunnel removes the tunnel named {name}: validate, patch, reload.
-// If the tunnel is active, the engine reload stops and drops it.
-func (s *Server) handleDeleteTunnel(w http.ResponseWriter, r *http.Request) {
+// handleDeleteTuber removes the tuber named {name}: validate, patch, reload.
+// If the tuber is active, the engine reload stops and drops it.
+func (s *Server) handleDeleteTuber(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if !s.hasTunnel(name) {
-		writeError(w, http.StatusNotFound, "unknown tunnel %q", name)
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
 		return
 	}
-	if _, err := s.cfg.WithTunnelRemoved(name); err != nil {
+	if _, err := s.cfg.WithTuberRemoved(name); err != nil {
 		writeError(w, http.StatusBadRequest, "%v", err)
 		return
 	}
-	if err := config.DeleteTunnelNode(s.cfgPath, name); err != nil {
+	if err := config.DeleteTuberNode(s.cfgPath, name); err != nil {
 		writeError(w, http.StatusInternalServerError, "persist: %v", err)
 		return
 	}
@@ -781,19 +781,19 @@ func (s *Server) handleDeleteTunnel(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "reload: %v", err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "tunnel": name})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "tuber": name})
 }
 
-func decodeTunnel(r *http.Request) (config.Tunnel, error) {
-	var t config.Tunnel
+func decodeTuber(r *http.Request) (config.Tuber, error) {
+	var t config.Tuber
 	if err := json.NewDecoder(r.Body).Decode(&t); err != nil {
-		return config.Tunnel{}, fmt.Errorf("decode tunnel: %w", err)
+		return config.Tuber{}, fmt.Errorf("decode tuber: %w", err)
 	}
 	return t, nil
 }
 
-func (s *Server) hasTunnel(name string) bool {
-	for _, t := range s.cfg.Tunnels {
+func (s *Server) hasTuber(name string) bool {
+	for _, t := range s.cfg.Tubers {
 		if t.Name == name {
 			return true
 		}
@@ -811,9 +811,9 @@ func (s *Server) isUp(name string) bool {
 }
 
 func (s *Server) setEnabled(name string, enabled bool) {
-	for i := range s.cfg.Tunnels {
-		if s.cfg.Tunnels[i].Name == name {
-			s.cfg.Tunnels[i].Enabled = enabled
+	for i := range s.cfg.Tubers {
+		if s.cfg.Tubers[i].Name == name {
+			s.cfg.Tubers[i].Enabled = enabled
 			return
 		}
 	}

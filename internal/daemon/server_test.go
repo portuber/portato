@@ -21,7 +21,7 @@ import (
 	routelog "github.com/portuber/portato/internal/log"
 )
 
-// fakeEngine is a tunneler stand-in: it flips in-memory states instead of
+// fakeEngine is a tuberer stand-in: it flips in-memory states instead of
 // opening SSH connections, so daemon HTTP/persistence logic is deterministic.
 type fakeEngine struct {
 	mu     sync.Mutex
@@ -31,8 +31,8 @@ type fakeEngine struct {
 }
 
 func newFakeEngine(cfg *config.Config) *fakeEngine {
-	states := make(map[string]forward.State, len(cfg.Tunnels))
-	for _, t := range cfg.Tunnels {
+	states := make(map[string]forward.State, len(cfg.Tubers))
+	for _, t := range cfg.Tubers {
 		states[t.Name] = forward.Off
 	}
 	return &fakeEngine{states: states, cfg: cfg}
@@ -41,8 +41,8 @@ func newFakeEngine(cfg *config.Config) *fakeEngine {
 func (f *fakeEngine) List() []forward.Status {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	out := make([]forward.Status, 0, len(f.cfg.Tunnels))
-	for _, t := range f.cfg.Tunnels {
+	out := make([]forward.Status, 0, len(f.cfg.Tubers))
+	for _, t := range f.cfg.Tubers {
 		out = append(out, forward.Status{
 			Name:   t.Name,
 			Type:   t.Type,
@@ -115,7 +115,7 @@ func (f *fakeEngine) broadcast() {
 
 func testConfig() *config.Config {
 	return &config.Config{
-		Tunnels: []config.Tunnel{{
+		Tubers: []config.Tuber{{
 			Name:   "db",
 			Type:   "local",
 			Local:  "5432",
@@ -125,8 +125,8 @@ func testConfig() *config.Config {
 	}
 }
 
-func tunnelEnabled(cfg *config.Config, name string) bool {
-	for _, t := range cfg.Tunnels {
+func tuberEnabled(cfg *config.Config, name string) bool {
+	for _, t := range cfg.Tubers {
 		if t.Name == name {
 			return t.Enabled
 		}
@@ -221,11 +221,11 @@ func TestServer_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload cfg: %v", err)
 	}
-	if !tunnelEnabled(persisted, "db") {
+	if !tuberEnabled(persisted, "db") {
 		t.Fatalf("enable not persisted to YAML")
 	}
 	if list, _ := c.List(); list[0].State == forward.Off {
-		t.Fatalf("tunnel not started after enable")
+		t.Fatalf("tuber not started after enable")
 	}
 
 	if err := c.Restart("db"); err != nil {
@@ -239,11 +239,11 @@ func TestServer_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload cfg: %v", err)
 	}
-	if tunnelEnabled(persisted2, "db") {
+	if tuberEnabled(persisted2, "db") {
 		t.Fatalf("disable not persisted to YAML")
 	}
 	if list, _ := c.List(); list[0].State != forward.Off {
-		t.Fatalf("tunnel not stopped after disable")
+		t.Fatalf("tuber not stopped after disable")
 	}
 
 	if err := c.Reload(); err != nil {
@@ -251,7 +251,7 @@ func TestServer_RoundTrip(t *testing.T) {
 	}
 
 	if err := c.Enable("nope"); err == nil {
-		t.Fatalf("expected error for unknown tunnel")
+		t.Fatalf("expected error for unknown tuber")
 	}
 
 	cancel()
@@ -299,8 +299,8 @@ func TestServer_Logs(t *testing.T) {
 		t.Fatalf("save config: %v", err)
 	}
 	ring := routelog.NewRing()
-	ring.Append(routelog.Entry{Tunnel: "db", Msg: "connected", Level: slog.LevelInfo})
-	ring.Append(routelog.Entry{Tunnel: "other", Msg: "noise", Level: slog.LevelDebug})
+	ring.Append(routelog.Entry{Tuber: "db", Msg: "connected", Level: slog.LevelInfo})
+	ring.Append(routelog.Entry{Tuber: "other", Msg: "noise", Level: slog.LevelDebug})
 
 	sock := filepath.Join(dir, "portato.sock")
 	fe := newFakeEngine(cfg)
@@ -315,7 +315,7 @@ func TestServer_Logs(t *testing.T) {
 
 	c := client.New(sock)
 
-	// Filtered by tunnel.
+	// Filtered by tuber.
 	db, err := c.Logs("db")
 	if err != nil {
 		t.Fatalf("Logs(db): %v", err)
@@ -582,7 +582,7 @@ func TestServer_AuthMiddleware(t *testing.T) {
 func TestServer_AuthProtectsEveryRoute(t *testing.T) {
 	_, sock, _ := startAuthServer(t)
 	// A few representative routes across methods — all must 401 without a token.
-	for _, p := range []string{"/tunnels", "/config", "/logs", "/reload"} {
+	for _, p := range []string{"/tubers", "/config", "/logs", "/reload"} {
 		method := http.MethodGet
 		if p == "/reload" {
 			method = http.MethodPost

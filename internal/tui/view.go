@@ -163,7 +163,7 @@ func (m Model) header() string {
 
 func (m Model) table() string {
 	if len(m.list) == 0 {
-		hint := dimStyle.Render("no tunnels — add one to config and press R to reload")
+		hint := dimStyle.Render("no tubers — add one to config and press R to reload")
 		if m.height >= splashMinH {
 			return m.splash(hint)
 		}
@@ -176,7 +176,7 @@ func (m Model) table() string {
 		}
 	}
 	if len(rows) == 0 {
-		return dimStyle.Render(fmt.Sprintf("no tunnels match %q — esc clears", m.filter.Value()))
+		return dimStyle.Render(fmt.Sprintf("no tubers match %q — esc clears", m.filter.Value()))
 	}
 	nameW := m.nameWidth()
 	var b strings.Builder
@@ -302,8 +302,8 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 }
 
 // indicator returns the leading status glyph, coloured by state. Error uses a
-// distinct ✗ so a failed tunnel cannot be mistaken for a connected one — the
-// old "● for everything not Off" made an errored tunnel look live.
+// distinct ✗ so a failed tuber cannot be mistaken for a connected one — the
+// old "● for everything not Off" made an errored tuber look live.
 func indicator(s controller.Status) string {
 	switch s.State {
 	case controller.Off:
@@ -365,20 +365,20 @@ func (m Model) helpBlock() string {
 	hotkeys := []string{
 		"↑ / k        move cursor up",
 		"↓ / j        move cursor down",
-		"space        toggle selected tunnel (on/off)",
-		"p            enter passphrase for the selected tunnel",
-		"r            restart selected tunnel",
-		"a            enable all tunnels",
-		"x            disable all tunnels",
-		"e            edit the selected tunnel",
-		"n            create a new tunnel",
-		"C            duplicate the selected tunnel",
-		"d            delete the selected tunnel",
-		"l            view the selected tunnel's logs",
+		"space        toggle selected tuber (on/off)",
+		"p            enter passphrase for the selected tuber",
+		"r            restart selected tuber",
+		"a            enable all tubers",
+		"x            disable all tubers",
+		"e            edit the selected tuber",
+		"n            create a new tuber",
+		"C            duplicate the selected tuber",
+		"d            delete the selected tuber",
+		"l            view the selected tuber's logs",
 		"/            filter the list (name/type/endpoint; esc clears)",
 		"R            reload config from disk",
 		"? / esc      toggle this help",
-		"q / ctrl+c   quit (stops all tunnels)",
+		"q / ctrl+c   quit (stops all tubers)",
 	}
 	title := helpTitle.Render("Help")
 	contentW := lipgloss.Width(title)
@@ -399,7 +399,7 @@ func (m Model) helpBlock() string {
 }
 
 // confirmQuitView renders the "leave running in background?" modal shown when
-// quitting a standalone TUI that still has live tunnels.
+// quitting a standalone TUI that still has live tubers.
 func (m Model) confirmQuitView() string {
 	n := 0
 	for _, s := range m.list {
@@ -408,18 +408,18 @@ func (m Model) confirmQuitView() string {
 			n++
 		}
 	}
-	line := fmt.Sprintf("%d tunnel(s) active.\nLeave them running in the background? [y/N]", n)
+	line := fmt.Sprintf("%d tuber(s) active.\nLeave them running in the background? [y/N]", n)
 	return modalStyle.Render(line)
 }
 
-// confirmDeleteView renders the "delete tunnel?" modal. Deleting stops an
-// active tunnel (via the engine reload) and removes it from the config.
+// confirmDeleteView renders the "delete tuber?" modal. Deleting stops an
+// active tuber (via the engine reload) and removes it from the config.
 func (m Model) confirmDeleteView() string {
-	line := fmt.Sprintf("Delete tunnel %q?\nThis stops it if active and removes it from the config. [y/N]", m.deleteTarget)
+	line := fmt.Sprintf("Delete tuber %q?\nThis stops it if active and removes it from the config. [y/N]", m.deleteTarget)
 	return modalStyle.Render(line)
 }
 
-// confirmAcceptView renders the Phase 11 TOFU modal: the tunnel is blocked by
+// confirmAcceptView renders the Phase 11 TOFU modal: the tuber is blocked by
 // an unknown SSH host key, and the user can accept it (append to known_hosts
 // and restart) or cancel.
 func (m Model) confirmAcceptView() string {
@@ -438,7 +438,7 @@ func (m Model) confirmAcceptView() string {
 	return modalStyle.Render(line)
 }
 
-// passphraseView renders the Phase 19 identity-passphrase modal: the tunnel's
+// passphraseView renders the Phase 19 identity-passphrase modal: the tuber's
 // dial is blocked on a passphrase-protected identity, and the user types the
 // passphrase (masked) and submits it via Controller.AcceptPassphrase. After a
 // rejected attempt a hint line appears.

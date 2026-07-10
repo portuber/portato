@@ -24,7 +24,7 @@ type PassphraseProvider interface {
 }
 
 // passphraseSink receives the identity path that needs a passphrase (so the
-// Tunnel can surface it via Status.PendingPassphrase for the UI to prompt), or
+// Tuber can surface it via Status.PendingPassphrase for the UI to prompt), or
 // an empty string to clear the pending need once a passphrase is accepted.
 // Nil-safe.
 type passphraseSink func(identityPath string)
@@ -36,7 +36,7 @@ type passphraseSink func(identityPath string)
 // ssh.ParsePrivateKeyWithPassphrase. A wrong passphrase is invalidated
 // (provider.Delete) and the need re-surfaced (sink) for a fresh prompt.
 // sink(path) is called before blocking so the UI can prompt; sink("") clears it
-// once the passphrase is accepted. ctx cancellation (tunnel disable/shutdown)
+// once the passphrase is accepted. ctx cancellation (tuber disable/shutdown)
 // aborts the wait. With provider == nil it degrades to today's behaviour: a
 // passphrase-protected key yields a parse error.
 func loadIdentityWithPassphrase(ctx context.Context, path string, provider PassphraseProvider, sink passphraseSink) (ssh.Signer, error) {

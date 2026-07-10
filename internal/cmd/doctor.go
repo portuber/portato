@@ -55,7 +55,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 	}
 	d.ok("config", "%s", cfgPath)
 
-	// 2. The config directory must be writable (tunnels/config are persisted
+	// 2. The config directory must be writable (tubers/config are persisted
 	// there; a read-only mount would break enable/disable and reload).
 	checkConfigDir(d, cfgPath)
 
@@ -79,8 +79,8 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		d.info("ssh-agent", "SSH_AUTH_SOCK unset (configure an identity key or start ssh-agent)")
 	}
 
-	// 5. Each tunnel's resolved identity file (when one is configured).
-	for _, t := range cfg.Tunnels {
+	// 5. Each tuber's resolved identity file (when one is configured).
+	for _, t := range cfg.Tubers {
 		id := t.ResolvedIdentity(cfg.Defaults)
 		if id == "" {
 			continue
@@ -88,7 +88,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		if fileExists(id) {
 			d.ok("identity", "%s (%s)", id, t.Name)
 		} else {
-			d.fail("identity", "%s not found (tunnel %s)", id, t.Name)
+			d.fail("identity", "%s not found (tuber %s)", id, t.Name)
 		}
 	}
 

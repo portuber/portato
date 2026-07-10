@@ -22,8 +22,8 @@ type fakeCtrl struct {
 	restarted []string
 	reloads   int
 	lists     int
-	adds      []config.Tunnel
-	updates   []config.Tunnel
+	adds      []config.Tuber
+	updates   []config.Tuber
 	deletes   []string
 	cfg       *config.Config
 	tunErr    error // returned by Add/Update/Delete when set
@@ -87,7 +87,7 @@ func (f *fakeCtrl) Config() (*config.Config, error) {
 	}
 	return f.cfg.Clone(), nil
 }
-func (f *fakeCtrl) AddTunnel(t config.Tunnel) error {
+func (f *fakeCtrl) AddTuber(t config.Tuber) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.tunErr != nil {
@@ -96,7 +96,7 @@ func (f *fakeCtrl) AddTunnel(t config.Tunnel) error {
 	f.adds = append(f.adds, t)
 	return nil
 }
-func (f *fakeCtrl) UpdateTunnel(name string, t config.Tunnel) error {
+func (f *fakeCtrl) UpdateTuber(name string, t config.Tuber) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.tunErr != nil {
@@ -105,7 +105,7 @@ func (f *fakeCtrl) UpdateTunnel(name string, t config.Tunnel) error {
 	f.updates = append(f.updates, t)
 	return nil
 }
-func (f *fakeCtrl) DeleteTunnel(name string) error {
+func (f *fakeCtrl) DeleteTuber(name string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.tunErr != nil {
@@ -276,7 +276,7 @@ func TestModel_HelpAndQuit(t *testing.T) {
 	}
 }
 
-func TestModel_RenderContainsTunnels(t *testing.T) {
+func TestModel_RenderContainsTubers(t *testing.T) {
 	f := newFake(
 		controller.Status{Name: "alpha", Type: "local", Local: "5432", Remote: "db:5432", State: controller.Connected},
 		controller.Status{Name: "beta", Type: "local", Local: "8080", Remote: "web:80", State: controller.Off, Error: "boom"},
@@ -311,7 +311,7 @@ func TestModel_EmptyList(t *testing.T) {
 	if mm, ok := m2.(Model); !ok || mm.cursor != 0 {
 		t.Error("space on empty list should be a no-op")
 	}
-	if !strings.Contains(m.render(), "no tunnels") {
+	if !strings.Contains(m.render(), "no tubers") {
 		t.Error("empty list should render placeholder")
 	}
 }
@@ -581,7 +581,7 @@ func TestModel_QuitStandaloneLiveShowsModal(t *testing.T) {
 	if m.confirmQuit {
 		// expected
 	} else {
-		t.Fatal("standalone q with live tunnels should raise confirm modal")
+		t.Fatal("standalone q with live tubers should raise confirm modal")
 	}
 	if m.quit {
 		t.Error("should not quit immediately while modal is up")
@@ -599,7 +599,7 @@ func TestModel_QuitStandaloneNoLiveQuits(t *testing.T) {
 	m := New(f, Options{Mode: "standalone"})
 	_, cmd := m.handleKey(keyPress("q"))
 	if cmd == nil {
-		t.Error("standalone q with no live tunnels should quit immediately")
+		t.Error("standalone q with no live tubers should quit immediately")
 	}
 }
 
@@ -659,7 +659,7 @@ func TestModel_ConfirmKeys(t *testing.T) {
 		t.Errorf("enter: quit=%v confirmQuit=%v cmd=%v", mm.quit, mm.confirmQuit, cmd)
 	}
 
-	// esc cancels the modal: back to the list, no quit, tunnels untouched
+	// esc cancels the modal: back to the list, no quit, tubers untouched
 	mEsc := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})
 	mEsc.list = []controller.Status{{Name: "a", State: controller.Connected}}
 	mEsc.confirmQuit = true
@@ -690,7 +690,7 @@ func TestIndicatorShapePerState(t *testing.T) {
 }
 
 // TestRenderErrorIndicatorDistinct guards the regression where an errored
-// tunnel showed ● (indistinguishable from connected). The error row must use
+// tuber showed ● (indistinguishable from connected). The error row must use
 // ✗ and must not contain a ● glyph that reads as "live".
 // TestRenderCursorGlyph asserts the selected row is marked with a ❯ cursor
 // glyph and unselected rows are not (Phase 11 selection redesign).
@@ -783,7 +783,7 @@ func TestRenderErrorIndicatorDistinct(t *testing.T) {
 	m.width = 100
 	out := m.render()
 	if !strings.Contains(out, "✗") {
-		t.Errorf("error tunnel should render ✗ indicator\ngot:\n%s", out)
+		t.Errorf("error tuber should render ✗ indicator\ngot:\n%s", out)
 	}
 	if strings.Contains(out, "●") {
 		t.Errorf("error render must not contain ● (would look connected)\ngot:\n%s", out)
@@ -826,7 +826,7 @@ func TestModel_RedrawTickDoesNotFetch(t *testing.T) {
 
 func TestModel_PasteRoutedToEditor(t *testing.T) {
 	f := newFake(controller.Status{Name: "db"})
-	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db"}}}
+	f.cfg = &config.Config{Tubers: []config.Tuber{{Name: "db"}}}
 	m := New(f, Options{Mode: "standalone"})
 
 	next, _ := m.handleKey(keyPress("n"))
@@ -857,7 +857,7 @@ func TestModel_PasteInListViewIsNoOp(t *testing.T) {
 
 func TestModel_EditKeyOpensEditor(t *testing.T) {
 	f := newFake(controller.Status{Name: "db", Type: "local"})
-	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db", Type: "local", SSH: "u@h:22", Local: "5432"}}}
+	f.cfg = &config.Config{Tubers: []config.Tuber{{Name: "db", Type: "local", SSH: "u@h:22", Local: "5432"}}}
 	m := New(f, Options{Mode: "standalone"})
 
 	next, _ := m.handleKey(keyPress("e"))
@@ -885,12 +885,12 @@ func TestModel_EditKeyNoSelection(t *testing.T) {
 
 func TestModel_NewKeyOpensEditor(t *testing.T) {
 	f := newFake(controller.Status{Name: "db"})
-	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db"}}}
+	f.cfg = &config.Config{Tubers: []config.Tuber{{Name: "db"}}}
 	m := New(f, Options{Mode: "standalone"})
 	next, _ := m.handleKey(keyPress("n"))
 	mm := next.(Model)
 	if mm.editor == nil || mm.editor.mode != modeNew {
-		t.Fatalf("n should open a new-tunnel editor, got editor=%v", mm.editor)
+		t.Fatalf("n should open a new-tuber editor, got editor=%v", mm.editor)
 	}
 	if mm.editor.name.Value() != "" {
 		t.Errorf("new editor name should be empty, got %q", mm.editor.name.Value())
@@ -899,7 +899,7 @@ func TestModel_NewKeyOpensEditor(t *testing.T) {
 
 func TestModel_DuplicateKeyOpensEditor(t *testing.T) {
 	f := newFake(controller.Status{Name: "db", Type: "local"})
-	f.cfg = &config.Config{Tunnels: []config.Tunnel{{
+	f.cfg = &config.Config{Tubers: []config.Tuber{{
 		Name: "db", Type: "local", SSH: "u@h:22", Local: "5432", Remote: "db:5432", Identity: "~/.ssh/id",
 	}}}
 	m := New(f, Options{Mode: "standalone"})
@@ -924,8 +924,8 @@ func TestModel_DuplicateKeyOpensEditor(t *testing.T) {
 	if mm.editor.enabled {
 		t.Error("duplicate should be created enabled=false")
 	}
-	if tunnelTypes[mm.editor.typeIdx] != "local" {
-		t.Errorf("type not prefilled from source: %s", tunnelTypes[mm.editor.typeIdx])
+	if tuberTypes[mm.editor.typeIdx] != "local" {
+		t.Errorf("type not prefilled from source: %s", tuberTypes[mm.editor.typeIdx])
 	}
 	if got := mm.editor.ssh.Value(); got != "u@h:22" {
 		t.Errorf("ssh not prefilled: %q", got)
@@ -953,7 +953,7 @@ func TestModel_DuplicateKeyNoSelection(t *testing.T) {
 
 func TestModel_LowercaseCIsNoOp(t *testing.T) {
 	f := newFake(controller.Status{Name: "db", Type: "local"})
-	f.cfg = &config.Config{Tunnels: []config.Tunnel{{Name: "db"}}}
+	f.cfg = &config.Config{Tubers: []config.Tuber{{Name: "db"}}}
 	m := New(f, Options{Mode: "standalone"})
 
 	next, _ := m.handleKey(keyPress("c"))
@@ -996,7 +996,7 @@ func TestModel_DeleteKeyShowsModal(t *testing.T) {
 	if !mm.confirmDelete || mm.deleteTarget != "db" {
 		t.Errorf("d should raise delete modal: confirm=%v target=%q", mm.confirmDelete, mm.deleteTarget)
 	}
-	if !strings.Contains(mm.render(), "Delete tunnel") {
+	if !strings.Contains(mm.render(), "Delete tuber") {
 		t.Error("render should show the delete modal")
 	}
 }
@@ -1016,7 +1016,7 @@ func TestModel_DeleteConfirmYes(t *testing.T) {
 		t.Error("y should clear the modal")
 	}
 	if len(f.deletes) != 1 || f.deletes[0] != "db" {
-		t.Errorf("DeleteTunnel(db) expected, got %v", f.deletes)
+		t.Errorf("DeleteTuber(db) expected, got %v", f.deletes)
 	}
 }
 
@@ -1040,8 +1040,8 @@ func TestModel_DeleteConfirmCancel(t *testing.T) {
 func TestModel_LogsKeyOpensScreen(t *testing.T) {
 	f := newFake(controller.Status{Name: "db"})
 	f.logs = []routelog.Entry{
-		{Tunnel: "db", Msg: "connected", Level: 0},         // info → shown by default
-		{Tunnel: "db", Msg: "socks5 handshake", Level: -4}, // debug → hidden by default
+		{Tuber: "db", Msg: "connected", Level: 0},         // info → shown by default
+		{Tuber: "db", Msg: "socks5 handshake", Level: -4}, // debug → hidden by default
 	}
 	m := New(f, Options{Mode: "standalone"})
 	m.width, m.height = 80, 24
@@ -1113,7 +1113,7 @@ func TestFilterLevelHidesDebugByDefault(t *testing.T) {
 }
 
 // TestModel_AcceptHostModalSpaceOpens guards the Phase 11 TOFU flow: pressing
-// space on a tunnel blocked by an unknown host key opens the accept modal
+// space on a tuber blocked by an unknown host key opens the accept modal
 // (instead of toggling), y accepts via Controller.AcceptHost, and n/esc cancel.
 func TestModel_AcceptHostModalSpaceOpens(t *testing.T) {
 	f := newFake(controller.Status{
@@ -1125,7 +1125,7 @@ func TestModel_AcceptHostModalSpaceOpens(t *testing.T) {
 	next, _ := m.handleKey(specialKey(tea.KeySpace))
 	mm := next.(Model)
 	if !mm.confirmAccept || mm.acceptTarget != "db" {
-		t.Fatalf("space on pending-host tunnel should open accept modal: confirm=%v target=%q", mm.confirmAccept, mm.acceptTarget)
+		t.Fatalf("space on pending-host tuber should open accept modal: confirm=%v target=%q", mm.confirmAccept, mm.acceptTarget)
 	}
 	out := mm.render()
 	for _, want := range []string{"Unknown host key", "h.example.com:22", "SHA256:abc"} {

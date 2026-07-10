@@ -16,7 +16,7 @@ var listJSON bool
 
 var listCmd = &cobra.Command{
 	Use:           "list",
-	Short:         "List the status of all tunnels (stdout)",
+	Short:         "List the status of all tubers (stdout)",
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE:          listRunE,
@@ -44,7 +44,7 @@ func listRunE(cmd *cobra.Command, _ []string) error {
 }
 
 // printJSON writes statuses as one JSON document. A nil/empty slice renders as
-// `[]` (not `null`) so `jq '.[0]'` is well-defined for the zero-tunnel case.
+// `[]` (not `null`) so `jq '.[0]'` is well-defined for the zero-tuber case.
 func printJSON(out io.Writer, statuses []forward.Status) error {
 	if statuses == nil {
 		statuses = []forward.Status{}

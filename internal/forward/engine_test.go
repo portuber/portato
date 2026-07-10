@@ -14,8 +14,8 @@ import (
 	"github.com/portuber/portato/internal/config"
 )
 
-type fakeTunnel struct {
-	cfg        config.Tunnel
+type fakeTuber struct {
+	cfg        config.Tuber
 	mu         sync.Mutex
 	state      State
 	starts     atomic.Int64
@@ -32,7 +32,7 @@ type fakeTunnel struct {
 	adopted net.Listener
 }
 
-func (f *fakeTunnel) Start(ctx context.Context) error {
+func (f *fakeTuber) Start(ctx context.Context) error {
 	f.starts.Add(1)
 	f.mu.Lock()
 	f.state = Connected
@@ -40,7 +40,7 @@ func (f *fakeTunnel) Start(ctx context.Context) error {
 	return f.startErr
 }
 
-func (f *fakeTunnel) StartWith(_ context.Context, ln net.Listener) error {
+func (f *fakeTuber) StartWith(_ context.Context, ln net.Listener) error {
 	f.starts.Add(1)
 	f.withStarts.Add(1)
 	f.mu.Lock()
@@ -50,7 +50,7 @@ func (f *fakeTunnel) StartWith(_ context.Context, ln net.Listener) error {
 	return f.startErr
 }
 
-func (f *fakeTunnel) Stop() error {
+func (f *fakeTuber) Stop() error {
 	f.stops.Add(1)
 	f.mu.Lock()
 	f.state = Off
@@ -58,7 +58,7 @@ func (f *fakeTunnel) Stop() error {
 	return nil
 }
 
-func (f *fakeTunnel) Restart() error {
+func (f *fakeTuber) Restart() error {
 	f.restarts.Add(1)
 	f.mu.Lock()
 	f.state = Connected
@@ -66,7 +66,7 @@ func (f *fakeTunnel) Restart() error {
 	return nil
 }
 
-func (f *fakeTunnel) Reconfigure(cfg config.Tunnel, _ config.Defaults) error {
+func (f *fakeTuber) Reconfigure(cfg config.Tuber, _ config.Defaults) error {
 	f.mu.Lock()
 	running := f.state != Off
 	f.cfg = cfg
@@ -77,13 +77,13 @@ func (f *fakeTunnel) Reconfigure(cfg config.Tunnel, _ config.Defaults) error {
 	return nil
 }
 
-func (f *fakeTunnel) Status() Status {
+func (f *fakeTuber) Status() Status {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return Status{Name: f.cfg.Name, Type: f.cfg.Type, State: f.state}
 }
 
-func (f *fakeTunnel) ListenerFile() (*os.File, error) {
+func (f *fakeTuber) ListenerFile() (*os.File, error) {
 	if f.listenerErr != nil {
 		return nil, f.listenerErr
 	}
@@ -93,17 +93,17 @@ func (f *fakeTunnel) ListenerFile() (*os.File, error) {
 	return nil, ErrNoListener
 }
 
-func newTestEngine(cfg *config.Config) (*Engine, map[string]*fakeTunnel) {
-	fakes := make(map[string]*fakeTunnel)
+func newTestEngine(cfg *config.Config) (*Engine, map[string]*fakeTuber) {
+	fakes := make(map[string]*fakeTuber)
 	e := &Engine{
 		ctx:      context.Background(),
 		cfg:      cfg,
 		log:      slog.Default(),
 		defaults: cfg.Defaults,
-		tunnels:  make(map[string]tunneler),
-		configs:  make(map[string]config.Tunnel),
-		factory: func(t config.Tunnel, d config.Defaults, l *slog.Logger) tunneler {
-			ft := &fakeTunnel{cfg: t}
+		tubers:   make(map[string]tuberer),
+		configs:  make(map[string]config.Tuber),
+		factory: func(t config.Tuber, d config.Defaults, l *slog.Logger) tuberer {
+			ft := &fakeTuber{cfg: t}
 			fakes[t.Name] = ft
 			return ft
 		},
@@ -112,15 +112,15 @@ func newTestEngine(cfg *config.Config) (*Engine, map[string]*fakeTunnel) {
 	return e, fakes
 }
 
-func tunnelCfg(name string) config.Tunnel {
-	return config.Tunnel{
+func tuberCfg(name string) config.Tuber {
+	return config.Tuber{
 		Name: name, Type: "local", Local: "10000",
 		Remote: "x:1", SSH: "u@h:22", User: "u", Host: "h", Port: 22,
 	}
 }
 
 func TestEngineEnableDisableRestart(t *testing.T) {
-	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}}
+	cfg := &config.Config{Tubers: []config.Tuber{tuberCfg("a")}}
 	e, fakes := newTestEngine(cfg)
 
 	if err := e.Enable("a"); err != nil {
@@ -147,7 +147,7 @@ func TestEngineEnableDisableRestart(t *testing.T) {
 }
 
 func TestEngineListOrder(t *testing.T) {
-	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a"), tunnelCfg("b"), tunnelCfg("c")}}
+	cfg := &config.Config{Tubers: []config.Tuber{tuberCfg("a"), tuberCfg("b"), tuberCfg("c")}}
 	e, _ := newTestEngine(cfg)
 	list := e.List()
 	if len(list) != 3 {
@@ -162,11 +162,11 @@ func TestEngineListOrder(t *testing.T) {
 }
 
 func TestEngineUpAllDownAllStartEnabled(t *testing.T) {
-	a := tunnelCfg("a")
+	a := tuberCfg("a")
 	a.Enabled = true
-	b := tunnelCfg("b")
+	b := tuberCfg("b")
 	b.Enabled = false
-	cfg := &config.Config{Tunnels: []config.Tunnel{a, b}}
+	cfg := &config.Config{Tubers: []config.Tuber{a, b}}
 	e, fakes := newTestEngine(cfg)
 
 	e.StartEnabled()
@@ -190,15 +190,15 @@ func TestEngineUpAllDownAllStartEnabled(t *testing.T) {
 }
 
 func TestEngineReload(t *testing.T) {
-	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a"), tunnelCfg("b")}}
+	cfg := &config.Config{Tubers: []config.Tuber{tuberCfg("a"), tuberCfg("b")}}
 	e, fakes := newTestEngine(cfg)
-	if err := e.Enable("a"); err != nil { // a is running -> a changed tunnel must restart
+	if err := e.Enable("a"); err != nil { // a is running -> a changed tuber must restart
 		t.Fatalf("Enable a: %v", err)
 	}
 
-	changed := tunnelCfg("a")
+	changed := tuberCfg("a")
 	changed.Remote = "changed:2"
-	newCfg := &config.Config{Tunnels: []config.Tunnel{changed, tunnelCfg("c")}}
+	newCfg := &config.Config{Tubers: []config.Tuber{changed, tuberCfg("c")}}
 
 	e.Reload(newCfg)
 
@@ -219,42 +219,42 @@ func TestEngineReload(t *testing.T) {
 		t.Errorf("Reload: b.stops = %d, want 1 (removed)", fakes["b"].stops.Load())
 	}
 	if _, ok := fakes["c"]; !ok {
-		t.Error("Reload: new tunnel c was not built")
+		t.Error("Reload: new tuber c was not built")
 	}
 }
 
-// TestEngineReload_OffChangedUpdatesConfigNotStarted guards the fix: a tunnel
+// TestEngineReload_OffChangedUpdatesConfigNotStarted guards the fix: a tuber
 // that is off must have its config updated on Reload but must NOT be started.
 func TestEngineReload_OffChangedUpdatesConfigNotStarted(t *testing.T) {
-	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}}
+	cfg := &config.Config{Tubers: []config.Tuber{tuberCfg("a")}}
 	e, fakes := newTestEngine(cfg)
 	// a is off (never enabled).
 
-	changed := tunnelCfg("a")
+	changed := tuberCfg("a")
 	changed.Remote = "new:9"
-	e.Reload(&config.Config{Tunnels: []config.Tunnel{changed}})
+	e.Reload(&config.Config{Tubers: []config.Tuber{changed}})
 
 	if fakes["a"].cfg.Remote != "new:9" {
-		t.Errorf("off tunnel cfg not updated: Remote = %q", fakes["a"].cfg.Remote)
+		t.Errorf("off tuber cfg not updated: Remote = %q", fakes["a"].cfg.Remote)
 	}
 	if fakes["a"].starts.Load() != 0 {
-		t.Errorf("off tunnel was started: starts = %d, want 0", fakes["a"].starts.Load())
+		t.Errorf("off tuber was started: starts = %d, want 0", fakes["a"].starts.Load())
 	}
 	if fakes["a"].restarts.Load() != 0 {
-		t.Errorf("off tunnel was restarted: restarts = %d, want 0", fakes["a"].restarts.Load())
+		t.Errorf("off tuber was restarted: restarts = %d, want 0", fakes["a"].restarts.Load())
 	}
 }
 
 func TestEngineReloadDefaultsChangedRestarts(t *testing.T) {
-	cfg := &config.Config{Defaults: config.Defaults{Identity: "/tmp/a"}, Tunnels: []config.Tunnel{tunnelCfg("a")}}
+	cfg := &config.Config{Defaults: config.Defaults{Identity: "/tmp/a"}, Tubers: []config.Tuber{tuberCfg("a")}}
 	e, fakes := newTestEngine(cfg)
-	if err := e.Enable("a"); err != nil { // defaults-change restarts only running tunnels now
+	if err := e.Enable("a"); err != nil { // defaults-change restarts only running tubers now
 		t.Fatalf("Enable a: %v", err)
 	}
 
 	newCfg := &config.Config{
 		Defaults: config.Defaults{Identity: "/tmp/b"},
-		Tunnels:  []config.Tunnel{tunnelCfg("a")},
+		Tubers:   []config.Tuber{tuberCfg("a")},
 	}
 	e.Reload(newCfg)
 	if fakes["a"].restarts.Load() != 1 {
@@ -262,13 +262,13 @@ func TestEngineReloadDefaultsChangedRestarts(t *testing.T) {
 	}
 }
 
-// TestTunnelReconfigureUpdatesStatus is the direct regression for the reported
-// bug: after editing a tunnel, Status() must show the new Local/Remote (the cfg
-// is swapped in place), and an off tunnel must not be started.
-func TestTunnelReconfigureUpdatesStatus(t *testing.T) {
-	tn := NewTunnel(context.Background(), tunnelCfg("a"), config.Defaults{}, slog.Default(), nil)
+// TestTuberReconfigureUpdatesStatus is the direct regression for the reported
+// bug: after editing a tuber, Status() must show the new Local/Remote (the cfg
+// is swapped in place), and an off tuber must not be started.
+func TestTuberReconfigureUpdatesStatus(t *testing.T) {
+	tn := NewTuber(context.Background(), tuberCfg("a"), config.Defaults{}, slog.Default(), nil)
 
-	newCfg := tunnelCfg("a")
+	newCfg := tuberCfg("a")
 	newCfg.Remote = "changed:9"
 	newCfg.Local = "127.0.0.1:20000"
 	if err := tn.Reconfigure(newCfg, config.Defaults{}); err != nil {
@@ -282,34 +282,34 @@ func TestTunnelReconfigureUpdatesStatus(t *testing.T) {
 		t.Errorf("Status.Local = %q, want 127.0.0.1:20000", st.Local)
 	}
 	if st.State != Off {
-		t.Errorf("State = %v, want Off (reconfigure must not start an off tunnel)", st.State)
+		t.Errorf("State = %v, want Off (reconfigure must not start an off tuber)", st.State)
 	}
 }
 
 // TestEngineReload_RenameRunningRestartsUnderNewName guards the Phase 26 fix:
-// a running, enabled tunnel that is renamed must be started under its new name
+// a running, enabled tuber that is renamed must be started under its new name
 // instead of being left Off. See docs/phases/phase-26-rename-restart-fix.md.
 func TestEngineReload_RenameRunningRestartsUnderNewName(t *testing.T) {
-	src := tunnelCfg("a")
+	src := tuberCfg("a")
 	src.Enabled = true
-	e, fakes := newTestEngine(&config.Config{Tunnels: []config.Tunnel{src}})
+	e, fakes := newTestEngine(&config.Config{Tubers: []config.Tuber{src}})
 	if err := e.Enable("a"); err != nil { // make it running
 		t.Fatalf("Enable a: %v", err)
 	}
 
-	renamed := tunnelCfg("c")
+	renamed := tuberCfg("c")
 	renamed.Enabled = true
-	e.Reload(&config.Config{Tunnels: []config.Tunnel{renamed}})
+	e.Reload(&config.Config{Tubers: []config.Tuber{renamed}})
 
 	if fakes["a"].stops.Load() != 1 {
 		t.Errorf("old name: a.stops = %d, want 1 (removed)", fakes["a"].stops.Load())
 	}
 	c, ok := fakes["c"]
 	if !ok {
-		t.Fatal("Reload: renamed tunnel c was not built")
+		t.Fatal("Reload: renamed tuber c was not built")
 	}
 	if c.starts.Load() != 1 {
-		t.Errorf("renamed tunnel: c.starts = %d, want 1 (restart under new name)", c.starts.Load())
+		t.Errorf("renamed tuber: c.starts = %d, want 1 (restart under new name)", c.starts.Load())
 	}
 	names := make(map[string]bool)
 	for _, s := range e.List() {
@@ -320,51 +320,51 @@ func TestEngineReload_RenameRunningRestartsUnderNewName(t *testing.T) {
 	}
 }
 
-// TestEngineReload_NewEnabledTunnelStarts: a newly-added tunnel whose config has
+// TestEngineReload_NewEnabledTuberStarts: a newly-added tuber whose config has
 // Enabled == true is started on Reload (mirrors StartEnabled at boot); an added
-// disabled tunnel is not started.
-func TestEngineReload_NewEnabledTunnelStarts(t *testing.T) {
+// disabled tuber is not started.
+func TestEngineReload_NewEnabledTuberStarts(t *testing.T) {
 	e, fakes := newTestEngine(&config.Config{})
 
-	on := tunnelCfg("on")
+	on := tuberCfg("on")
 	on.Enabled = true
-	off := tunnelCfg("off")
+	off := tuberCfg("off")
 	off.Enabled = false
-	e.Reload(&config.Config{Tunnels: []config.Tunnel{on, off}})
+	e.Reload(&config.Config{Tubers: []config.Tuber{on, off}})
 
 	if fakes["on"].starts.Load() != 1 {
-		t.Errorf("enabled new tunnel: on.starts = %d, want 1", fakes["on"].starts.Load())
+		t.Errorf("enabled new tuber: on.starts = %d, want 1", fakes["on"].starts.Load())
 	}
 	if fakes["off"].starts.Load() != 0 {
-		t.Errorf("disabled new tunnel: off.starts = %d, want 0", fakes["off"].starts.Load())
+		t.Errorf("disabled new tuber: off.starts = %d, want 0", fakes["off"].starts.Load())
 	}
 }
 
-// TestEngineReload_RenameOffStaysOff: renaming a tunnel that is off (Enabled
+// TestEngineReload_RenameOffStaysOff: renaming a tuber that is off (Enabled
 // false) must not start it under the new name.
 func TestEngineReload_RenameOffStaysOff(t *testing.T) {
-	src := tunnelCfg("a")
+	src := tuberCfg("a")
 	src.Enabled = false
-	e, fakes := newTestEngine(&config.Config{Tunnels: []config.Tunnel{src}})
+	e, fakes := newTestEngine(&config.Config{Tubers: []config.Tuber{src}})
 
-	renamed := tunnelCfg("c")
+	renamed := tuberCfg("c")
 	renamed.Enabled = false
-	e.Reload(&config.Config{Tunnels: []config.Tunnel{renamed}})
+	e.Reload(&config.Config{Tubers: []config.Tuber{renamed}})
 
 	c, ok := fakes["c"]
 	if !ok {
-		t.Fatal("Reload: renamed tunnel c was not built")
+		t.Fatal("Reload: renamed tuber c was not built")
 	}
 	if c.starts.Load() != 0 {
-		t.Errorf("off renamed tunnel: c.starts = %d, want 0", c.starts.Load())
+		t.Errorf("off renamed tuber: c.starts = %d, want 0", c.starts.Load())
 	}
 	if c.stops.Load() != 0 {
-		t.Errorf("off renamed tunnel: c.stops = %d, want 0", c.stops.Load())
+		t.Errorf("off renamed tuber: c.stops = %d, want 0", c.stops.Load())
 	}
 }
 
 func TestEngineLiveListenerFiles(t *testing.T) {
-	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a"), tunnelCfg("b"), tunnelCfg("c")}}
+	cfg := &config.Config{Tubers: []config.Tuber{tuberCfg("a"), tuberCfg("b"), tuberCfg("c")}}
 	e, fakes := newTestEngine(cfg)
 
 	fa, err := os.CreateTemp("", "portato-a-*")
@@ -396,16 +396,16 @@ func TestEngineLiveListenerFiles(t *testing.T) {
 }
 
 func TestEngineLiveListenerFiles_HardError(t *testing.T) {
-	cfg := &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}}
+	cfg := &config.Config{Tubers: []config.Tuber{tuberCfg("a")}}
 	e, fakes := newTestEngine(cfg)
 	fakes["a"].listenerErr = errors.New("boom")
 
 	if _, err := e.LiveListenerFiles(); err == nil {
-		t.Fatal("want error for a tunnel that fails to produce its fd, got nil")
+		t.Fatal("want error for a tuber that fails to produce its fd, got nil")
 	}
 }
 
-func TestTunnelListenerFile(t *testing.T) {
+func TestTuberListenerFile(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -413,9 +413,9 @@ func TestTunnelListenerFile(t *testing.T) {
 	t.Cleanup(func() { _ = ln.Close() })
 	addr := ln.Addr().String()
 
-	tn := &Tunnel{
+	tn := &Tuber{
 		baseCtx:  context.Background(),
-		cfg:      tunnelCfg("a"),
+		cfg:      tuberCfg("a"),
 		listener: ln,
 		running:  true,
 	}
@@ -446,7 +446,7 @@ func TestTunnelListenerFile(t *testing.T) {
 		t.Fatal("original listener did not accept after File()")
 	}
 
-	// Stopped tunnel -> ErrNoListener.
+	// Stopped tuber -> ErrNoListener.
 	tn.running = false
 	if _, err := tn.ListenerFile(); !errors.Is(err, ErrNoListener) {
 		t.Errorf("stopped: want ErrNoListener, got %v", err)
@@ -460,15 +460,15 @@ func TestTunnelListenerFile(t *testing.T) {
 	}
 }
 
-// TestEngineStartEnabledWith_Adopts: an enabled tunnel with an adopted listener
-// is started via StartWith (no bind); a disabled tunnel's adopted listener is
+// TestEngineStartEnabledWith_Adopts: an enabled tuber with an adopted listener
+// is started via StartWith (no bind); a disabled tuber's adopted listener is
 // closed so it does not leak.
 func TestEngineStartEnabledWith_Adopts(t *testing.T) {
-	on := tunnelCfg("a")
+	on := tuberCfg("a")
 	on.Enabled = true
-	off := tunnelCfg("b")
+	off := tuberCfg("b")
 	off.Enabled = false
-	e, fakes := newTestEngine(&config.Config{Tunnels: []config.Tunnel{on, off}})
+	e, fakes := newTestEngine(&config.Config{Tubers: []config.Tuber{on, off}})
 
 	ln1, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -490,10 +490,10 @@ func TestEngineStartEnabledWith_Adopts(t *testing.T) {
 		t.Error("a: StartWith did not receive the adopted listener")
 	}
 	if fakes["b"].starts.Load() != 0 {
-		t.Errorf("b: disabled tunnel should not start, got starts=%d", fakes["b"].starts.Load())
+		t.Errorf("b: disabled tuber should not start, got starts=%d", fakes["b"].starts.Load())
 	}
 
-	// ln2 belonged to a disabled tunnel: it must have been closed. A closed
+	// ln2 belonged to a disabled tuber: it must have been closed. A closed
 	// listener's Accept returns immediately; a live one blocks.
 	errCh := make(chan error, 1)
 	go func() {

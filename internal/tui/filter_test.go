@@ -8,9 +8,9 @@ import (
 	"github.com/portuber/portato/internal/controller"
 )
 
-// threeTunnels is the fixture used across filter tests: two db tunnels and one
-// web tunnel, so a "db" query matches 2 of 3 and "web" matches 1.
-func threeTunnels() *fakeCtrl {
+// threeTubers is the fixture used across filter tests: two db tubers and one
+// web tuber, so a "db" query matches 2 of 3 and "web" matches 1.
+func threeTubers() *fakeCtrl {
 	return newFake(
 		controller.Status{Name: "db", Type: "local", Local: "5432", Remote: "db:5432"},
 		controller.Status{Name: "web", Type: "local", Local: "8080", Remote: "web:80"},
@@ -19,7 +19,7 @@ func threeTunnels() *fakeCtrl {
 }
 
 func TestFilter_SlashOpensInput(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "standalone"})
+	m := New(threeTubers(), Options{Mode: "standalone"})
 	next, _ := m.handleKey(keyPress("/"))
 	mm := next.(Model)
 	if !mm.filtering {
@@ -28,7 +28,7 @@ func TestFilter_SlashOpensInput(t *testing.T) {
 }
 
 func TestFilter_TypingAppendsAndNarrows(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "standalone"})
+	m := New(threeTubers(), Options{Mode: "standalone"})
 
 	// Open the input, then type "d","b".
 	next, _ := m.handleKey(keyPress("/"))
@@ -48,7 +48,7 @@ func TestFilter_TypingAppendsAndNarrows(t *testing.T) {
 		t.Errorf("filtered render should hide web\ngot:\n%s", out)
 	}
 	if !strings.Contains(out, "db") || !strings.Contains(out, "db-replica") {
-		t.Errorf("filtered render should show both db tunnels\ngot:\n%s", out)
+		t.Errorf("filtered render should show both db tubers\ngot:\n%s", out)
 	}
 	if !strings.Contains(out, "(2/3)") {
 		t.Errorf("filter line should show matched/total count\ngot:\n%s", out)
@@ -56,7 +56,7 @@ func TestFilter_TypingAppendsAndNarrows(t *testing.T) {
 }
 
 func TestFilter_MatchesAllFieldsCaseInsensitive(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "standalone"})
+	m := New(threeTubers(), Options{Mode: "standalone"})
 	cases := map[string]int{
 		"":       3,
 		"db":     2, // name "db" + "db-replica" (and remote host db)
@@ -74,7 +74,7 @@ func TestFilter_MatchesAllFieldsCaseInsensitive(t *testing.T) {
 }
 
 func TestFilter_EscWhileTypingClearsAndCloses(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "standalone"})
+	m := New(threeTubers(), Options{Mode: "standalone"})
 	next, _ := m.handleKey(keyPress("/"))
 	m = next.(Model)
 	next, _ = m.handleFilterKey(keyPress("d"))
@@ -94,7 +94,7 @@ func TestFilter_EscWhileTypingClearsAndCloses(t *testing.T) {
 }
 
 func TestFilter_EnterKeepsAppliedThenEscClears(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "standalone"})
+	m := New(threeTubers(), Options{Mode: "standalone"})
 	next, _ := m.handleKey(keyPress("/"))
 	m = next.(Model)
 	next, _ = m.handleFilterKey(keyPress("w"))
@@ -122,7 +122,7 @@ func TestFilter_EnterKeepsAppliedThenEscClears(t *testing.T) {
 }
 
 func TestFilter_NavigationSkipsHiddenRows(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "standalone"})
+	m := New(threeTubers(), Options{Mode: "standalone"})
 	m.filter.SetValue("db") // matches index 0 (db) and 2 (db-replica)
 	(&m).clampCursor()
 	if m.cursor != 0 {
@@ -144,8 +144,8 @@ func TestFilter_NavigationSkipsHiddenRows(t *testing.T) {
 }
 
 func TestFilter_SpaceTogglesVisibleSelectionOnly(t *testing.T) {
-	f := threeTunnels()
-	// Make web Off and the db tunnels Off so toggle enables them.
+	f := threeTubers()
+	// Make web Off and the db tubers Off so toggle enables them.
 	f.statuses[0].State = controller.Off // db
 	f.statuses[1].State = controller.Off // web
 	f.statuses[2].State = controller.Off // db-replica
@@ -168,16 +168,16 @@ func TestFilter_SpaceTogglesVisibleSelectionOnly(t *testing.T) {
 }
 
 func TestFilter_NoMatchesRender(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "standalone"})
+	m := New(threeTubers(), Options{Mode: "standalone"})
 	m.filter.SetValue("zzz")
 	out := m.render()
-	if !strings.Contains(out, "no tunnels match") {
+	if !strings.Contains(out, "no tubers match") {
 		t.Errorf("render should show the no-match placeholder\ngot:\n%s", out)
 	}
 }
 
 func TestFilter_SurvivesRedrawTick(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "standalone"})
+	m := New(threeTubers(), Options{Mode: "standalone"})
 	m.filter.SetValue("db")
 	m.filtering = false // applied state
 	before := m.visibleCount()
@@ -193,7 +193,7 @@ func TestFilter_SurvivesRedrawTick(t *testing.T) {
 }
 
 func TestFilter_WorksInAttachMode(t *testing.T) {
-	m := New(threeTunnels(), Options{Mode: "attach @ /sock"})
+	m := New(threeTubers(), Options{Mode: "attach @ /sock"})
 	if !m.attach {
 		t.Fatal("precondition: should be in attach mode")
 	}

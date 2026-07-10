@@ -11,7 +11,7 @@ import (
 )
 
 func TestEngineSubscribeNotify(t *testing.T) {
-	e, _ := newTestEngine(&config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}})
+	e, _ := newTestEngine(&config.Config{Tubers: []config.Tuber{tuberCfg("a")}})
 	ch, unsub := e.Subscribe()
 
 	e.notify()
@@ -31,7 +31,7 @@ func TestEngineSubscribeNotify(t *testing.T) {
 }
 
 func TestEngineSubscribeMultiple(t *testing.T) {
-	e, _ := newTestEngine(&config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}})
+	e, _ := newTestEngine(&config.Config{Tubers: []config.Tuber{tuberCfg("a")}})
 	ch1, unsub1 := e.Subscribe()
 	defer unsub1()
 	ch2, unsub2 := e.Subscribe()
@@ -48,7 +48,7 @@ func TestEngineSubscribeMultiple(t *testing.T) {
 }
 
 func TestEngineNotifyDropOld(t *testing.T) {
-	e, _ := newTestEngine(&config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}})
+	e, _ := newTestEngine(&config.Config{Tubers: []config.Tuber{tuberCfg("a")}})
 	ch, unsub := e.Subscribe()
 	defer unsub()
 
@@ -65,35 +65,35 @@ func TestEngineNotifyDropOld(t *testing.T) {
 }
 
 func TestEngineSubscribeUnsubscribeIdempotent(t *testing.T) {
-	e, _ := newTestEngine(&config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}})
+	e, _ := newTestEngine(&config.Config{Tubers: []config.Tuber{tuberCfg("a")}})
 	_, unsub := e.Subscribe()
 	unsub()
 	unsub() // must not panic
 }
 
 // TestEngineFactoryWiresOnChange proves the full push chain end to end without
-// SSH: a real Engine builds a real *Tunnel (its onChange is wired to e.notify),
-// and a state transition on that tunnel reaches a subscriber.
+// SSH: a real Engine builds a real *Tuber (its onChange is wired to e.notify),
+// and a state transition on that tuber reaches a subscriber.
 func TestEngineFactoryWiresOnChange(t *testing.T) {
-	e := NewEngine(context.Background(), &config.Config{Tunnels: []config.Tunnel{tunnelCfg("a")}}, slog.Default(), nil)
+	e := NewEngine(context.Background(), &config.Config{Tubers: []config.Tuber{tuberCfg("a")}}, slog.Default(), nil)
 	ch, unsub := e.Subscribe()
 	defer unsub()
 
-	tn := e.tunnels["a"].(*Tunnel)
+	tn := e.tubers["a"].(*Tuber)
 	tn.setState(Connected)
 
 	select {
 	case <-ch:
 	case <-time.After(time.Second):
-		t.Fatal("subscriber did not receive a tunnel state-change event")
+		t.Fatal("subscriber did not receive a tuber state-change event")
 	}
 }
 
-func TestTunnelEmitsOnChange(t *testing.T) {
+func TestTuberEmitsOnChange(t *testing.T) {
 	var fired atomic.Int64
-	tn := &Tunnel{
+	tn := &Tuber{
 		baseCtx:  context.Background(),
-		cfg:      tunnelCfg("x"),
+		cfg:      tuberCfg("x"),
 		onChange: func() { fired.Add(1) },
 	}
 	tn.setState(Connecting)
@@ -105,14 +105,14 @@ func TestTunnelEmitsOnChange(t *testing.T) {
 	}
 }
 
-func TestTunnelNoChangeNoNotify(t *testing.T) {
+func TestTuberNoChangeNoNotify(t *testing.T) {
 	var fired atomic.Int64
-	tn := &Tunnel{
+	tn := &Tuber{
 		baseCtx:  context.Background(),
-		cfg:      tunnelCfg("x"),
+		cfg:      tuberCfg("x"),
 		onChange: func() { fired.Add(1) },
 	}
-	// Stop on a never-started tunnel returns early and must not notify.
+	// Stop on a never-started tuber returns early and must not notify.
 	if err := tn.Stop(); err != nil {
 		t.Fatalf("Stop: %v", err)
 	}

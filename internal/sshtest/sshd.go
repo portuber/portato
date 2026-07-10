@@ -243,7 +243,7 @@ type fwdEntry struct {
 // test sshd: it honors tcpip-forward (binds a real loopback port on the test
 // host, modelling the "server side") and, on each accepted connection, opens a
 // forwarded-tcpip channel back to the client. This is what a type=remote
-// tunnel relies on via ssh.Client.Listen.
+// tuber relies on via ssh.Client.Listen.
 func (s *SSHD) serveForwards(sconn *ssh.ServerConn, reqs <-chan *ssh.Request) {
 	var (
 		mu  sync.Mutex

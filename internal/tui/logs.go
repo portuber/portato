@@ -14,9 +14,9 @@ import (
 	routelog "github.com/portuber/portato/internal/log"
 )
 
-// logsView is the Phase 11 per-tunnel log screen opened with `l`. It is a
+// logsView is the Phase 11 per-tuber log screen opened with `l`. It is a
 // sub-model held by the main Model (m.logs, nil when inactive), like the
-// tunnel editor. It reads the controller's in-memory ring buffer and renders
+// tuber editor. It reads the controller's in-memory ring buffer and renders
 // it in a scrollable viewport, refreshing on the redraw tick and on every
 // state change (a state change almost always pairs with a log line).
 type logsView struct {

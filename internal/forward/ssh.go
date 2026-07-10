@@ -26,19 +26,19 @@ import (
 
 const connectTimeout = 5 * time.Second
 
-// hostKeySink receives a rejected unknown host key so the caller (the Tunnel,
+// hostKeySink receives a rejected unknown host key so the caller (the Tuber,
 // and through Status the TUI) can offer to accept it. The arguments are the
 // hostname as dialed, the key fingerprint, and a ready-to-append known_hosts
 // line. Nil-safe: a nil sink records nothing.
 type hostKeySink func(host, fingerprint, line string)
 
-// dialSSH establishes an SSH client connection to the tunnel's server.
-// The TCP dial is context-aware so it can be interrupted by tunnel shutdown.
+// dialSSH establishes an SSH client connection to the tuber's server.
+// The TCP dial is context-aware so it can be interrupted by tuber shutdown.
 // sink, when non-nil, receives any rejected unknown host key (TOFU prompt).
 // provider, when non-nil, lets a passphrase-protected identity load by
 // obtaining its passphrase (blocking until one is provided); passSink surfaces
 // the identity path that needs a passphrase via Status.PendingPassphrase.
-func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger, sink hostKeySink, provider PassphraseProvider, passSink passphraseSink) (*ssh.Client, error) {
+func dialSSH(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, sink hostKeySink, provider PassphraseProvider, passSink passphraseSink) (*ssh.Client, error) {
 	auths, closeAgent, err := authMethods(ctx, cfg, def, log, provider, passSink)
 	if err != nil {
 		return nil, err
@@ -82,7 +82,7 @@ func dialSSH(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *s
 // open for the lifetime of the agent-backed signers (which sign lazily during
 // the handshake) and is a no-op when no agent is used. provider/passSink enable
 // passphrase-protected identity loading (Phase 19); both may be nil.
-func authMethods(ctx context.Context, cfg config.Tunnel, def config.Defaults, log *slog.Logger, provider PassphraseProvider, passSink passphraseSink) ([]ssh.AuthMethod, func() error, error) {
+func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, provider PassphraseProvider, passSink passphraseSink) ([]ssh.AuthMethod, func() error, error) {
 	var (
 		methods []ssh.AuthMethod
 		closers []io.Closer

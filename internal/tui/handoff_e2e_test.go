@@ -61,15 +61,15 @@ func TestHandoffE2E_PortStaysUp(t *testing.T) {
 	cfgPath, ctrl, localAddr, cleanup := buildE2EStandalone(t, echoAddr, "e2e", "local")
 	defer cleanup()
 
-	// Start the tunnel in the standalone and wait for it to connect.
+	// Start the tuber in the standalone and wait for it to connect.
 	if err := ctrl.Enable("e2e"); err != nil {
 		t.Fatalf("Enable: %v", err)
 	}
 	if !waitStatus(func() ([]controller.Status, error) { return ctrl.List(), nil }, "e2e", controller.Connected, 5*time.Second) {
-		t.Fatalf("standalone tunnel did not reach Connected")
+		t.Fatalf("standalone tuber did not reach Connected")
 	}
 	if !pingE2E(t, localAddr) {
-		t.Fatalf("baseline ping through standalone tunnel failed")
+		t.Fatalf("baseline ping through standalone tuber failed")
 	}
 
 	// Dial the local port continuously; it must NEVER be refused across the
@@ -139,17 +139,17 @@ func TestHandoffE2E_PortStaysUp(t *testing.T) {
 	// The daemon must now own the port and forward through its re-dialled SSH
 	// session (uptime is fresh, but new connections are seamless).
 	if !waitPingE2E(localAddr, 5*time.Second) {
-		t.Fatalf("daemon tunnel did not forward after hand-off")
+		t.Fatalf("daemon tuber did not forward after hand-off")
 	}
 	socket := os.Getenv("PORTATO_SOCKET")
 	if !waitStatus(func() ([]controller.Status, error) { return client.New(socket).List() }, "e2e", controller.Connected, 5*time.Second) {
-		t.Fatalf("daemon did not report the tunnel Connected after hand-off")
+		t.Fatalf("daemon did not report the tuber Connected after hand-off")
 	}
 }
 
 // TestHandoffE2E_Fallback exercises the Phase 5 close+rebind fallback: when the
 // FD transfer is unavailable (LiveListenerFiles errors), the standalone falls
-// back to stopping its tunnels, spawning the daemon and letting it rebind. The
+// back to stopping its tubers, spawning the daemon and letting it rebind. The
 // daemon still comes up and forwards (with a brief port blip, which is expected
 // here and not measured).
 func TestHandoffE2E_Fallback(t *testing.T) {
@@ -163,7 +163,7 @@ func TestHandoffE2E_Fallback(t *testing.T) {
 		t.Fatalf("Enable: %v", err)
 	}
 	if !waitStatus(func() ([]controller.Status, error) { return ctrl.List(), nil }, "fb", controller.Connected, 5*time.Second) {
-		t.Fatalf("standalone tunnel did not reach Connected")
+		t.Fatalf("standalone tuber did not reach Connected")
 	}
 
 	// Wrap the controller so LiveListenerFiles always errors -> handoffWithFDs
@@ -195,7 +195,7 @@ func TestHandoffE2E_Fallback(t *testing.T) {
 
 	// Fallback rebinds the port: the daemon must end up serving it.
 	if !waitPingE2E(localAddr, 5*time.Second) {
-		t.Fatalf("daemon tunnel did not forward after fallback hand-off")
+		t.Fatalf("daemon tuber did not forward after fallback hand-off")
 	}
 }
 
@@ -227,10 +227,10 @@ func setupE2EEnv(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", filepath.Join(root, "state"))
 }
 
-// buildE2EStandalone stands up a real SSH server, writes a one-tunnel config to
-// disk, builds a Local controller over it (without starting the tunnel), and
-// returns the config path, controller, the tunnel's local dial address, and a
-// cleanup. The caller starts the tunnel via ctrl.Enable(name).
+// buildE2EStandalone stands up a real SSH server, writes a one-tuber config to
+// disk, builds a Local controller over it (without starting the tuber), and
+// returns the config path, controller, the tuber's local dial address, and a
+// cleanup. The caller starts the tuber via ctrl.Enable(name).
 func buildE2EStandalone(t *testing.T, echoAddr, name, typ string) (string, controller.Controller, string, func()) {
 	t.Helper()
 
@@ -262,7 +262,7 @@ func buildE2EStandalone(t *testing.T, echoAddr, name, typ string) (string, contr
 			KnownHosts:     filepath.Join(root, "known_hosts"),
 			AcceptNewHosts: true,
 		},
-		Tunnels: []config.Tunnel{{
+		Tubers: []config.Tuber{{
 			Name: name, Type: typ, Local: strconv.Itoa(localPort),
 			Remote: echoAddr, SSH: "u@" + srv.Addr(), Identity: idPath,
 			User: "u", Host: "127.0.0.1", Port: srv.Port, Enabled: true,
@@ -279,7 +279,7 @@ func buildE2EStandalone(t *testing.T, echoAddr, name, typ string) (string, contr
 	}
 }
 
-// waitStatus polls list until a tunnel named name reaches state, or timeout.
+// waitStatus polls list until a tuber named name reaches state, or timeout.
 func waitStatus(list func() ([]controller.Status, error), name string, state controller.State, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {

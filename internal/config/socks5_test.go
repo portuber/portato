@@ -6,7 +6,7 @@ import (
 )
 
 // TestLoadSocks5Creds verifies Phase 20 SOCKS5 user/pass fields parse from YAML
-// at both the tunnel and defaults level (via the custom tunnelRaw unmarshal).
+// at both the tuber and defaults level (via the custom tuberRaw unmarshal).
 func TestLoadSocks5Creds(t *testing.T) {
 	dir := t.TempDir()
 	p := writeConfigFile(t, dir, "config.yaml", `
@@ -15,18 +15,18 @@ defaults:
   known_hosts: ~/.ssh/known_hosts
   socks5_user: defaultuser
   socks5_password: defaultpass
-tunnels:
+tubers:
   - name: override
     type: dynamic
     local: 1080
     ssh: host.example.com
-    socks5_user: tunneluser
-    socks5_password: tunnelpass
+    socks5_user: tuberuser
+    socks5_password: tuberpass
   - name: inherit
     type: dynamic
     local: 1081
     ssh: host.example.com
-  - name: local-tunnel
+  - name: local-tuber
     type: local
     local: 5432
     remote: db:5432
@@ -40,22 +40,22 @@ tunnels:
 		t.Errorf("defaults socks5 = %q/%q, want defaultuser/defaultpass",
 			c.Defaults.Socks5User, c.Defaults.Socks5Password)
 	}
-	if len(c.Tunnels) != 3 {
-		t.Fatalf("expected 3 tunnels, got %d", len(c.Tunnels))
+	if len(c.Tubers) != 3 {
+		t.Fatalf("expected 3 tubers, got %d", len(c.Tubers))
 	}
-	ov := c.Tunnels[0]
-	if ov.Socks5User != "tunneluser" || ov.Socks5Password != "tunnelpass" {
-		t.Errorf("override tunnel socks5 = %q/%q, want tunneluser/tunnelpass",
+	ov := c.Tubers[0]
+	if ov.Socks5User != "tuberuser" || ov.Socks5Password != "tuberpass" {
+		t.Errorf("override tuber socks5 = %q/%q, want tuberuser/tuberpass",
 			ov.Socks5User, ov.Socks5Password)
 	}
-	in := c.Tunnels[1]
+	in := c.Tubers[1]
 	if in.Socks5User != "" || in.Socks5Password != "" {
-		t.Errorf("inherit tunnel socks5 = %q/%q, want empty (inherits at resolve time)",
+		t.Errorf("inherit tuber socks5 = %q/%q, want empty (inherits at resolve time)",
 			in.Socks5User, in.Socks5Password)
 	}
 }
 
-// TestResolvedSocks5Creds covers the tunnel-wins-over-defaults resolution,
+// TestResolvedSocks5Creds covers the tuber-wins-over-defaults resolution,
 // including the empty-falls-back-to-default and both-empty (NoAuth) cases.
 func TestResolvedSocks5Creds(t *testing.T) {
 	def := Defaults{Socks5User: "du", Socks5Password: "dp"}
@@ -67,14 +67,14 @@ func TestResolvedSocks5Creds(t *testing.T) {
 		wantPass    string
 		wantNoCreds bool
 	}{
-		{"tunnel wins", "tu", "tp", "tu", "tp", false},
+		{"tuber wins", "tu", "tp", "tu", "tp", false},
 		{"defaults fallback", "", "", "du", "dp", false},
 		{"user only falls back to defaults pass", "tu", "", "tu", "dp", false},
 		{"both empty = no auth", "", "", "", "", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tun := Tunnel{Socks5User: tc.tunUser, Socks5Password: tc.tunPass}
+			tun := Tuber{Socks5User: tc.tunUser, Socks5Password: tc.tunPass}
 			if tc.name == "both empty = no auth" {
 				def = Defaults{} // exercise the truly-empty path
 			} else {
@@ -102,7 +102,7 @@ func TestSocks5CredsRoundTripThroughFile(t *testing.T) {
 	p := filepath.Join(dir, "config.yaml")
 	orig := &Config{
 		Defaults: Defaults{Socks5User: "u", Socks5Password: "p"},
-		Tunnels: []Tunnel{{
+		Tubers: []Tuber{{
 			Name: "d", Type: "dynamic", Local: "1080", SSH: "h.example.com",
 			Socks5User: "tu", Socks5Password: "tp",
 		}},
@@ -117,7 +117,7 @@ func TestSocks5CredsRoundTripThroughFile(t *testing.T) {
 	if c.Defaults.Socks5User != "u" || c.Defaults.Socks5Password != "p" {
 		t.Errorf("defaults round-trip: %q/%q", c.Defaults.Socks5User, c.Defaults.Socks5Password)
 	}
-	if c.Tunnels[0].Socks5User != "tu" || c.Tunnels[0].Socks5Password != "tp" {
-		t.Errorf("tunnel round-trip: %q/%q", c.Tunnels[0].Socks5User, c.Tunnels[0].Socks5Password)
+	if c.Tubers[0].Socks5User != "tu" || c.Tubers[0].Socks5Password != "tp" {
+		t.Errorf("tuber round-trip: %q/%q", c.Tubers[0].Socks5User, c.Tubers[0].Socks5Password)
 	}
 }

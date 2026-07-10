@@ -20,7 +20,7 @@ import (
 
 var daemonCmd = &cobra.Command{
 	Use:   "daemon",
-	Short: "Run as a background daemon with tunnels and an IPC server",
+	Short: "Run as a background daemon with tubers and an IPC server",
 	RunE:  daemonRunE,
 }
 
@@ -115,7 +115,7 @@ func adoptPassedListeners(socket string, log *slog.Logger) (map[string]net.Liste
 		for n := range adopted {
 			names = append(names, n)
 		}
-		log.Info("adopted hand-off listeners", "tunnels", names)
+		log.Info("adopted hand-off listeners", "tubers", names)
 	}
 	return adopted, nil
 }

@@ -188,7 +188,7 @@ func TestLoadIdentity_WrongPassphraseRetries(t *testing.T) {
 }
 
 // TestLoadIdentity_CtxCancelAbortsWait asserts that cancelling the context
-// unblocks Wait (the tunnel disable/shutdown path).
+// unblocks Wait (the tuber disable/shutdown path).
 func TestLoadIdentity_CtxCancelAbortsWait(t *testing.T) {
 	p := genPassphraseKey(t, "secret")
 	provider := newFakeProvider()

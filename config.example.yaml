@@ -9,7 +9,7 @@ defaults:
   known_hosts: ~/.ssh/known_hosts
   accept_new_hosts: false         # TOFU: when true, new hosts are appended to known_hosts
 
-tunnels:
+tubers:
   - name: db-stage                # unique, required
     type: local                   # "local" (-L), "remote" (-R), or "dynamic" (-D)
     local: 5432                   # port or host:port (defaults to 127.0.0.1)

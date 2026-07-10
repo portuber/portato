@@ -25,7 +25,7 @@ defaults:
   identity: ~/.ssh/id_ed25519
   known_hosts: ~/.ssh/known_hosts
   accept_new_hosts: false
-tunnels:
+tubers:
   - name: db-stage
     type: local
     local: 5432
@@ -44,10 +44,10 @@ tunnels:
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if len(c.Tunnels) != 2 {
-		t.Fatalf("expected 2 tunnels, got %d", len(c.Tunnels))
+	if len(c.Tubers) != 2 {
+		t.Fatalf("expected 2 tubers, got %d", len(c.Tubers))
 	}
-	db := c.Tunnels[0]
+	db := c.Tubers[0]
 	if db.Name != "db-stage" || db.Type != "local" || db.Enabled != true {
 		t.Errorf("db-stage mismatch: %+v", db)
 	}
@@ -57,7 +57,7 @@ tunnels:
 	if got := db.ListenAddr(); got != "127.0.0.1:5432" {
 		t.Errorf("db-stage listen addr = %q, want 127.0.0.1:5432", got)
 	}
-	ad := c.Tunnels[1]
+	ad := c.Tubers[1]
 	if ad.User != "alice" || ad.Host != "web.internal" || ad.Port != 22 {
 		t.Errorf("admin ssh parse mismatch: user=%q host=%q port=%d", ad.User, ad.Host, ad.Port)
 	}
@@ -72,7 +72,7 @@ func TestApplyDefaults(t *testing.T) {
 	p := writeConfigFile(t, dir, "config.yaml", `
 defaults:
   identity: ~/.ssh/default_key
-tunnels:
+tubers:
   - name: t1
     type: local
     local: 9090
@@ -83,7 +83,7 @@ tunnels:
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	t1 := c.Tunnels[0]
+	t1 := c.Tubers[0]
 	if got := t1.ListenAddr(); got != "127.0.0.1:9090" {
 		t.Errorf("ListenAddr = %q, want 127.0.0.1:9090", got)
 	}
@@ -113,7 +113,7 @@ func TestRoundTrip(t *testing.T) {
 	p := filepath.Join(dir, "config.yaml")
 	original := &Config{
 		Defaults: Defaults{Identity: "~/.ssh/id_ed25519", KnownHosts: "~/.ssh/known_hosts"},
-		Tunnels: []Tunnel{
+		Tubers: []Tuber{
 			{Name: "db", Type: "local", Local: "5432", Remote: "10.0.0.5:5432", SSH: "user@host.example.com:22", Enabled: false},
 		},
 	}
@@ -124,7 +124,7 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load: %v", err)
 	}
-	loaded1.Tunnels[0].Enabled = true
+	loaded1.Tubers[0].Enabled = true
 	if err := loaded1.Save(p); err != nil {
 		t.Fatalf("save toggled: %v", err)
 	}
@@ -132,14 +132,14 @@ func TestRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload: %v", err)
 	}
-	if !loaded2.Tunnels[0].Enabled {
+	if !loaded2.Tubers[0].Enabled {
 		t.Errorf("after round-trip Enabled = false, want true")
 	}
 	if !reflect.DeepEqual(loaded1, loaded2) {
 		t.Errorf("round-trip state mismatch:\n loaded1=%+v\n loaded2=%+v", loaded1, loaded2)
 	}
-	if loaded2.Tunnels[0].Local != "5432" {
-		t.Errorf("local was normalized on save: got %q, want original 5432", loaded2.Tunnels[0].Local)
+	if loaded2.Tubers[0].Local != "5432" {
+		t.Errorf("local was normalized on save: got %q, want original 5432", loaded2.Tubers[0].Local)
 	}
 }
 
@@ -152,42 +152,42 @@ func TestValidateErrors(t *testing.T) {
 	}{
 		{
 			name:    "duplicate name",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}, {Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tubers: []Tuber{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}, {Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "duplicate name",
 		},
 		{
 			name:    "empty name",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tubers: []Tuber{{Name: "", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "name is empty",
 		},
 		{
 			name:    "bad name chars",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "bad name!", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tubers: []Tuber{{Name: "bad name!", Type: "local", Local: "1", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "name must be",
 		},
 		{
 			name:    "unsupported type",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "foo", Local: "1", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tubers: []Tuber{{Name: "a", Type: "foo", Local: "1", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "not supported",
 		},
 		{
 			name:    "empty local",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "  ", Remote: "r:1", SSH: "h:22"}}},
+			cfg:     &Config{Tubers: []Tuber{{Name: "a", Type: "local", Local: "  ", Remote: "r:1", SSH: "h:22"}}},
 			wantSub: "local is empty",
 		},
 		{
 			name:    "empty remote",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "1", Remote: "  ", SSH: "h:22"}}},
+			cfg:     &Config{Tubers: []Tuber{{Name: "a", Type: "local", Local: "1", Remote: "  ", SSH: "h:22"}}},
 			wantSub: "remote is empty",
 		},
 		{
 			name:    "empty ssh host",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "  "}}},
+			cfg:     &Config{Tubers: []Tuber{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "  "}}},
 			wantSub: "ssh host is empty",
 		},
 		{
 			name:    "port out of range",
-			cfg:     &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:0"}}},
+			cfg:     &Config{Tubers: []Tuber{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "h:0"}}},
 			wantSub: "out of range",
 		},
 	}
@@ -252,7 +252,7 @@ func TestListenAddr(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.local, func(t *testing.T) {
-			got := Tunnel{Local: tc.local}.ListenAddr()
+			got := Tuber{Local: tc.local}.ListenAddr()
 			if got != tc.want {
 				t.Errorf("ListenAddr(%q) = %q, want %q", tc.local, got, tc.want)
 			}
@@ -279,7 +279,7 @@ func TestRemoteListenAddr(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.remote, func(t *testing.T) {
-			got := Tunnel{Remote: tc.remote}.RemoteListenAddr()
+			got := Tuber{Remote: tc.remote}.RemoteListenAddr()
 			if got != tc.want {
 				t.Errorf("RemoteListenAddr(%q) = %q, want %q", tc.remote, got, tc.want)
 			}
@@ -309,7 +309,7 @@ func TestValidateAcceptsTypes(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cfg := &Config{Tunnels: []Tunnel{{Name: "a", Type: tc.typ, Local: tc.local, Remote: tc.remote, SSH: "u@h:22"}}}
+			cfg := &Config{Tubers: []Tuber{{Name: "a", Type: tc.typ, Local: tc.local, Remote: tc.remote, SSH: "u@h:22"}}}
 			cfg.prepare()
 			err := cfg.Validate()
 			if tc.ok && err != nil {
@@ -327,13 +327,13 @@ func TestExpandTilde(t *testing.T) {
 	t.Setenv("HOME", dir)
 	c := &Config{
 		Defaults: Defaults{Identity: "~/keys/default", KnownHosts: "~/kh"},
-		Tunnels: []Tunnel{
-			{Name: "a", Type: "local", Remote: "r:1", SSH: "h:22", Identity: "~/keys/tunnel"},
+		Tubers: []Tuber{
+			{Name: "a", Type: "local", Remote: "r:1", SSH: "h:22", Identity: "~/keys/tuber"},
 		},
 	}
 	c.prepare()
-	if got := c.Tunnels[0].ResolvedIdentity(c.Defaults); got != filepath.Join(dir, "keys", "tunnel") {
-		t.Errorf("tunnel identity = %q, want %s", got, filepath.Join(dir, "keys", "tunnel"))
+	if got := c.Tubers[0].ResolvedIdentity(c.Defaults); got != filepath.Join(dir, "keys", "tuber") {
+		t.Errorf("tuber identity = %q, want %s", got, filepath.Join(dir, "keys", "tuber"))
 	}
 	if got := c.Defaults.ResolvedKnownHosts(); got != filepath.Join(dir, "kh") {
 		t.Errorf("known_hosts = %q, want %s", got, filepath.Join(dir, "kh"))
@@ -372,8 +372,8 @@ func TestLoadCreatesExampleWhenMissing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load on missing path: %v", err)
 	}
-	if len(c.Tunnels) != 1 {
-		t.Fatalf("expected example with 1 tunnel, got %d", len(c.Tunnels))
+	if len(c.Tubers) != 1 {
+		t.Fatalf("expected example with 1 tuber, got %d", len(c.Tubers))
 	}
 	if _, err := os.Stat(p); err != nil {
 		t.Fatalf("config not created: %v", err)
@@ -383,7 +383,7 @@ func TestLoadCreatesExampleWhenMissing(t *testing.T) {
 func TestSavePermissions(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
-	cfg := &Config{Tunnels: []Tunnel{{Name: "a", Type: "local", Remote: "r:1", SSH: "h:22"}}}
+	cfg := &Config{Tubers: []Tuber{{Name: "a", Type: "local", Remote: "r:1", SSH: "h:22"}}}
 	if err := cfg.Save(p); err != nil {
 		t.Fatalf("Save: %v", err)
 	}
@@ -420,7 +420,7 @@ defaults:
     max_size_mb: 2
     max_age_days: 14
     retain: 5
-tunnels:
+tubers:
   - name: db-stage
     type: local
     local: 5432
@@ -445,7 +445,7 @@ func TestLoadLogRotationDefaultsAbsent(t *testing.T) {
 	p := writeConfigFile(t, dir, "config.yaml", `
 defaults:
   identity: ~/.ssh/id_ed25519
-tunnels:
+tubers:
   - name: db-stage
     type: local
     local: 5432

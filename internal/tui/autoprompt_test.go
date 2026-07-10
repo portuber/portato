@@ -13,7 +13,7 @@ func tick(m Model) Model {
 	return mm.(Model)
 }
 
-// TestPassphraseModal_AutoOpenOnPending asserts that when the tunnel under the
+// TestPassphraseModal_AutoOpenOnPending asserts that when the tuber under the
 // cursor starts blocking on a passphrase (no keypress from the user), the tick
 // refresh auto-opens the prompt — the "press space a second time" gap is gone.
 func TestPassphraseModal_AutoOpenOnPending(t *testing.T) {
@@ -28,7 +28,7 @@ func TestPassphraseModal_AutoOpenOnPending(t *testing.T) {
 
 	m = tick(m)
 	if !m.enteringPassphrase || m.passphraseTarget != "db" {
-		t.Fatalf("tick should auto-open the passphrase modal for the cursor's tunnel; got entering=%v target=%q", m.enteringPassphrase, m.passphraseTarget)
+		t.Fatalf("tick should auto-open the passphrase modal for the cursor's tuber; got entering=%v target=%q", m.enteringPassphrase, m.passphraseTarget)
 	}
 }
 
@@ -82,7 +82,7 @@ func TestPassphraseModal_AutoOpenNotReopenedAfterEsc(t *testing.T) {
 }
 
 // TestAcceptModal_AutoOpenOnPendingHost asserts the same auto-open covers the
-// TOFU unknown-host prompt (so enabling a tunnel whose host key is unknown
+// TOFU unknown-host prompt (so enabling a tuber whose host key is unknown
 // surfaces the accept modal without a second keypress).
 func TestAcceptModal_AutoOpenOnPendingHost(t *testing.T) {
 	f := newFake(controller.Status{

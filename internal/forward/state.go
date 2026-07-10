@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// State is the lifecycle state of a tunnel.
+// State is the lifecycle state of a tuber.
 type State int
 
 const (
@@ -59,7 +59,7 @@ func (s *State) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Status is a point-in-time snapshot of a tunnel.
+// Status is a point-in-time snapshot of a tuber.
 type Status struct {
 	Name        string    `json:"name"`
 	Type        string    `json:"type"`
@@ -69,7 +69,7 @@ type Status struct {
 	Error       string    `json:"error,omitempty"`
 	ConnectedAt time.Time `json:"connected_at"`
 
-	// TOFU (Phase 11): when the tunnel is blocked by an unknown SSH host key
+	// TOFU (Phase 11): when the tuber is blocked by an unknown SSH host key
 	// (accept_new_hosts: false), these carry the offending host, its
 	// fingerprint and a ready-to-append known_hosts line so the TUI can offer
 	// to accept it. Empty when not applicable.
@@ -77,7 +77,7 @@ type Status struct {
 	PendingFingerprint string `json:"pending_fingerprint,omitempty"`
 	PendingHostLine    string `json:"pending_host_line,omitempty"`
 
-	// Passphrase (Phase 19): when the tunnel's identity key is
+	// Passphrase (Phase 19): when the tuber's identity key is
 	// passphrase-protected and no passphrase is available yet, this carries
 	// the identity path that needs one, so the TUI/CLI can prompt. The dial
 	// blocks (PassphraseProvider.Wait) until a passphrase arrives, rather than
@@ -93,7 +93,7 @@ func (s Status) Uptime() time.Duration {
 }
 
 // Endpoint renders the directional endpoint string for display: "local →
-// remote" for a local tunnel, "local ← remote" for a remote tunnel (traffic
+// remote" for a local tuber, "local ← remote" for a remote tuber (traffic
 // flows from the server to here). The arrow encodes the direction.
 func (s Status) Endpoint() string {
 	switch s.Type {

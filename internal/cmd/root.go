@@ -39,12 +39,12 @@ like the MCP screen in opencode.
 
 Modes:
   portato            smart launcher (attach to a running daemon, or standalone TUI)
-  portato daemon     background process with tunnels + IPC server
+  portato daemon     background process with tubers + IPC server
   portato attach     TUI client connected to a running daemon
-  portato list       list status of all tunnels (stdout)
-  portato enable     enable a tunnel on the daemon
-  portato disable    disable a tunnel on the daemon
-  portato restart    restart a tunnel
+  portato list       list status of all tubers (stdout)
+  portato enable     enable a tuber on the daemon
+  portato disable    disable a tuber on the daemon
+  portato restart    restart a tuber
   portato reload    reload the config on the running daemon
   portato stop       stop the running daemon
   portato install    install system autostart (launchd / systemd --user)
@@ -93,8 +93,8 @@ func runStandalone() error {
 	defer ctrl.Close()
 
 	// Match the daemon's boot-time StartEnabledWith (SPEC §6): launch every
-	// enabled:true tunnel so standalone and daemon agree on what is up, and a
-	// hand-off to the daemon brings up the same set instead of surprise tunnels.
+	// enabled:true tuber so standalone and daemon agree on what is up, and a
+	// hand-off to the daemon brings up the same set instead of surprise tubers.
 	ctrl.StartEnabled()
 
 	return tui.Run(ctrl, tui.Options{Mode: "standalone", CfgPath: path})

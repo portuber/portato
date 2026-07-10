@@ -23,9 +23,9 @@ import (
 
 // socks5DialUserPass performs a SOCKS5 CONNECT handshake offering ONLY the
 // UserPass auth method (0x02). On success it returns the established connection
-// tunneled to dst; on auth failure (or method rejection) it returns an error so
+// tubered to dst; on auth failure (or method rejection) it returns an error so
 // the caller can distinguish a rejected credential from a transport failure.
-// Mirrors socks5Dial (no-auth) in tunnel_integration_test.go (Phase 20).
+// Mirrors socks5Dial (no-auth) in tuber_integration_test.go (Phase 20).
 func socks5DialUserPass(t *testing.T, proxy, dst, user, pass string) (net.Conn, error) {
 	t.Helper()
 	conn, err := net.Dial("tcp", proxy)
@@ -125,12 +125,12 @@ func socks5DialUserPass(t *testing.T, proxy, dst, user, pass string) (net.Conn, 
 	return conn, nil
 }
 
-// TestTunnelDynamicSocks5Auth is the Phase 20 SOCKS5 user/pass end-to-end test.
-// A type=dynamic tunnel configured with socks5_user/socks5_password must:
+// TestTuberDynamicSocks5Auth is the Phase 20 SOCKS5 user/pass end-to-end test.
+// A type=dynamic tuber configured with socks5_user/socks5_password must:
 //   - accept a SOCKS5 client with the correct creds and forward traffic;
 //   - reject a client offering wrong creds at the auth step;
 //   - reject a client offering NoAuth only (the server requires UserPass).
-func TestTunnelDynamicSocks5Auth(t *testing.T) {
+func TestTuberDynamicSocks5Auth(t *testing.T) {
 	t.Setenv("SSH_AUTH_SOCK", "")
 
 	echoAddr, stopEcho := startEcho(t)
@@ -159,7 +159,7 @@ func TestTunnelDynamicSocks5Auth(t *testing.T) {
 	localPort := freePort(t)
 	localAddr := fmt.Sprintf("127.0.0.1:%d", localPort)
 
-	cfg := config.Tunnel{
+	cfg := config.Tuber{
 		Name: "d-auth", Type: "dynamic",
 		Local:    strconv.Itoa(localPort),
 		SSH:      "u@" + srv.Addr(),
@@ -171,7 +171,7 @@ func TestTunnelDynamicSocks5Auth(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTunnel(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}

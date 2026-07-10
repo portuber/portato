@@ -34,12 +34,12 @@ func (h *handoffFakeCtrl) Changes() <-chan struct{}  { return h.changes }
 func (h *handoffFakeCtrl) Config() (*config.Config, error) {
 	return &config.Config{}, nil
 }
-func (h *handoffFakeCtrl) AddTunnel(config.Tunnel) error            { return nil }
-func (h *handoffFakeCtrl) UpdateTunnel(string, config.Tunnel) error { return nil }
-func (h *handoffFakeCtrl) DeleteTunnel(string) error                { return nil }
-func (h *handoffFakeCtrl) Logs(string) ([]routelog.Entry, error)    { return nil, nil }
-func (h *handoffFakeCtrl) AcceptHost(string) error                  { return nil }
-func (h *handoffFakeCtrl) AcceptPassphrase(string, string) error    { return nil }
+func (h *handoffFakeCtrl) AddTuber(config.Tuber) error            { return nil }
+func (h *handoffFakeCtrl) UpdateTuber(string, config.Tuber) error { return nil }
+func (h *handoffFakeCtrl) DeleteTuber(string) error               { return nil }
+func (h *handoffFakeCtrl) Logs(string) ([]routelog.Entry, error)  { return nil, nil }
+func (h *handoffFakeCtrl) AcceptHost(string) error                { return nil }
+func (h *handoffFakeCtrl) AcceptPassphrase(string, string) error  { return nil }
 func (h *handoffFakeCtrl) LiveListenerFiles() (map[string]*os.File, error) {
 	if h.liveErr != nil {
 		return nil, h.liveErr

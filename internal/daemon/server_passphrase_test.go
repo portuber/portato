@@ -15,7 +15,7 @@ import (
 	"github.com/portuber/portato/internal/secret"
 )
 
-// passphraseConfig is a test config whose single tunnel has an identity, so the
+// passphraseConfig is a test config whose single tuber has an identity, so the
 // passphrase handler has a path to key on (via ResolvedIdentity).
 func passphraseConfig(t *testing.T) (*config.Config, string) {
 	t.Helper()
@@ -23,7 +23,7 @@ func passphraseConfig(t *testing.T) (*config.Config, string) {
 	idPath := filepath.Join(dir, "id_ed25519")
 	cfg := &config.Config{
 		Defaults: config.Defaults{Identity: idPath},
-		Tunnels: []config.Tunnel{{
+		Tubers: []config.Tuber{{
 			Name:   "db",
 			Type:   "local",
 			Local:  "5432",
@@ -70,9 +70,9 @@ func startPassphraseServer(t *testing.T, cfg *config.Config) (*client.Client, *s
 	return client.New(sock), store, backend
 }
 
-// TestPassphrase_StoreAndPersist asserts POST /tunnels/{name}/passphrase stores
+// TestPassphrase_StoreAndPersist asserts POST /tubers/{name}/passphrase stores
 // the passphrase in the cache and (with persist on) the keyring, keyed by the
-// tunnel's resolved identity path.
+// tuber's resolved identity path.
 func TestPassphrase_StoreAndPersist(t *testing.T) {
 	cfg, idPath := passphraseConfig(t)
 	c, store, backend := startPassphraseServer(t, cfg)
@@ -88,21 +88,21 @@ func TestPassphrase_StoreAndPersist(t *testing.T) {
 	}
 }
 
-// TestPassphrase_UnknownTunnel asserts a 404-style error for a missing tunnel.
-func TestPassphrase_UnknownTunnel(t *testing.T) {
+// TestPassphrase_UnknownTuber asserts a 404-style error for a missing tuber.
+func TestPassphrase_UnknownTuber(t *testing.T) {
 	cfg, _ := passphraseConfig(t)
 	c, _, _ := startPassphraseServer(t, cfg)
 	if err := c.SetPassphrase("nope", "x"); err == nil {
-		t.Error("expected an error for an unknown tunnel")
+		t.Error("expected an error for an unknown tuber")
 	}
 }
 
-// TestPassphrase_NoIdentity asserts a 409 when the tunnel has no identity to
+// TestPassphrase_NoIdentity asserts a 409 when the tuber has no identity to
 // key a passphrase on.
 func TestPassphrase_NoIdentity(t *testing.T) {
 	dir := shortDir(t)
 	cfgPath := filepath.Join(dir, "config.yaml")
-	cfg := &config.Config{Tunnels: []config.Tunnel{{Name: "db", Type: "local", Local: "5432", Remote: "db:5432", SSH: "u@h:22"}}}
+	cfg := &config.Config{Tubers: []config.Tuber{{Name: "db", Type: "local", Local: "5432", Remote: "db:5432", SSH: "u@h:22"}}}
 	if err := cfg.Save(cfgPath); err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestPassphrase_NoIdentity(t *testing.T) {
 	}
 	c := client.New(sock)
 	if err := c.SetPassphrase("db", "x"); err == nil {
-		t.Error("expected a conflict error when the tunnel has no identity")
+		t.Error("expected a conflict error when the tuber has no identity")
 	}
 }
 

@@ -292,7 +292,7 @@ defaults:
     max_age_days: 0               # purge rotated archives older than N days; 0 -> disabled
     retain: 3                     # rotated archives to keep (.1 .. .retain); 0 -> default (3)
 
-tunnels:
+tubers:
   - name: db-stage                # unique, required
     type: local                   # "local" (-L), "remote" (-R), or "dynamic" (-D)
     local: 5432                   # port or host:port (defaults to 127.0.0.1)

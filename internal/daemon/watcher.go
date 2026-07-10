@@ -28,7 +28,7 @@ var watchSettle = 300 * time.Millisecond
 // swapping on a parse error — so a syntactically bad edit is logged and
 // skipped. A vanished file is likewise skipped (not reloaded), since
 // config.Load on a missing path recreates an example and would clear the live
-// tunnels.
+// tubers.
 type watcher struct {
 	path    string
 	log     *slog.Logger
@@ -95,7 +95,7 @@ func (w *watcher) loop(stable os.FileInfo, stableOK bool) {
 			cur, exists := w.stat()
 			if !exists {
 				// Skip: a reload would hit config.Load's EnsureExample path
-				// and wipe the live tunnels. Warn once, then stay quiet until
+				// and wipe the live tubers. Warn once, then stay quiet until
 				// the file reappears.
 				if stableOK && !vanished {
 					w.log.Warn("config vanished, keeping last-good config", "path", w.path)

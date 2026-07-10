@@ -15,7 +15,7 @@ import (
 )
 
 // maxMsg caps the single transfer message's data buffer: a 4-byte length prefix
-// followed by the JSON list of Headers. A few hundred tunnels fit easily; the
+// followed by the JSON list of Headers. A few hundred tubers fit easily; the
 // buffer bounds a single ReadMsgUnix.
 const maxMsg = 16 * 1024
 
@@ -82,7 +82,7 @@ func Send(c *net.UnixConn, offers []Offer) error {
 }
 
 // Recv reads the single transfer message and reconstructs each offered listener
-// via net.FileListener, keyed by tunnel name (from the Headers, in order). It
+// via net.FileListener, keyed by tuber name (from the Headers, in order). It
 // returns an empty map when the sender had nothing to pass (it half-closed
 // without sending). The control message (all fds) arrives whole with the first
 // ReadMsgUnix that touches the payload; the length prefix lets Recv top up a
