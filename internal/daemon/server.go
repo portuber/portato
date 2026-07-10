@@ -250,8 +250,11 @@ func (s *Server) Start(ctx context.Context) error {
 		s.token = tok
 		s.log.Info("ipc token written", "path", s.tokenPath)
 	}
+	s.mu.Lock()
 	s.listener = ln
 	s.srv = &http.Server{Handler: s.routes()}
+	srv := s.srv
+	s.mu.Unlock()
 	s.engine.StartEnabledWith(s.adopted)
 	s.adopted = nil
 	if s.watcher != nil {
@@ -259,7 +262,7 @@ func (s *Server) Start(ctx context.Context) error {
 	}
 
 	serveErr := make(chan error, 1)
-	go func() { serveErr <- s.srv.Serve(ln) }()
+	go func() { serveErr <- srv.Serve(ln) }()
 
 	select {
 	case <-ctx.Done():
@@ -317,8 +320,11 @@ func (s *Server) Shutdown() error {
 		}
 		shutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer cancel()
-		if s.srv != nil {
-			_ = s.srv.Shutdown(shutCtx)
+		s.mu.Lock()
+		srv := s.srv
+		s.mu.Unlock()
+		if srv != nil {
+			_ = srv.Shutdown(shutCtx)
 		}
 		s.engine.StopAll()
 		s.cleanup()

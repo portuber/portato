@@ -106,6 +106,9 @@ func TestWatcher_BadEditKeepsLastGood(t *testing.T) {
 	}
 	// Let the watcher detect, settle, attempt and skip.
 	time.Sleep(200 * time.Millisecond)
+	// Stop the watcher before asserting on the log buffer: bytes.Buffer is not
+	// safe for concurrent use (the watcher writes logs while we read them).
+	s.watcher.stop()
 
 	if got := serverTuberCount(s); got != 2 {
 		t.Errorf("server config after bad edit: %d tubers, want 2 (last-good)", got)
@@ -129,6 +132,9 @@ func TestWatcher_VanishSkipsReload(t *testing.T) {
 		t.Fatalf("remove config: %v", err)
 	}
 	time.Sleep(150 * time.Millisecond)
+	// Stop the watcher before asserting on the log buffer: bytes.Buffer is not
+	// safe for concurrent use (the watcher writes logs while we read them).
+	s.watcher.stop()
 
 	// No crash, last-good config (1 tuber) survives.
 	if got := serverTuberCount(s); got != 1 {
