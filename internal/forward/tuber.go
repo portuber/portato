@@ -185,7 +185,18 @@ func (t *Tuber) StartWith(ctx context.Context, ln net.Listener) error {
 func (t *Tuber) Stop() error {
 	t.mu.Lock()
 	if !t.running {
+		// A non-running tuber may still display a terminal Error from a failed
+		// bind: Start set state=Error but never flipped running, so it never
+		// reached the teardown path below. Fold it back to Off so Disable (and
+		// the TUI toggle) can clear the error and a subsequent Enable rebinds.
+		changed := t.state != Off || t.errMsg != ""
+		t.state = Off
+		t.errMsg = ""
+		t.connectedAt = time.Time{}
 		t.mu.Unlock()
+		if changed {
+			t.notifyChange()
+		}
 		return nil
 	}
 	t.running = false
@@ -236,9 +247,22 @@ func (t *Tuber) Reconfigure(cfg config.Tuber, def config.Defaults) error {
 	running := t.running
 	t.cfg = cfg
 	t.defaults = def
+	// A failed bind leaves state=Error with running=false; updating cfg (e.g.
+	// a new Local port) must not keep showing the stale error referencing the
+	// old address. Reset a non-running tuber to a clean Off.
+	changed := false
+	if !running && (t.state != Off || t.errMsg != "") {
+		t.state = Off
+		t.errMsg = ""
+		t.connectedAt = time.Time{}
+		changed = true
+	}
 	t.mu.Unlock()
 	if running {
 		return t.Restart()
+	}
+	if changed {
+		t.notifyChange()
 	}
 	return nil
 }
