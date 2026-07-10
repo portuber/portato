@@ -72,7 +72,8 @@ func TestLinux_Install_New_CommandSequence(t *testing.T) {
 	}
 	// The socket unit is enabled before the service so systemd owns the IPC
 	// socket when the service (Requires+After it) starts and gets the fd.
-	if io, sc := strings.Index(j, linuxSocketUnit), strings.Index(j, linuxUnit+" "); io < 0 || io > sc {
+	// (commands are newline-joined, so match the bare unit names, not "unit ".)
+	if io, sc := strings.Index(j, linuxSocketUnit), strings.Index(j, linuxUnit); io < 0 || sc < 0 || io > sc {
 		t.Errorf("socket unit should be enabled before the service:\n%s", j)
 	}
 	// A brand-new unit must restart, not be merely enabled.
@@ -99,7 +100,9 @@ func TestLinux_Install_Existing_Restarts(t *testing.T) {
 	if !strings.Contains(j, "systemctl --user restart "+linuxUnit) {
 		t.Errorf("existing unit should be restarted:\n%s", j)
 	}
-	if strings.Contains(j, "enable --now") {
+	// The socket unit is legitimately enable --now'd; only the *service* must
+	// not be (it is restarted instead).
+	if strings.Contains(j, "enable --now "+linuxUnit) {
 		t.Errorf("existing unit should not be (re)enabled:\n%s", j)
 	}
 	body, _ := os.ReadFile(unit)
