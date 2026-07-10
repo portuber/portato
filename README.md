@@ -247,3 +247,8 @@ The source of truth lives in [`docs/`](./docs):
 
 Portato is licensed under the [MIT License](./LICENSE). All dependencies are
 permissive (MIT / Apache-2.0 / BSD); there is no copyleft.
+
+## Versioning
+
+Portato uses [Semantic Versioning](./docs/VERSIONING.md). Releases are tagged
+`vX.Y.Z`.
