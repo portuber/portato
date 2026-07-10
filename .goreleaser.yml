@@ -23,9 +23,10 @@ builds:
       - -X github.com/portuber/portato/internal/cmd.date={{.Date}}
 
 archives:
-  - formats: [tar.gz]
-    # Use a human-friendly archive name (macOS, x86_64) matching the matrix
-    # already produced by `make build-all`.
+  - id: default
+    formats: [tar.gz]
+    # Human-friendly archive name (macOS, x86_64) matching `make build-all`.
+    # Windows is not built yet (see phase 17); Scoop is deferred with it.
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin"}}macOS{{- else}}{{ .Os }}{{- end}}_
@@ -34,10 +35,54 @@ archives:
 checksum:
   name_template: checksums.txt
 
-# The project may be built with `make snapshot` before a git remote is
-# configured; skip publishing to any SCM.
+# On a `git tag vX.Y.Z` push, goreleaser publishes the GitHub Release (the
+# owner/repo is inferred from the origin remote) and the tap/bucket commits
+# below. `make snapshot` (goreleaser --snapshot) skips all publishing.
 release:
-  disable: true
+  draft: false
+
+homebrew_casks:
+  # Homebrew Cask -> https://github.com/portuber/homebrew-tap (Casks/portato.rb)
+  # `brew install --cask portuber/tap/portato`
+  # goreleaser v2.16 deprecated `brews` (formulae) for pre-built binaries in
+  # favour of casks; casks are macOS-only (Linux users use deb/rpm/tarball).
+  - name: portato
+    binaries:
+      - portato
+    repository:
+      owner: portuber
+      name: homebrew-tap
+      branch: main
+    homepage: https://github.com/portuber/portato
+    description: SSH port-forwarding manager with a TUI
+    license: MIT
+    commit_author:
+      name: Valerii Kipkaev
+      email: kipkaev@kipkaev.name
+    # The binary is not Apple-signed/notarized; strip the quarantine bit on
+    # install so Gatekeeper does not block it.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/portato"]
+          end
+
+nfpms:
+  # deb + rpm from one config (linux builds only).
+  - package_name: portato
+    file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    homepage: https://github.com/portuber/portato
+    description: SSH port-forwarding manager with a TUI
+    maintainer: Valerii Kipkaev <kipkaev@kipkaev.name>
+    license: MIT
+    vendor: Valerii Kipkaev
+    formats:
+      - deb
+      - rpm
+    contents:
+      - src: ./LICENSE
+        dst: /usr/share/doc/portato/LICENSE
 
 changelog:
   use: git

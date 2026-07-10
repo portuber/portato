@@ -15,9 +15,13 @@ publishing prerequisite.
 
 ## Tasks
 
-- [ ] Extend `.goreleaser.yaml` (snapshot exists from Phase 13) with:
-      `brews:` (Homebrew tap formula), `scoops:` (Scoop manifest), and
-      `nfpms:` (deb + rpm via nfpm).
+- [x] Extend `.goreleaser.yaml` (snapshot exists from Phase 13) with the
+      packaging sections. NOTE: `brews` is hard-deprecated in goreleaser
+      v2.16+ (`goreleaser check` fails), so the Homebrew channel uses
+      `homebrew_casks` (a Cask, not a Formula); `nfpms:` adds deb + rpm.
+      `scoops:` (Scoop) is **deferred to phase 17** — the windows build does
+      not compile (`syscall.Kill` in discovery.go/stop.go, `Setsid` in
+      handoff.go) and would not run (unix-socket IPC, fd-passing).
 - [ ] Wire the external tap/bucket repos (the maintainer provides them); use
       goreleaser's publish hooks to push the formula/manifest on release.
 - [ ] CI release workflow (`.github/workflows/release.yml`): on `v*` tag →
@@ -33,10 +37,11 @@ publishing prerequisite.
       All dependencies are permissive (MIT / Apache-2.0 / BSD), there is no
       copyleft and therefore no conflict; the only obligation is to retain the
       deps' notices on redistribution (the same for any permissive choice).
-- [ ] README: an "Install" section listing all four channels —
+- [ ] README: an "Install" section listing the channels —
       `go install github.com/portuber/portato/cmd/portato@latest` (note: requires
       Go 1.25+), direct download from the GitHub Release,
-      `brew install <tap>/portato`, `scoop install portato`, deb/rpm.
+      `brew install --cask portuber/tap/portato`, and deb/rpm. (Scoop is
+      deferred to phase 17.)
 
 ## Definition of Done
 

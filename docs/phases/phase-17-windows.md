@@ -32,6 +32,16 @@ supported platform matrix (SPEC §15/§16).
 - [ ] Build-tag the hand-off `Setsid` (`syscall.SysProcAttr{Setsid: true}` is
       unix-only) — Windows uses `SysProcAttr{CreationFlags:
       windows.CREATE_NEW_PROCESS_GROUP | windows.DETACHED_PROCESS}`.
+- [ ] Build-tag the two `syscall.Kill` call sites (unix-only) found during the
+      phase-21 windows build attempt: `pidAlive` in
+      `internal/daemon/discovery.go` (PID-liveness check) and `stopKill` in
+      `internal/cmd/stop.go` (`portato stop` sends SIGTERM). Windows needs an
+      equivalent `OpenProcess`+`TerminateProcess` (or `taskkill`) path behind a
+      build-tagged seam (the `stopKill` var in stop.go is already a seam).
+- [ ] Packaging follow-up (phase 21): re-add `windows` to the `.goreleaser.yml`
+      build matrix, restore the zip `format_overrides`, and add back the
+      `scoops:` section (`portuber/scoop-bucket`) so a Scoop manifest publishes
+      alongside the windows archive.
 - [ ] CI: add `windows/amd64` (and `windows/arm64` when Go supports it) to the
       cross-compile matrix; add a Windows smoke test (`portato daemon` +
       `portato list` round-trip).
