@@ -53,6 +53,9 @@ homebrew_casks:
       owner: portuber
       name: homebrew-tap
       branch: main
+      # A PAT with push rights to the tap repo (cross-repo publish); the default
+      # GITHUB_TOKEN cannot push to portuber/homebrew-tap.
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     homepage: https://github.com/portuber/portato
     description: SSH port-forwarding manager with a TUI
     license: MIT

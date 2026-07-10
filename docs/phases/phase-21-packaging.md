@@ -22,11 +22,13 @@ publishing prerequisite.
       `scoops:` (Scoop) is **deferred to phase 17** — the windows build does
       not compile (`syscall.Kill` in discovery.go/stop.go, `Setsid` in
       handoff.go) and would not run (unix-socket IPC, fd-passing).
-- [ ] Wire the external tap/bucket repos (the maintainer provides them); use
-      goreleaser's publish hooks to push the formula/manifest on release.
-- [ ] CI release workflow (`.github/workflows/release.yml`): on `v*` tag →
-      `goreleaser release`; publish the GitHub Release + the tap/bucket
-      commits; surface the needed tokens as CI secrets.
+- [x] Wire the external tap repo: the `homebrew_casks.repository`
+      (owner/name/branch/token) + `HOMEBREW_TAP_GITHUB_TOKEN` push the cask to
+      portuber/homebrew-tap on release. (The Scoop bucket is deferred to
+      phase 17 with windows.)
+- [x] CI release workflow (`.github/workflows/release.yml`): on `v*` tag →
+      `goreleaser release`; publishes the GitHub Release + the tap cask commit;
+      surfaces `GITHUB_TOKEN` and `HOMEBREW_TAP_GITHUB_TOKEN` as CI secrets.
 - [x] Extend `portato doctor`: check the binary is on PATH, the config dir is
       writable, autostart is in place (per OS), and report the embedded
       version/commit/date.
