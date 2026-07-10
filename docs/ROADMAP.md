@@ -36,7 +36,7 @@
 | 18  | IPC authorization token           | `[x]`  | [phase-18-ipc-token.md](./phases/phase-18-ipc-token.md) |
 | 19  | Identity passphrase storage       | `[x]`  | [phase-19-identity-passphrase.md](./phases/phase-19-identity-passphrase.md) |
 | 20  | CLI/UX polish                     | `[x]`  | [phase-20-cli-ux-polish.md](./phases/phase-20-cli-ux-polish.md) |
-| 21  | Packaging and releases            | `[~]`  | [phase-21-packaging.md](./phases/phase-21-packaging.md) |
+| 21  | Packaging and releases            | `[x]`  | [phase-21-packaging.md](./phases/phase-21-packaging.md) |
 | 22  | Robustness (socket activation…)   | `[x]`  | [phase-22-robustness.md](./phases/phase-22-robustness.md) |
 | 23  | TUI list column alignment         | `[x]`  | [phase-23-tui-list-column-alignment.md](./phases/phase-23-tui-list-column-alignment.md) |
 | 24  | TUI branding / logo               | `[x]`  | [phase-24-tui-logo.md](./phases/phase-24-tui-logo.md) |
@@ -56,11 +56,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–31 (post-MVP backlog) are planned in detail — all are done (`[x]`) except **17 (Windows)**, which is pending (`[ ]`) and blocked on external infrastructure, and **21 (packaging)**, which is in progress (`[~]`).
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–31 (post-MVP backlog) are planned in detail — all are done (`[x]`) except **17 (Windows)**, which is pending (`[ ]`) and blocked on external infrastructure. Phase 21 (packaging) is done (`[x]`): v0.1.0 is released (GitHub Release + Homebrew cask + deb/rpm); Scoop is deferred to phase 17.
 
 ## Current focus
 
-**Phases 0–16, 18–20, 22–30 and 31 are `[x]`; phase 17 (Windows) remains pending (`[ ]`), blocked on external infrastructure, and phase 21 (packaging) is in progress (`[~]`).** The single binary runs the smart launcher
+**Phases 0–16, 18–20, 22–31 are `[x]`; phase 17 (Windows) remains pending (`[ ]`), blocked on external infrastructure. Phase 21 (packaging) is done: v0.1.0 is released (GitHub Release + Homebrew cask + deb/rpm); Scoop/Windows is deferred to phase 17.** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports

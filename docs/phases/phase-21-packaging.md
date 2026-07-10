@@ -1,7 +1,7 @@
 ---
 phase: 21
 title: Packaging and releases
-status: in-progress
+status: done
 depends_on: [13]
 ---
 
@@ -47,13 +47,16 @@ publishing prerequisite.
 
 ## Definition of Done
 
-- [ ] A tag push produces darwin/linux × amd64/arm64 archives + a Homebrew
-      formula + a Scoop manifest + a deb + an rpm.
-- [ ] On a clean machine: `brew install <tap>/portato` and
-      `scoop install portato` succeed and produce a working `portato`.
-- [ ] `portato doctor` exits 0 on a healthy install and prints the version.
-- [ ] `goreleaser check` is clean; a `--snapshot --clean` build reproduces
-      locally; the release workflow dry-runs green in CI.
+- [x] A tag push produces darwin/linux × amd64/arm64 archives + a Homebrew
+      **cask** + a deb + an rpm. (goreleaser v2.16 hard-deprecated `brews`/
+      formulae, so the Homebrew channel ships a Cask; Scoop is deferred to
+      phase 17 with windows.)
+- [x] On a clean machine: `brew install --cask portuber/tap/portato` succeeds
+      and produces a working `portato` (verified on macOS). (Scoop deferred to
+      phase 17.)
+- [x] `portato doctor` exits 0 on a healthy install and prints the version.
+- [x] `goreleaser check` is clean; a `--snapshot --clean` build reproduces
+      locally; the release workflow ran green in CI and published v0.1.0.
 
 ## Verification
 
