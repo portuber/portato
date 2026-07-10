@@ -15,9 +15,12 @@ builds:
       - amd64
       - arm64
     ldflags:
-      # -s -w strip debug info for a smaller binary; inject the version from
-      # the git tag into internal/cmd.version (see internal/cmd/version.go).
-      - -s -w -X github.com/portuber/portato/internal/cmd.version={{.Version}}
+      # -s -w strip debug info for a smaller binary; inject the version, commit
+      # and date from the git tag into internal/cmd.{version,commit,date}.
+      - -s -w
+      - -X github.com/portuber/portato/internal/cmd.version={{.Version}}
+      - -X github.com/portuber/portato/internal/cmd.commit={{.Commit}}
+      - -X github.com/portuber/portato/internal/cmd.date={{.Date}}
 
 archives:
   - formats: [tar.gz]

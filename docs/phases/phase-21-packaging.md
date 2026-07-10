@@ -23,10 +23,10 @@ publishing prerequisite.
 - [ ] CI release workflow (`.github/workflows/release.yml`): on `v*` tag →
       `goreleaser release`; publish the GitHub Release + the tap/bucket
       commits; surface the needed tokens as CI secrets.
-- [ ] Extend `portato doctor`: check the binary is on PATH, the config dir is
+- [x] Extend `portato doctor`: check the binary is on PATH, the config dir is
       writable, autostart is in place (per OS), and report the embedded
       version/commit/date.
-- [ ] Version embedding: wire `main.version` / `main.commit` / `main.date`
+- [x] Version embedding: wire `main.version` / `main.commit` / `main.date`
       ldflags into the release builds (snapshot builds already inject
       placeholders).
 - [x] Add a `LICENSE` file (**MIT**) at the repo root — publishing prerequisite.

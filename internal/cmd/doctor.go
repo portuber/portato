@@ -7,16 +7,19 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
 
+	"github.com/adrg/xdg"
 	"github.com/spf13/cobra"
 
 	"github.com/portuber/portato/internal/client"
 	"github.com/portuber/portato/internal/config"
 	"github.com/portuber/portato/internal/daemon"
 	routelog "github.com/portuber/portato/internal/log"
+	"github.com/portuber/portato/internal/service"
 )
 
 var doctorCmd = &cobra.Command{
@@ -36,6 +39,8 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 	out := cmd.OutOrStdout()
 	d := newDoctor(out)
 
+	fmt.Fprintf(out, "portato %s (commit %s, built %s)\n\n", version, commit, date)
+
 	// 1. Config file exists and loads.
 	cfgPath := cfgFile
 	if cfgPath == "" {
@@ -50,7 +55,11 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 	}
 	d.ok("config", "%s", cfgPath)
 
-	// 2. known_hosts (auto-created on first connect, so absent is only a hint).
+	// 2. The config directory must be writable (tunnels/config are persisted
+	// there; a read-only mount would break enable/disable and reload).
+	checkConfigDir(d, cfgPath)
+
+	// 3. known_hosts (auto-created on first connect, so absent is only a hint).
 	hosts := cfg.Defaults.ResolvedKnownHosts()
 	if fileExists(hosts) {
 		d.ok("known_hosts", "%s", hosts)
@@ -58,7 +67,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		d.info("known_hosts", "%s not found (created automatically on first connect)", hosts)
 	}
 
-	// 3. ssh-agent: if SSH_AUTH_SOCK points at a reachable socket, good; if it
+	// 4. ssh-agent: if SSH_AUTH_SOCK points at a reachable socket, good; if it
 	// is set but unreachable, that is a failure; if unset, only a hint.
 	if sock := strings.TrimSpace(os.Getenv("SSH_AUTH_SOCK")); sock != "" {
 		if isReachableSock(sock) {
@@ -70,7 +79,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		d.info("ssh-agent", "SSH_AUTH_SOCK unset (configure an identity key or start ssh-agent)")
 	}
 
-	// 4. Each tunnel's resolved identity file (when one is configured).
+	// 5. Each tunnel's resolved identity file (when one is configured).
 	for _, t := range cfg.Tunnels {
 		id := t.ResolvedIdentity(cfg.Defaults)
 		if id == "" {
@@ -83,7 +92,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
-	// 5. Log file + rotation. The daemon/standalone write a size-rotated file
+	// 6. Log file + rotation. The daemon/standalone write a size-rotated file
 	// under the state home; report its path and the most recent rotation
 	// (evidenced by the newest archive's mtime — doctor is a separate process
 	// and cannot read the in-memory RotatingWriter state).
@@ -99,7 +108,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		d.info("logs", "%s (created when the daemon or standalone runs)", logPath)
 	}
 
-	// 6. Daemon reachability (the daemon is optional, so absent is informational).
+	// 7. Daemon reachability (the daemon is optional, so absent is informational).
 	socket, err := daemon.ResolveSocket()
 	if err == nil && socket != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), doctorProbeTimeout)
@@ -107,7 +116,7 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		cancel()
 		if herr == nil {
 			d.ok("daemon", "reachable at %s", socket)
-			// 7. The IPC socket must be owner-only (SPEC §6: 0600).
+			// 8. The IPC socket must be owner-only (SPEC §6: 0600).
 			if info, statErr := os.Stat(socket); statErr == nil {
 				if perm := info.Mode().Perm(); perm != 0o600 {
 					d.fail("socket perms", "%s mode %o, expected 0600", socket, perm)
@@ -120,7 +129,14 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		d.info("daemon", "not running (start with `portato daemon` or `portato install`)")
 	}
 
-	// 8. Linux: lingering must be enabled for the daemon to survive logout.
+	// 9. The binary should be on PATH so autostart can launch `portato daemon`.
+	checkBinary(d)
+
+	// 10. Autostart definition (launchd plist on macOS, systemd --user unit on
+	// Linux); absent is informational — autostart is optional.
+	checkAutostart(d)
+
+	// 11. Linux: lingering must be enabled for the daemon to survive logout.
 	if runtime.GOOS == "linux" {
 		checkLinger(d)
 	}
@@ -211,5 +227,70 @@ func checkLinger(d *doctor) {
 		d.ok("lingering", "enabled for %s", user)
 	} else {
 		d.info("lingering", "not enabled (run: loginctl enable-linger %s) so the daemon survives logout", user)
+	}
+}
+
+// lookPath resolves a binary on PATH (exec.LookPath by default); a seam so
+// tests can fake it without depending on the host's PATH.
+var lookPath = exec.LookPath
+
+// autostartArtefact returns the autostart definition path for the current OS
+// (launchd plist on macOS, systemd --user unit on Linux), or "" where autostart
+// is unsupported. Overridable in tests.
+var autostartArtefact = defaultAutostartArtefact
+
+func defaultAutostartArtefact() string {
+	switch runtime.GOOS {
+	case "darwin":
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return ""
+		}
+		return filepath.Join(home, "Library", "LaunchAgents", service.DefaultLabel+".plist")
+	case "linux":
+		return filepath.Join(xdg.ConfigHome, "systemd", "user", "portato.service")
+	default:
+		return ""
+	}
+}
+
+// checkConfigDir verifies the directory holding the config file is writable
+// (portato persists enable state and reloads config there).
+func checkConfigDir(d *doctor, cfgPath string) {
+	dir := filepath.Dir(cfgPath)
+	probe := filepath.Join(dir, ".doctor-probe")
+	if err := os.WriteFile(probe, nil, 0o600); err != nil {
+		d.fail("config dir", "%s not writable: %v", dir, err)
+		return
+	}
+	_ = os.Remove(probe)
+	d.ok("config dir", "%s (writable)", dir)
+}
+
+// checkBinary reports the running binary's path and whether `portato` is
+// resolvable on PATH (autostart launches `portato daemon`).
+func checkBinary(d *doctor) {
+	exe, err := os.Executable()
+	if err != nil {
+		d.info("binary", "running path unknown (%v)", err)
+		return
+	}
+	if lp, err := lookPath("portato"); err == nil {
+		d.ok("binary", "%s (on PATH: %s)", exe, lp)
+	} else {
+		d.info("binary", "%s (not on PATH; install it so `portato install` can launch the daemon)", exe)
+	}
+}
+
+// checkAutostart reports whether the autostart definition is installed.
+func checkAutostart(d *doctor) {
+	p := autostartArtefact()
+	if p == "" {
+		return
+	}
+	if fileExists(p) {
+		d.ok("autostart", "%s", p)
+	} else {
+		d.info("autostart", "not installed (run `portato install`)")
 	}
 }

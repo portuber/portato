@@ -150,3 +150,117 @@ func withLogPaths(t *testing.T, paths ...string) {
 	logStatePaths = func() []string { return paths }
 	t.Cleanup(func() { logStatePaths = saved })
 }
+
+// writeMinimalConfig writes a minimal valid config into dir and returns its path.
+func writeMinimalConfig(t *testing.T, dir string) string {
+	t.Helper()
+	cfgPath := filepath.Join(dir, "config.yaml")
+	body := "tunnels:\n  - name: t1\n    type: local\n    local: \"20001\"\n    remote: 127.0.0.1:5432\n    ssh: user@127.0.0.1:2222\n"
+	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	return cfgPath
+}
+
+func withLookPath(t *testing.T, fn func(string) (string, error)) {
+	t.Helper()
+	saved := lookPath
+	lookPath = fn
+	t.Cleanup(func() { lookPath = saved })
+}
+
+func withAutostart(t *testing.T, path string) {
+	t.Helper()
+	saved := autostartArtefact
+	autostartArtefact = func() string { return path }
+	t.Cleanup(func() { autostartArtefact = saved })
+}
+
+// TestDoctor_PrintsVersion verifies the Phase 21 version header: doctor prints
+// the embedded version/commit/date before the checks.
+func TestDoctor_PrintsVersion(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := writeMinimalConfig(t, dir)
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should pass, got err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "portato dev (commit") {
+		t.Errorf("output should print the version header\ngot:\n%s", out)
+	}
+}
+
+// TestDoctor_ConfigDirWritable verifies the Phase 21 config-dir writability
+// check: a temp config dir is reported writable.
+func TestDoctor_ConfigDirWritable(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := writeMinimalConfig(t, dir)
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should pass, got err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "✓ config dir") {
+		t.Errorf("output should report a writable config dir\ngot:\n%s", out)
+	}
+}
+
+// TestDoctor_BinaryOnPath covers the binary-on-PATH check (Phase 21) when
+// portato is resolvable.
+func TestDoctor_BinaryOnPath(t *testing.T) {
+	withLookPath(t, func(string) (string, error) { return "/usr/local/bin/portato", nil })
+	dir := t.TempDir()
+	cfgPath := writeMinimalConfig(t, dir)
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should pass, got err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "✓ binary") {
+		t.Errorf("output should report binary on PATH\ngot:\n%s", out)
+	}
+}
+
+// TestDoctor_BinaryNotOnPath: a missing PATH entry is informational, not a failure.
+func TestDoctor_BinaryNotOnPath(t *testing.T) {
+	withLookPath(t, func(string) (string, error) { return "", os.ErrNotExist })
+	dir := t.TempDir()
+	cfgPath := writeMinimalConfig(t, dir)
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should still pass, got err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "· binary") {
+		t.Errorf("output should report binary as info\ngot:\n%s", out)
+	}
+}
+
+// TestDoctor_AutostartInstalled: an existing autostart definition is a pass.
+func TestDoctor_AutostartInstalled(t *testing.T) {
+	artefact := filepath.Join(t.TempDir(), "portato.service")
+	if err := os.WriteFile(artefact, []byte("unit"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	withAutostart(t, artefact)
+	dir := t.TempDir()
+	cfgPath := writeMinimalConfig(t, dir)
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should pass, got err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "✓ autostart") {
+		t.Errorf("output should report autostart installed\ngot:\n%s", out)
+	}
+}
+
+// TestDoctor_AutostartMissing: no autostart definition is informational.
+func TestDoctor_AutostartMissing(t *testing.T) {
+	withAutostart(t, filepath.Join(t.TempDir(), "absent"))
+	dir := t.TempDir()
+	cfgPath := writeMinimalConfig(t, dir)
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should still pass, got err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "· autostart") {
+		t.Errorf("output should report autostart as info\ngot:\n%s", out)
+	}
+}
