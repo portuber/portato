@@ -6,6 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/portuber/portato)](https://github.com/portuber/portato/releases)
 [![License: MIT](https://img.shields.io/github/license/portuber/portato)](LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/portuber/portato)](go.mod)
+[![Go Report Card](https://goreportcard.com/badge/github.com/portuber/portato)](https://goreportcard.com/report/github.com/portuber/portato)
 
 **Portato** is an SSH port-forwarding manager with a TUI. It lets you turn
 individual SSH tunnels on and off, restart them, and watch their status from a
@@ -22,15 +23,18 @@ The single binary works in several modes:
 | `portato enable <name>`      | Enable a tunnel on the daemon                                       |
 | `portato disable <name>`     | Disable a tunnel on the daemon                                      |
 | `portato restart <name>`     | Restart a tunnel                                                    |
+| `portato reload`             | Reload the daemon's config from disk (also auto-reloads on change)  |
+| `portato stop`               | Stop the running daemon (graceful, via SIGTERM)                     |
 | `portato install`            | Install system autostart (launchd / systemd --user)                 |
 | `portato uninstall`          | Remove system autostart                                             |
+| `portato add-identity <path>`| Cache a passphrase for a passphrase-protected SSH key (OS keyring)  |
+| `portato forget-identity <path>` | Forget a cached identity passphrase                             |
 | `portato doctor`             | Diagnose the setup (config, keys, agent, daemon, logs)             |
 | `portato version`            | Print the version                                                   |
 
 ## Install
 
-All channels are built from the same release. *(Scoop/Windows is coming with
-Phase 17.)*
+All channels are built from the same release.
 
 **Homebrew** (macOS / Linuxbrew):
 
@@ -56,7 +60,7 @@ sudo dpkg -i portato_<version>_linux_amd64.deb
 # or: sudo rpm -i portato_<version>_linux_amd64.rpm
 ```
 
-**go install** (needs Go 1.25+):
+**go install** (needs Go 1.26+):
 
 ```sh
 go install github.com/portuber/portato/cmd/portato@latest
@@ -74,7 +78,7 @@ make vet     # go vet ./...
 make fmt     # gofmt -w .
 ```
 
-Requires Go 1.25+.
+Requires Go 1.26+.
 
 ## Releases
 
@@ -86,20 +90,6 @@ publish, writes to `dist/`):
 ```sh
 make snapshot   # needs goreleaser: go install github.com/goreleaser/goreleaser/v2@latest
 ```
-
-## Status
-
-Phases 0–15 are done. The single binary runs the smart launcher, a background
-daemon with HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands,
-and system autostart (`portato install` / `uninstall`) for macOS (launchd) and
-Linux (systemd --user). It supports `local` (`-L`), `remote` (`-R`) and
-`dynamic` (`-D`, SOCKS5) tunnels, push-based status events, an in-TUI tunnel
-editor (`e`/`n`/`d`) and duplication (`Shift+C`), a per-tunnel log screen (`l`),
-an interactive unknown-host (TOFU) prompt, automatic light/dark theming, a
-`portato doctor` diagnostics command, robust IPC socket discovery, size-rotated
-logs with a `/` list filter, and goreleaser release tooling.
-
-See [`docs/ROADMAP.md`](./docs/ROADMAP.md) for the phase-by-phase status.
 
 ## Tunnel types
 
