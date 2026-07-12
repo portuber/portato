@@ -2,6 +2,16 @@ version: 2
 
 project_name: portato
 
+# Regenerate the bundled THIRD_PARTY_LICENSES.txt (Phase 32) before the pipeline
+# assembles archives/nfpm packages, so every binary release carries each
+# dependency's LICENSE (MIT/Apache-2.0/BSD-3) as required on redistribution.
+# The make target installs go-licenses and concatenates the per-module notices
+# into one file (a tree would collide on identical LICENSE basenames inside
+# deb/rpm, which flatten directory sources).
+before:
+  hooks:
+    - make third-party-licenses
+
 builds:
   - id: portato
     main: ./cmd/portato
@@ -31,6 +41,13 @@ archives:
       {{ .ProjectName }}_{{ .Version }}_
       {{- if eq .Os "darwin"}}macOS{{- else}}{{ .Os }}{{- end}}_
       {{- if eq .Arch "amd64"}}x86_64{{- else}}{{ .Arch }}{{- end}}
+    # Pack the dependency license notices (Phase 32) alongside the project's
+    # own LICENSE and README. Setting `files` overrides goreleaser's defaults,
+    # so the defaults we rely on are re-listed here.
+    files:
+      - LICENSE
+      - README.md
+      - THIRD_PARTY_LICENSES.txt
 
 checksum:
   name_template: checksums.txt
@@ -86,6 +103,10 @@ nfpms:
     contents:
       - src: ./LICENSE
         dst: /usr/share/doc/portato/LICENSE
+      # Dependency license notices (Phase 32) — a single concatenated file
+      # alongside the project's own LICENSE.
+      - src: THIRD_PARTY_LICENSES.txt
+        dst: /usr/share/doc/portato/THIRD_PARTY_LICENSES.txt
 
 changelog:
   use: git

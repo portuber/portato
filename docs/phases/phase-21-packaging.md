@@ -38,7 +38,10 @@ publishing prerequisite.
 - [x] Add a `LICENSE` file (**MIT**) at the repo root — publishing prerequisite.
       All dependencies are permissive (MIT / Apache-2.0 / BSD), there is no
       copyleft and therefore no conflict; the only obligation is to retain the
-      deps' notices on redistribution (the same for any permissive choice).
+      deps' notices on redistribution (the same for any permissive choice). That
+      retention is implemented for binary releases in Phase 32 — a bundled
+      `THIRD_PARTY_LICENSES.txt` per archive + deb/rpm (see
+      `docs/phases/phase-32-third-party-licenses.md`).
 - [x] README: an "Install" section listing the channels —
       `go install github.com/portuber/portato/cmd/portato@latest` (note: requires
       Go 1.25+), direct download from the GitHub Release,

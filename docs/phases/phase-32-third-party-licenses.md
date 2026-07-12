@@ -25,12 +25,12 @@ only obligation is to retain the deps' notices on redistribution (the same for
 any permissive choice)."* — but the release tooling never actually implemented
 that retention:
 
-- `.goreleaser.yml` `archives:` has no `files:` adding a notices file/tree.
-- `.goreleaser.yml` `nfpms.contents` installs only Portato's own `LICENSE` to
-  `/usr/share/doc/portato/LICENSE`; the dependencies' notices are absent.
-- There is no `before.hooks` block.
+- `.goreleaser.yml` `archives:` had no `files:` adding a notices file/tree.
+- `.goreleaser.yml` `nfpms.contents` installed only Portato's own `LICENSE` to
+  `/usr/share/doc/portato/LICENSE`; the dependencies' notices were absent.
+- There was no `before.hooks` block.
 
-So the already-published v0.1.x artifacts ship without the dependency license
+So the already-published v0.1.x artifacts shipped without the dependency license
 texts — a real (if rarely enforced) compliance gap, and the decisive hook is
 unambiguous: `golang.org/x/{crypto,sys,term}` and `github.com/spf13/pflag` are
 BSD-3-Clause, which explicitly covers "binary form".
@@ -42,86 +42,121 @@ here requires crediting or "thanking" authors; BSD-3 in fact prohibits using
 contributors' names to promote the product without permission. The obligation is
 to carry license **text**, which is exactly what this phase adds.
 
-## Design decisions (locked)
+## Design decisions (locked, then revised — see "Deviation from plan")
 
 | Aspect | Decision |
 |---|---|
 | Generation timing | Generate the notices **at release time**, not committed to the repo. Stays in sync with `go.mod`; no drift, no repo bloat. |
 | Tool | `github.com/google/go-licenses` (Apache-2.0 build tool; not linked into the binary, imposes nothing on it). |
-| Placement | `before.hooks` in `.goreleaser.yml` — runs for both `release` and local `snapshot`, keeps everything in one config (no extra `release.yml` step). |
-| Output layout | A `third_party/` tree mirroring module paths, one `LICENSE` per dependency (`go-licenses save ./cmd/portato --save_path third_party`). Self-describing and standard. |
-| Archives | Add `third_party/**/*` to `archives[].files`; re-list `LICENSE` + `README.md` because setting `files:` overrides goreleaser's defaults. |
-| deb/rpm | Add `src: third_party/` → `dst: /usr/share/doc/portato/third_party/` to `nfpms.contents` (nfpm expands a directory `src` recursively), alongside the existing own-LICENSE install. |
+| Placement | A `before.hooks: make third-party-licenses` step in `.goreleaser.yml` — runs for both `release` and local `snapshot`; the generation logic lives in the Makefile. |
+| Output layout | A single concatenated `THIRD_PARTY_LICENSES.txt` — one block per dependency: its module path as a header, then the license text. Produced by the Makefile target (`go-licenses save` → concat → drop the tree). A per-module tree was the original plan but collides inside deb/rpm (see below). |
+| Archives | Add `THIRD_PARTY_LICENSES.txt` to `archives[].files`; re-list `LICENSE` + `README.md` because setting `files:` overrides goreleaser's defaults. |
+| deb/rpm | Add `src: THIRD_PARTY_LICENSES.txt` → `dst: /usr/share/doc/portato/THIRD_PARTY_LICENSES.txt` to `nfpms.contents`, alongside the existing own-LICENSE install. |
 | Homebrew cask | Untouched — downloads the archive, notices ride along. |
-| Binary itself | No embedded licenses; no Go code change (except an optional Makefile target). |
+| Binary itself | No embedded licenses; no Go code change. |
 | Phase 21 | Stays `[x]`. This phase only implements what phase-21:39-41 declares; a cross-link note is added to the phase-21 doc, its status is not reopened (same pattern phase-31 used w.r.t. phase-24). |
 
 ## Tasks
 
+### `Makefile`
+- [x] Add a `third-party-licenses` target: `go install github.com/google/go-licenses@latest`,
+      `go-licenses save ./cmd/portato --save_path third_party --force`, then
+      concatenate every file under `third_party/` (module-path header + text)
+      into `THIRD_PARTY_LICENSES.txt` and `rm -rf third_party`.
+
 ### `.goreleaser.yml`
-- [ ] Add a top-level `before.hooks` block:
-      - `go install github.com/google/go-licenses@latest`
-      - `go-licenses save ./cmd/portato --save_path third_party --force`
-- [ ] `archives[].files`: set explicitly to `['LICENSE', 'README.md', 'third_party/**/*']`
-      (overriding the default; re-list LICENSE/README so they remain packed).
-- [ ] `nfpms.contents`: add
-      `{ src: third_party/, dst: /usr/share/doc/portato/third_party/ }`
-      next to the existing `{ src: ./LICENSE, dst: /usr/share/doc/portato/LICENSE }`.
+- [x] Add a top-level `before.hooks` with a single step
+      `make third-party-licenses` (replaces an earlier two-step inline form).
+- [x] `archives[].files`: set explicitly to
+      `['LICENSE', 'README.md', 'THIRD_PARTY_LICENSES.txt']` (re-list the
+      goreleaser defaults we rely on, since `files:` overrides them).
+- [x] `nfpms.contents`: add
+      `{ src: THIRD_PARTY_LICENSES.txt, dst: /usr/share/doc/portato/THIRD_PARTY_LICENSES.txt }`
+      next to the existing own-LICENSE entry.
 
 ### Docs
-- [ ] `docs/phases/phase-21-packaging.md`: add a cross-link note pointing to
+- [x] `docs/phases/phase-21-packaging.md`: add a cross-link note pointing to
       phase 32 as the implementation of the "retain notices on redistribution"
       line (phase 21 status unchanged).
-- [ ] Check `docs/SPEC.md`'s packaging/release section; if it enumerates release
-      contents, note the bundled `third_party/` there too.
-
-### Optional
-- [ ] `Makefile`: a `licenses` target
-      (`go-licenses save ./cmd/portato --save_path third_party --force`) for local review.
-- [ ] README "License" section: optionally a one-liner pointing readers to the
-      bundled `third_party/` in release artifacts.
+- [x] `docs/SPEC.md`: checked — it does not enumerate release/archive contents,
+      so no SPEC change is needed.
 
 ## Definition of Done
 
-- [ ] `goreleaser release --snapshot --clean` produces tar.gz archives whose
-      contents include a `third_party/` tree with each runtime dependency's
-      LICENSE (spot-check: cobra = Apache-2.0, golang.org/x/crypto = BSD-3-Clause,
-      charm.land/bubbletea = MIT).
-- [ ] `dpkg-deb -c dist/*.deb` lists files under
-      `/usr/share/doc/portato/third_party/...`; the rpm likewise carries them.
-- [ ] `goreleaser check` is clean.
-- [ ] `go build ./...`, `make vet`, `make test`, `gofmt -l .` unchanged (no Go
-      code change expected).
-- [ ] ROADMAP + phase-21 cross-link updated; SPEC packaging section reconciled
-      if needed.
+- [x] `goreleaser release --snapshot --clean` produces tar.gz archives that
+      contain `THIRD_PARTY_LICENSES.txt` (verified across all 4 darwin/linux ×
+      amd64/arm64 archives), and that file holds every runtime dependency's
+      license text (spot-check: cobra = Apache-2.0, golang.org/x/crypto =
+      BSD-3-Clause, charm.land/bubbletea = MIT; yaml.v3 also carries its Apache
+      NOTICE).
+- [x] The deb's `data.tar.gz` lists
+      `/usr/share/doc/portato/THIRD_PARTY_LICENSES.txt`; the rpm uses the same
+      `nfpms.contents` (shared config, build succeeded without collision).
+- [x] `goreleaser check` is clean.
+- [x] `go build ./...`, `go vet ./...`, `gofmt -l .` unchanged — no Go code
+      changed in this phase. (`make test` is green under CI's env; a pre-existing
+      `tui` test-isolation flake surfaced locally only because the dev shell
+      exports `PORTATO_THEME=mono` — unrelated to this phase, to be fixed
+      separately.)
+- [x] ROADMAP + phase-21 cross-link updated; SPEC packaging section reconciled
+      (no change needed).
 
 ## Verification
 
 ```sh
-make fmt && make vet && make test
+make third-party-licenses                 # regenerates THIRD_PARTY_LICENSES.txt
 goreleaser check
 goreleaser release --snapshot --clean
-tar -tzf dist/*linux_amd64*.tar.gz | grep '^third_party/' | head      # tree present
-tar -tzf dist/*linux_amd64*.tar.gz | grep -E 'x/crypto|cobra|bubbletea'  # control deps present
-dpkg-deb -c dist/*linux_amd64*.deb | grep third_party                 # deb carries it
+tar -tzf dist/*linux_x86_64*.tar.gz       # lists LICENSE, README.md, portato, THIRD_PARTY_LICENSES.txt
+# inspect a deb without dpkg-deb (macOS):
+ar x dist/*linux_amd64*.deb && tar -tzf data.tar.gz | grep THIRD_PARTY   # /usr/share/doc/portato/THIRD_PARTY_LICENSES.txt
 ```
+
+## Deviation from plan (during implementation)
+
+The plan locked a per-module `third_party/` tree packed into archives and
+expanded into deb/rpm via `nfpms.contents: { src: third_party/, dst:
+.../third_party/ }`. That failed in practice:
+
+```
+⨯ nfpm failed … add globbed files from "third_party/": adding at destination
+  /usr/share/doc/portato/third_party/LICENSE: file with source
+  third_party/github.com/charmbracelet/colorprofile/LICENSE is already present
+  at this destination: content collision
+```
+
+nfpm **flattens** a directory/glob `src` to basenames under `dst`, and the dep
+tree has many files all named `LICENSE` (or `LICENSE.txt`), so they collide.
+(The tar.gz archives handled the tree fine — the collision is deb/rpm only.)
+
+Resolution: generate one concatenated `THIRD_PARTY_LICENSES.txt` (module-path
+header + license text per block) and pack that single file into both archives
+and deb/rpm. This is deterministic, avoids the collision entirely, is uniform
+across all three artifact kinds, and is the conventional shape for a bundled
+notices file. The Makefile target owns the generation; goreleaser calls it via
+`before.hooks: make third-party-licenses`. `go-licenses` itself works on Go 1.26
+(verified: 33 module notices; its warnings about non-Go `.s` files are
+informational).
 
 ## Technical details / risks
 
-- **go-licenses vs Go 1.26.** `go-licenses` is Google-maintained and
-  occasionally lags a Go release. At phase start, verify it runs on Go 1.26
-  (`go-licenses save ./cmd/portato --save_path /tmp/tp --force`). Fallback if it
-  breaks: pin `go-licenses@<known-good commit>`, or collect LICENSE files
-  manually from the module cache via `go list -m all` +
-  `$(go env GOMODCACHE)/<module>@<ver>/LICENSE`.
+- **go-licenses on Go 1.26.** Verified working at phase start
+  (`go-licenses save ./cmd/portato --save_path /tmp/tp --force`, exit 0, 33
+  notices). Fallback if a future Go release breaks it: pin
+  `go-licenses@<known-good commit>`, or collect LICENSE files manually from the
+  module cache via `go list -m all` + `$(go env GOMODCACHE)/<module>@<ver>/LICENSE`.
 - **`before.hooks` ordering.** goreleaser runs `before.hooks` once at pipeline
-  start, before builds/archives/nfpm assemble — so `third_party/` exists by
-  packaging time. `setup-go` + the build itself populate the module cache that
-  `go-licenses` reads.
+  start, before builds/archives/nfpm assemble — so `THIRD_PARTY_LICENSES.txt`
+  exists by packaging time. `setup-go` + the build populate the module cache
+  that `go-licenses` reads.
 - **Network in CI.** `go install go-licenses` needs the module proxy; GitHub
   Actions runners reach it by default.
 - **Retroactive.** v0.1.x is already published without notices; this fixes the
   **next** release onward.
+- **Pre-existing test-isolation flake (not this phase).** `internal/tui`
+  `TestDetectKind` does not unset `PORTATO_THEME` for its COLORFGBG/default
+  cases, so a dev shell exporting `PORTATO_THEME=mono` makes them fail. CI is
+  unaffected (clean env). To be fixed in a separate `fix(tui):` commit.
 - **Why a new phase, not a reopen of 21.** Phase 21 is `[x]`; CONVENTIONS
   forbids silently reopening a completed phase. Tracked as phase 32
   (`depends_on: [21]`); the phase-21 doc gets only a cross-link, status
@@ -129,18 +164,15 @@ dpkg-deb -c dist/*linux_amd64*.deb | grep third_party                 # deb carr
 
 ## Commit plan (per CONVENTIONS)
 
-1. `docs(phase-32): plan` — create this file + the ROADMAP row (`[ ]`) (+ the
-   phase-21 cross-link can ride here or in the start commit). This is the
-   planning commit; may be made at plan time.
-2. On "start phase 32": `docs(phase-32): start` — flip the frontmatter + ROADMAP
-   row `[ ] -> [~]`.
+1. `docs(phase-32): plan` — create this file + the ROADMAP row (`[ ]`). ✅
+2. `docs(phase-32): start` — flip the frontmatter + ROADMAP row `[ ] -> [~]`. ✅
 3. `feat(build): bundle third-party license notices into releases` —
-   `.goreleaser.yml` (+ optional Makefile).
+   `Makefile` + `.goreleaser.yml` + this phase file's deviation note +
+   phase-21 cross-link.
 4. `docs(phase-32): complete` — `[~] -> [x]` after the DoD passes.
 
 ## Start guard
 
-This phase is `status: todo`. It starts only on an explicit **"start phase 32"**
-command (per `docs/CONVENTIONS.md`). The first action then is to flip the
-frontmatter + ROADMAP row `[ ] -> [~]` (commit `docs(phase-32): start`) — not
-before.
+This phase is `status: in-progress`. It completes only on an explicit
+**"complete phase 32"** command (per `docs/CONVENTIONS.md`), after every DoD
+item is verified.

@@ -1,5 +1,7 @@
 bin/
 dist/
+third_party/
+THIRD_PARTY_LICENSES.txt
 *.log
 *.sock
 *.pid
