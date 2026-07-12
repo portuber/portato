@@ -14,7 +14,7 @@
   - **daemon** (`portato daemon`): a background process holding tunnels + an IPC server;
   - **attach/CLI** (`portato attach`, `portato list/enable/...`): clients to the daemon.
 - When quitting standalone mode with live tunnels — a "leave running in the background?" modal with a seamless hand-off to the daemon.
-- Cross-platform within the MVP: **macOS + Linux**. Windows is post-MVP.
+- Cross-platform: **macOS + Linux** (MVP); **Windows** (Phase 17 — named-pipe IPC + registry Run-key autostart).
 - Autostart at system boot (launchd / systemd --user); tunnels are **off** by default.
 
 ## 2. Stack
@@ -27,6 +27,7 @@
 | SSH              | `golang.org/x/crypto/ssh` + `golang.org/x/crypto/ssh/knownhosts` (native, no system `ssh`) |
 | Config           | `gopkg.in/yaml.v3`                             |
 | Paths (XDG)      | `github.com/adrg/xdg`                          |
+| IPC (Windows)    | `github.com/Microsoft/go-winio` (named pipe)   |
 | Logging          | `log/slog` (standard library)                  |
 
 No system dependency on `ssh` — everything goes through the Go SSH client.
@@ -159,7 +160,7 @@ Implementations:
 
 ## 6. IPC (daemon <-> clients)
 
-- **Transport:** a unix domain socket (a file). No TCP ports exposed to the network.
+- **Transport:** a unix domain socket (a file) on darwin/linux; a **named pipe** (`\\.\pipe\portato`) on Windows. No TCP ports exposed to the network.
 - **Socket discovery (Phase 12):** the daemon's socket lives in a semantically
   correct but *session-variable* runtime location, so the daemon advertises its
   actual path via a stable discovery marker that every client reads instead of
@@ -178,6 +179,9 @@ Implementations:
       varies across terminal/tmux sessions), which is exactly why the marker is
       needed — the socket path differs per session but the marker always points
       at the live one.
+    - Windows: a named pipe `\\.\pipe\portato` (no socket file). The marker
+      still records it as the `socket` field; the PID and the IPC token live in
+      `%LOCALAPPDATA%\portato\` (the pipe has no sibling file to chmod).
   - **Liveness:** the source of truth is a `GET /healthz` probe, not the PID.
     A client reads the marker and probes the socket it advertises; if it
     answers, that path is used. A marker whose socket is silent is stale: when
@@ -274,6 +278,7 @@ Default path (via `xdg.ConfigHome`):
 |--------|---------------------------------------------------|
 | macOS  | `~/Library/Application Support/portato/config.yaml`  |
 | Linux  | `~/.config/portato/config.yaml`                      |
+| Windows | `%AppData%\portato\config.yaml` (via `xdg.ConfigHome`) |
 
 Overridden by the global `--config` flag.
 
@@ -481,6 +486,7 @@ Limitation: the seamless hand-off preserves continuous **local-port** availabili
 |--------|-----------------|---------------------------------------------------------------------|
 | macOS  | launchd         | `~/Library/LaunchAgents/dev.portato.daemon.plist`, `RunAtLoad=true`, `KeepAlive=true` |
 | Linux  | systemd --user  | `~/.config/systemd/user/portato.service` (+ `portato.socket`), `Restart=on-failure`, lingering enabled |
+| Windows | registry Run key | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Portato` (REG_SZ) → `portato daemon --config <abs>` |
 
 `portato install` detects the OS and installs the right mechanism; `portato uninstall` reverses it.
 Since tunnels are `enabled: false` by default, at system boot **only** the control daemon is brought up.
@@ -514,7 +520,7 @@ the pure-Go single binary — socket activation there is deferred.
 
 ## 15. Non-functional requirements
 
-- **Cross-platform (MVP):** compiles and runs on darwin/amd64, darwin/arm64, linux/amd64, linux/arm64.
+- **Cross-platform:** compiles and runs on darwin/amd64, darwin/arm64, linux/amd64, linux/arm64 (MVP) and windows/amd64 (Phase 17).
 - **Single binary:** no external dependencies (the system `ssh` is not required).
 - **Startup behavior:** on the first run, if there is no config — an example is created and the path is shown to the user.
 - **Tests:** the key packages (`config`, `forward`, `controller`) are covered by unit tests (Phases 1, 2, 6).
@@ -524,4 +530,4 @@ the pure-Go single binary — socket activation there is deferred.
 - IPC authorization: only filesystem permissions (0600) or a token? -> **resolved (Phase 18)**: a 32-byte bearer token in `<socketDir>/portato.token`, layered on the `0600` socket; `--ipc-token off` disables it. See §6.
 - Where to store a passphrase for an identity when the agent is unavailable? -> **resolved (Phase 19)**: an in-memory cache (per process, so reconnects don't re-prompt) plus the OS keyring (macOS Keychain / Linux Secret Service / Windows Credential Manager via `zalando/go-keyring`) for cross-restart persistence. Opt-in keyring persistence via `defaults.identity_passphrase_store` (off by default); explicit `portato add-identity`/`forget-identity` always write/clear the keyring. Nothing is ever written to disk in plaintext. See §9.
 - Passing live listener FDs to the new daemon during hand-off (a seamless transition) -> **resolved (Phase 16)**: the standalone dups its local listeners and sends them (SCM_RIGHTS) over a one-shot transfer socket; the daemon adopts them via `net.FileListener`, so the local ports never go down. The SSH session itself is re-dialed (no cross-process resume in `golang.org/x/crypto/ssh`); only local-port availability is seamless. See §12.
-- Windows support — post-MVP (named pipe + the registry Run key).
+- Windows support -> **resolved (Phase 17)**: IPC over a named pipe (`\\.\pipe\portato` via `go-winio`), autostart via the HKCU registry Run key. See §6/§13.
