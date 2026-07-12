@@ -6,7 +6,7 @@
 [![Release](https://img.shields.io/github/v/release/portuber/portato)](https://github.com/portuber/portato/releases)
 [![License: MIT](https://img.shields.io/github/license/portuber/portato)](LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/portuber/portato)](go.mod)
-[![Go Report Card](https://goreportcard.com/badge/github.com/portuber/portato)](https://goreportcard.com/report/github.com/portuber/portato)
+[![Codefactor](https://www.codefactor.io/repository/github/portuber/portato/badge)](https://www.codefactor.io/repository/github/portuber/portato)
 
 **Portato** is an SSH port-forwarding manager with a TUI. It lets you turn
 individual SSH tunnels on and off, restart them, and watch their status from a
