@@ -65,6 +65,9 @@ portato --log-level <l> -> debug|info|warn|error (global, Phase 20; default info
 portato --socket <path> -> override the daemon IPC socket (global)
 portato --help
 portato --version       -> print the logo banner + version/commit/date and exit (pipe-safe)
+portato license         -> print license info: MIT + source URL + pointer to bundled THIRD_PARTY_LICENSES.txt
+portato license --full  -> also print the full MIT License text (embedded in the binary)
+portato --license       -> print the license summary and exit (pipe-safe; parallel to --version)
 ```
 
 For `portato` (smart): the daemon's presence is detected by reading the discovery marker (§6) for its socket path and PID, then probing the socket.

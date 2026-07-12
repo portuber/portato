@@ -39,37 +39,47 @@ and flag.
 
 ## Tasks
 
-### `internal/cmd/license.go` (new)
-- [ ] `licenseCmd` (`Use: "license"`, `Short: "Print license information"`) with
+### `licensetext.go` (new, module root) + `internal/cmd/license.go` (new)
+- [x] `licenseCmd` (`Use: "license"`, `Short: "Print license information"`) with
       a local `--full` bool flag.
-- [ ] `printLicense(w io.Writer, full bool)` — renders the short summary
+- [x] `printLicense(w io.Writer, full bool)` — renders the short summary
       (project name + version from the embedded vars, MIT + source URL, the
       bundled-notices pointer, the `--full` hint); when `full`, append a
       separator and the embedded MIT LICENSE text.
-- [ ] `//go:embed LICENSE` → `licenseBytes []byte` for the `--full` output.
+- [x] `//go:embed LICENSE` → `licensetext.MIT string`. **Resolved embed path:**
+      `//go:embed` cannot ascend with `..`, and the directive's pattern is
+      relative to the source file, so no `internal/` package can reach the
+      repo-root `LICENSE`. The embed therefore lives in a new package at the
+      **module root** — `licensetext.go` (`package licensetext`,
+      `//go:embed LICENSE` → `var MIT string`) — which `internal/cmd/license.go`
+      imports as `github.com/portuber/portato`. Single canonical source, no
+      drift, no second LICENSE copy. (Alternatives considered: a committed
+      `internal/licensetext/LICENSE` copy + `make sync-license`, matching the
+      `internal/logo/assets/*` convention — rejected to keep a single source;
+      a Go `const` of the MIT text — rejected as silent drift.)
 
 ### `internal/cmd/root.go`
-- [ ] Register `licenseCmd` in `Execute()` alongside the other subcommands.
-- [ ] Add `rootCmd.Flags().BoolVar(&showLicense, "license", false, "print license information and exit")`.
-- [ ] In `rootRunE`, handle `showLicense` before the standalone/attach logic
+- [x] Register `licenseCmd` in `Execute()` alongside the other subcommands.
+- [x] Add `rootCmd.Flags().BoolVar(&showLicense, "license", false, "print license information and exit")`.
+- [x] In `rootRunE`, handle `showLicense` before the standalone/attach logic
       (next to the existing `showVersion` check): `printLicense(cmd.OutOrStdout(), false); return nil`.
       Pin `licenseCmd` to the default help template (like every other subcommand)
       so the easter-egg footer does not leak.
 
 ### Tests — `internal/cmd/license_test.go` (new)
-- [ ] `TestLicenseShort`: `printLicense(&b, false)` output contains `MIT`, the
+- [x] `TestLicenseShort`: `printLicense(&b, false)` output contains `MIT`, the
       source URL, `THIRD_PARTY_LICENSES.txt`, and the `--full` hint; does not
       contain the full MIT body ("PERMISSION IS HEREBY GRANTED" absent).
-- [ ] `TestLicenseFull`: `printLicense(&b, true)` contains the short summary
+- [x] `TestLicenseFull`: `printLicense(&b, true)` contains the short summary
       **and** the full MIT body (e.g. "OUT OF OR IN CONNECTION WITH THE SOFTWARE").
-- [ ] `TestLicenseCmdRun`: `portato license` via the cobra command writes the
+- [x] `TestLicenseCmdRun`: `portato license` via the cobra command writes the
       short summary to stdout; `--full` writes the long form.
-- [ ] `TestRootLicenseFlag`: `portato --license` (rootRunE path) prints the
+- [x] `TestRootLicenseFlag`: `portato --license` (rootRunE path) prints the
       short summary and returns nil (does not start the daemon/TUI).
 
 ### Docs
-- [ ] `README.md`: add a `portato license` row to the mode/command table.
-- [ ] `docs/SPEC.md`: add `license` to the CLI command list.
+- [x] `README.md`: add a `portato license` row to the mode/command table.
+- [x] `docs/SPEC.md`: add `license` to the CLI command list.
 - [ ] `docs/VERSIONING.md`: no change needed — the general "new CLI command /
       flag = MINOR" rule already covers this; the phase records the resulting
       v0.2.0 bump.

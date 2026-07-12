@@ -31,6 +31,7 @@ The single binary works in several modes:
 | `portato forget-identity <path>` | Forget a cached identity passphrase                             |
 | `portato doctor`             | Diagnose the setup (config, keys, agent, daemon, logs)             |
 | `portato version`            | Print the version                                                   |
+| `portato license`            | Print license information (`--full` prints the full MIT text)       |
 
 ## Install
 
@@ -239,7 +240,9 @@ The source of truth lives in [`docs/`](./docs):
 ## License
 
 Portato is licensed under the [MIT License](./LICENSE). All dependencies are
-permissive (MIT / Apache-2.0 / BSD); there is no copyleft.
+permissive (MIT / Apache-2.0 / BSD); there is no copyleft. Run `portato license`
+(or `portato license --full` for the full MIT text) to see the same from the
+binary; third-party notices ship in `THIRD_PARTY_LICENSES.txt`.
 
 ## Versioning
 

@@ -59,6 +59,10 @@ func rootRunE(cmd *cobra.Command, _ []string) error {
 		printVersion(cmd.OutOrStdout())
 		return nil
 	}
+	if showLicense {
+		printLicense(cmd.OutOrStdout(), false)
+		return nil
+	}
 	if !forceStandalone {
 		if socket, err := daemon.ResolveSocket(); err == nil && socket != "" && probeDaemon(socket) {
 			ctrl := controller.NewRemote(client.New(socket))
@@ -112,6 +116,7 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to config file (default: XDG config home)")
 	rootCmd.Flags().BoolVar(&forceStandalone, "force-standalone", false, "skip daemon auto-detection and run a standalone TUI")
 	rootCmd.Flags().BoolVar(&showVersion, "version", false, "print the version banner and exit")
+	rootCmd.Flags().BoolVar(&showLicense, "license", false, "print license information and exit")
 	rootCmd.PersistentFlags().StringVar(&socketFlag, "socket", "",
 		"override the daemon IPC socket path; the daemon binds it and clients dial it directly (also PORTATO_SOCKET)")
 	rootCmd.PersistentFlags().StringVar(&logLevelFlag, "log-level", "info",
@@ -201,6 +206,7 @@ func Execute() error {
 		addIdentityCmd,
 		forgetIdentityCmd,
 		versionCmd,
+		licenseCmd,
 	)
 	// Pin every subcommand to the default help template so the root's
 	// easter-egg footer does not leak via cobra's HelpTemplate() parent-walk.
