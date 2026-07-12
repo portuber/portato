@@ -1,7 +1,7 @@
 ---
 phase: 34
 title: "`portato license` command + `--license` flag"
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -86,16 +86,16 @@ and flag.
 
 ## Definition of Done
 
-- [ ] `portato license` prints the short summary (version, MIT + URL, bundled
+- [x] `portato license` prints the short summary (version, MIT + URL, bundled
       pointer, `--full` hint); `portato license --full` appends the full MIT
       License text.
-- [ ] `portato --license` prints the same short summary and exits cleanly
+- [x] `portato --license` prints the same short summary and exits cleanly
       (does not start the daemon or TUI).
-- [ ] `portato --help` lists `license`; `portato license --help` documents
+- [x] `portato --help` lists `license`; `portato license --help` documents
       `--full`; neither inherits the easter-egg footer.
-- [ ] `--version` output is unchanged (no license line added there).
-- [ ] `make fmt && make vet && make test && make lint` clean; `gofmt -l .` empty.
-- [ ] README command table + SPEC updated.
+- [x] `--version` output is unchanged (no license line added there).
+- [x] `make fmt && make vet && make test && make lint` clean; `gofmt -l .` empty.
+- [x] README command table + SPEC updated.
 
 ## Verification
 

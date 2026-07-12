@@ -49,7 +49,7 @@
 | 31  | TUI logo wordmark + drop PNG mode | `[x]` | [phase-31-logo-wordmark.md](./phases/phase-31-logo-wordmark.md) |
 | 32  | Third-party license notices in releases | `[x]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
 | 33  | CodeFactor cleanup + golangci-lint guardrails | `[x]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
-| 34  | `portato license` command + `--license` flag | `[~]` | [phase-34-license-command.md](./phases/phase-34-license-command.md) |
+| 34  | `portato license` command + `--license` flag | `[x]` | [phase-34-license-command.md](./phases/phase-34-license-command.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -63,7 +63,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–16, 18–20, 22–33 are `[x]`; phase 17 (Windows) remains pending (`[ ]`), blocked on external infrastructure. Phase 21 (packaging) is done: v0.1.4 is released (GitHub Release + Homebrew cask + deb/rpm, now bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); Scoop/Windows is deferred to phase 17. Phase 34 (`portato license` command + `--license` flag) is in progress (`[~]`) — a MINOR (next release `v0.2.0`).** The single binary runs the smart launcher
+**Phases 0–16, 18–20, 22–34 are `[x]`; phase 17 (Windows) remains pending (`[ ]`), blocked on external infrastructure. Phase 21 (packaging) is done: v0.1.4 is released (GitHub Release + Homebrew cask + deb/rpm, now bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); Scoop/Windows is deferred to phase 17. Phase 34 (`portato license` command + `--license` flag) is done (`[x]`) — a MINOR (next release `v0.2.0`).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -148,11 +148,15 @@ tests were refactored instead.) The one remaining DoD item — confirming
 codefactor.io shows 0 issues — is a deferred-to-push manual check (no push yet,
 per AGENTS.md local-only).
 
-**Phase 34** (`portato license` command + `--license` flag) is `[~]` (in
-progress): adding a `portato license` subcommand and a `--license` root flag
-(parallel to `version`/`--version`) that print the project's MIT license +
-source URL + a pointer to the bundled `THIRD_PARTY_LICENSES.txt`; `license
---full` appends the embedded MIT LICENSE text.
+**Phase 34** (`portato license` command + `--license` flag) is `[x]` (done): a
+`portato license` subcommand and a `--license` root flag (parallel to
+`version`/`--version`) print the project's MIT license + source URL + a pointer
+to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` appends the full MIT
+License text embedded via a new module-root `licensetext` package
+(`//go:embed LICENSE`, single source — no drift). `--version` is unchanged. A
+MINOR: the next release is `v0.2.0`.
+
+No phase is currently `[~]`.
 
 ## Final MVP E2E (on completing Phase 6)
 
