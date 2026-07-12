@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet cross build-all cover install-service snapshot e2e-handoff stop reload third-party-licenses
+.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff third-party-licenses
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -19,6 +19,14 @@ fmt:
 
 vet:
 	go vet ./...
+
+# lint runs golangci-lint with .golangci.yml: predeclared (no builtin
+# shadowing, e.g. max/min/len) and gocyclo (cyclomatic complexity < 15),
+# the local gate for the codefactor.io issue classes (Phase 33). Tests are
+# excluded from gocyclo only.
+# Requires golangci-lint v1.x: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+lint:
+	golangci-lint run ./...
 
 # build-all cross-compiles the binary for the MVP target matrix (SPEC §15).
 # cross is a back-compat alias.

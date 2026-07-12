@@ -1,0 +1,38 @@
+# golangci-lint config — the local gate for the CodeFactor issue classes
+# (builtin shadowing + high cyclomatic complexity). See
+# docs/phases/phase-33-codefactor-cleanup.md.
+#
+# Install:  go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+# Run:      make lint   (or: golangci-lint run ./...)
+# Note: this is a v1-schema config; it must run under golangci-lint v1.x
+# (v2.0+ uses a different config format).
+#
+# Scoped on purpose: only the two linters that map to codefactor.io's findings
+# for this repo. The default set (errcheck/staticcheck/unused) surfaces a large
+# backlog of pre-existing debt unrelated to the 12 findings and is deliberately
+# left for a future phase.
+
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+    - predeclared # shadowing of builtins like max/min/len/clear/error (CodeFactor category A)
+    - gocyclo     # cyclomatic complexity (CodeFactor "Complex Method")
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15 # stricter than codefactor.io's ~18 threshold; leaves margin
+  predeclared:
+    q: false # do not flag qualified selectors like pkg.max; only in-scope shadowing
+
+issues:
+  # Long table-driven / E2E tests routinely exceed per-function complexity
+  # without being bad code — exclude *_test.go from gocyclo only. predeclared
+  # still runs everywhere, so test files keep the no-builtin-shadowing
+  # guarantee.
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo

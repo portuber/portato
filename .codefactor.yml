@@ -1,0 +1,11 @@
+# CodeFactor analysis config (https://codefactor.io/repository).
+#
+# Excludes Go test files from analysis. Table-driven and end-to-end tests
+# routinely exceed per-function complexity limits without being bad code, and
+# the local golangci-lint gate (`make lint`, see .golangci.yml) already
+# enforces no-builtin-shadowing on *_test.go (only gocyclo is relaxed there).
+# This keeps CodeFactor's "Complex Method" findings scoped to production code.
+#
+# See docs/phases/phase-33-codefactor-cleanup.md.
+exclude_patterns:
+  - "**/*_test.go"

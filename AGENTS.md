@@ -47,15 +47,19 @@ make build            # -> bin/portato
 make run              # go run ./cmd/portato
 make test             # go test ./...
 make vet              # go vet ./...
+make lint             # golangci-lint run ./... (predeclared + gocyclo@15)
 make fmt              # gofmt -w .
 ```
 
-Run after every change: `make fmt && make vet && make test`. Before closing a
-phase, ensure all of these are clean:
+Run after every change: `make fmt && make vet && make test`. Run `make lint`
+before closing a phase (it guards against builtin shadowing and high
+cyclomatic complexity — the codefactor.io issue classes; requires
+golangci-lint v1.x). Before closing a phase, ensure all of these are clean:
 
 - `go build ./...` succeeds;
 - `gofmt -l .` is empty;
 - `go vet ./...` is clean;
+- `golangci-lint run ./...` is clean (i.e. `make lint`);
 - the phase's tests are green, e.g. `go test ./internal/config/... -v`.
 
 ## Phases (GSD)
