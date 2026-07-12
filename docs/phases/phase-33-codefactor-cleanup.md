@@ -57,11 +57,11 @@ complexity. No `.golangci.yml`, no `.codefactor.yml`.
 |---|---|
 | Category A fix | Rename shadowing identifiers: `max` -> `maxWidth` (params) / `maxW` (locals). Mechanical; signatures unchanged (calls are positional). |
 | Category B — production | Extract methods to drop cyclomatic complexity below the gocyclo threshold (15). No behavior change. |
-| Category B — tests | **Do not refactor.** Long E2E tests read better linearly; exclude `_test.go` from the complexity linters. |
+| Category B — tests | Refactor the two flagged test funcs below the threshold (originally "do not refactor"; reversed — see Revision below). `TestServer_RoundTrip` 24 -> 11 via a `must(t, err, what)` helper; `socks5DialUserPass` 22 -> ~5 via three phase helpers (`socks5Greet`/`socks5UserPassAuth`/`socks5Connect`). No behavior change. |
 | Linter | `golangci-lint` `.golangci.yml`: `disable-all` + `predeclared` (Category A, forever) and `gocyclo` min 15 (Category B). `gocognit` was dropped — it flagged out-of-scope funcs (e.g. `serveForheads`, `watcher.loop`) that codefactor.io did not report. The default set (errcheck/staticcheck/unused) surfaces a large pre-existing backlog unrelated to the 12 findings and is deferred to a future phase; this phase's config is intentionally scoped to the CodeFactor issue classes. v1-schema config, requires golangci-lint v1.x (v1.64.8 at implement time). |
-| Test exclusion | `issues.exclude-rules`: skip `gocyclo` on `*_test.go` (predeclared still runs everywhere). |
+| Test exclusion | `.golangci.yml` still skips `gocyclo` on `*_test.go` (predeclared runs everywhere). The local gate stays a production-code guard; CodeFactor is the external check that also covers test complexity, which is why the two test funcs were refactored rather than excluded. |
 | Make target | `lint: golangci-lint run ./...`; added to `AGENTS.md` "run after every change" and the phase-close checklist. |
-| CodeFactor | `.codefactor.yml` `exclude_patterns: ["**/*_test.go"]` — excludes all Go test files from analysis (broader than the two flagged files: consistent with the local gocyclo exclusion and future-proof). CodeFactor excludes whole files (no per-rule exemption in the free tier); local `golangci-lint` still lints tests (only complexity is exempt). |
+| CodeFactor | **No `.codefactor.yml`.** CodeFactor's free tier does not honor repo-file path exclusions — an `.codefactor.yml` with `exclude_patterns: ["**/*_test.go"]` was tried and had no effect (CodeFactor analyzed test files regardless). All 12 findings are therefore fixed in code (6 renames + 4 production splits + 2 test splits). |
 | CI | None (local-only for now). |
 | `depends_on` | `[11]` — phase 11 introduced doctor + CI, the closest quality/tooling precedent. |
 
@@ -95,7 +95,12 @@ complexity. No `.golangci.yml`, no `.codefactor.yml`.
       the final listener-adoption loop.
 
 ### C — tests
-- (None — excluded from complexity, not refactored.)
+- [x] internal/daemon/server_test.go — `TestServer_RoundTrip` 24 -> 11: added a
+      `must(t, err, what)` helper and collapsed the plain `if err != nil`
+      blocks; state/perm assertions stay inline.
+- [x] internal/forward/socks5_auth_integration_test.go — `socks5DialUserPass`
+      22 -> ~5: extracted `socks5Greet`/`socks5UserPassAuth`/`socks5Connect`
+      (+ `closeErr`); the func is now dial -> greet -> auth -> connect.
 
 ### D — guardrails
 - [x] `.golangci.yml` — `disable-all` + `predeclared` + `gocyclo` (min 15),
@@ -104,7 +109,9 @@ complexity. No `.golangci.yml`, no `.codefactor.yml`.
 - [x] `Makefile` — `lint` target (`golangci-lint run ./...`).
 - [x] `AGENTS.md` — `make lint` added to the "run after every change" ritual
       and the phase-close checklist.
-- [x] `.codefactor.yml` — `exclude_patterns: ["**/*_test.go"]`.
+- [x] `.codefactor.yml` — removed. It was ineffective (CodeFactor's free tier
+      ignores repo-file path exclusions); the two test findings are fixed via
+      refactor (Tasks C) instead.
 
 ## Definition of Done
 
@@ -115,10 +122,10 @@ complexity. No `.golangci.yml`, no `.codefactor.yml`.
       (`Update` 7, `handleKey` 6, `doctorRunE` ≤ 5, `Recv` 12).
 - [x] `make fmt && make vet && make test` clean — no behavior change.
 - [x] codefactor.io reports 0 issues on portuber/portato after the next push
-      (6 `max` + 4 production Complex Method findings fixed; the 2 test
-      findings suppressed via `.codefactor.yml`). *Deferred-to-push manual
-      check — the changes that drive CodeFactor to zero are in place; not
-      pushed per AGENTS.md (local-only).*
+      (6 `max` + 4 production Complex Method + 2 test Complex Method findings,
+      all 12 fixed in code: renames + method splits + test splits). *Deferred-
+      to-push manual check — the changes that drive CodeFactor to zero are in
+      place; not pushed per AGENTS.md (local-only).*
 - [x] ROADMAP + this file: phase row + status flips on start/complete.
 
 ## Verification
@@ -145,13 +152,17 @@ Manual: after pushing, reload the codefactor.io page — the issues list is empt
 - **gocyclo vs CodeFactor thresholds.** Not identical; gocyclo at 15 is a
   stricter, conventional default. CodeFactor is the external signal;
   golangci-lint is the enforced gate.
-- **`.codefactor.yml` whole-file exclusion.** Excludes files from *all* engines,
-  so the two test files lose other analysis too. Accepted to reach zero
-  CodeFactor issues; local `golangci-lint` still lints them (only complexity is
-  exempt).
-- **Complexity threshold for tests.** Excluding `_test.go` from `gocyclo` is the
-  widely-used convention; long table/E2E tests routinely exceed function-level
-  complexity without being bad code.
+- **No `.codefactor.yml` (revision).** An `.codefactor.yml` with
+  `exclude_patterns: ["**/*_test.go"]` was added in the initial pass to
+  suppress the two test findings, but it had no effect — CodeFactor's free
+  tier does not honor repo-file path exclusions (it analyzed the test files
+  regardless, and kept flagging them). It was removed; the two test funcs are
+  refactored instead (Tasks C).
+- **Complexity threshold for tests.** The local `.golangci.yml` still excludes
+  `*_test.go` from `gocyclo` (the local gate is a production-code guard), so
+  `make lint` will not fail on a complex test. CodeFactor, however, does grade
+  test complexity, so any test func CodeFactor flags must be refactored (as
+  the two here were) — there is no working file-based suppression.
 
 ## Commit plan (per CONVENTIONS)
 
@@ -164,6 +175,16 @@ Manual: after pushing, reload the codefactor.io page — the issues list is empt
 5. `chore(build): add golangci-lint config and make lint` — `.golangci.yml`,
    `Makefile`, `AGENTS.md`, `.codefactor.yml`.
 6. `docs(phase-33): complete` — `[~] -> [x]` after the DoD passes.
+
+### Revision (post-complete: clear the 2 test findings)
+
+CodeFactor still flagged the two test funcs after the initial pass (the
+`.codefactor.yml` exclusion was a no-op). Decision: refactor them in code.
+
+7. `refactor(test): split TestServer_RoundTrip and socks5DialUserPass to lower
+   complexity` — Tasks C; also removes the ineffective `.codefactor.yml`.
+8. `docs(phase-33): revise test-findings approach` — flips the Category-B-tests
+   decision to "refactor", records the `.codefactor.yml` removal.
 
 ## Start guard
 

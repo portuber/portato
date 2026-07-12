@@ -131,17 +131,20 @@ time-based (not just size-based) log rotation.
 - **Phase 30** — TUI toggle vs passphrase: `space` toggles purely by state; `p` enters a passphrase for a blocked tunnel.
 - **Phase 31** — TUI logo wordmark: a combined potato+PORTATO wordmark in the empty-config splash and `--version` (compact-potato fallback on narrow terminals), the compact potato kept in the help overlay, and the inline-PNG image mode removed (iTerm2/WezTerm render braille).
 - **Phase 32** — third-party license notices in releases: bundle each runtime dependency's LICENSE (MIT/Apache-2.0/BSD-3) into the GitHub Release archives and deb/rpm, generated at release time via `go-licenses`, closing the redistribution-notice obligation that phase 21 declared but didn't implement.
-- **Phase 33** — clear codefactor.io's 12 issues (6 builtin-`max` shadowing + 6 complex methods) and add a `golangci-lint` config + `make lint` so builtin shadowing and high-complexity production methods can't slip back in.
+- **Phase 33** — clear codefactor.io's 12 issues (6 builtin-`max` shadowing + 6 complex methods, incl. 2 test funcs) and add a `golangci-lint` config + `make lint` so builtin shadowing and high-complexity production methods can't slip back in.
 
 ## Current work
 
 **Phase 33** (CodeFactor cleanup + golangci-lint guardrails) is `[x]` (done):
 renamed the `max` builtin shadows, split four high-complexity production
-methods (`Update`, `handleKey`, `doctorRunE`, `Recv`), and added a
+methods (`Update`, `handleKey`, `doctorRunE`, `Recv`) and the two flagged test
+funcs (`TestServer_RoundTrip`, `socks5DialUserPass`), and added a
 `golangci-lint` guardrail (`.golangci.yml` + `make lint`) so neither class
-regresses. No behavior change. The one remaining DoD item — confirming
-codefactor.io shows 0 issues — is a deferred-to-push manual check (no push
-yet, per AGENTS.md local-only).
+regresses. No behavior change. (A `.codefactor.yml` exclusion was tried for the
+test files but CodeFactor's free tier ignores repo-file path exclusions, so the
+tests were refactored instead.) The one remaining DoD item — confirming
+codefactor.io shows 0 issues — is a deferred-to-push manual check (no push yet,
+per AGENTS.md local-only).
 
 No phase is currently `[~]`.
 
