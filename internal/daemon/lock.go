@@ -3,8 +3,6 @@ package daemon
 import (
 	"errors"
 	"path/filepath"
-
-	"github.com/adrg/xdg"
 )
 
 // ErrAlreadyRunning is returned by New when another daemon already holds the
@@ -22,9 +20,8 @@ const lockFile = "daemon.lock"
 func LockPath() (string, error) { return lockPathFn() }
 
 // lockPathFn resolves the lock path. It is a variable so tests can redirect it
-// to a temp dir: adrg/xdg caches xdg.ConfigHome at package init, so
-// t.Setenv("XDG_CONFIG_HOME", ...) would not affect LockPath (the same seam
-// pattern discoveryPathFn uses).
+// to a temp dir (the real base dir is resolved at call time, so t.Setenv would
+// not reliably affect LockPath — the same seam pattern discoveryPathFn uses).
 var lockPathFn = func() (string, error) {
-	return filepath.Join(xdg.ConfigHome, "portato", lockFile), nil
+	return filepath.Join(appDataDir(), lockFile), nil
 }

@@ -19,17 +19,11 @@ import (
 	"path/filepath"
 )
 
-// tokenFile is the filename of the IPC bearer token, placed in the same
-// directory as the unix socket the daemon listens on.
+// tokenFile is the filename of the IPC bearer token. On unix it sits in the
+// same directory as the unix socket the daemon listens on; on Windows it lives
+// in %LOCALAPPDATA%\portato (see tokenpath_windows.go). The per-OS TokenPath
+// turns an IPC address into this file's path.
 const tokenFile = "portato.token"
-
-// TokenPath returns the token file path for a given unix-socket path: the
-// token lives in the socket's directory. Both the daemon (write) and clients
-// (read) derive it identically, so no extra discovery is needed beyond the
-// socket path the client already resolved.
-func TokenPath(socketPath string) string {
-	return filepath.Join(filepath.Dir(socketPath), tokenFile)
-}
 
 // GenerateToken returns a fresh 32-byte bearer token, hex-encoded (64 chars).
 // crypto/rand is the source so the token is unpredictable.

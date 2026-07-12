@@ -10,11 +10,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"syscall"
 	"time"
-
-	"github.com/adrg/xdg"
 
 	"github.com/portuber/portato/internal/daemon/transport"
 	"github.com/portuber/portato/internal/ipctoken"
@@ -48,27 +45,13 @@ func DiscoveryPath() (string, error) {
 }
 
 // discoveryPathFn resolves the marker path. It is a variable so tests can
-// redirect it to a temp dir: adrg/xdg caches xdg.ConfigHome at package init,
-// so t.Setenv("XDG_CONFIG_HOME", ...) does not affect DiscoveryPath — without
-// this seam the ResolveSocket tests would read (and clobber) the host's real
-// marker whenever a daemon happens to be running.
+// redirect it to a temp dir: the real base dir (xdg.ConfigHome on unix,
+// %LOCALAPPDATA% on Windows) is resolved at call time, so t.Setenv would not
+// reliably affect DiscoveryPath — without this seam the ResolveSocket tests
+// would read (and clobber) the host's real marker whenever a daemon happens to
+// be running.
 var discoveryPathFn = func() (string, error) {
-	return filepath.Join(xdg.ConfigHome, "portato", markerFile), nil
-}
-
-// RuntimeSocketPath returns where the socket file itself should live: a
-// runtime/temp dir. On Linux the per-user runtime dir (`/run/user/<uid>`,
-// set by systemd/logind) is preferred; on macOS there is no such dir, so
-// `$TMPDIR` (via os.TempDir) is used. The filename is uid-scoped to avoid
-// collisions between users on shared hosts.
-func RuntimeSocketPath() (string, error) {
-	name := fmt.Sprintf("portato-%d.sock", os.Getuid())
-	if runtime.GOOS != "darwin" {
-		if dir := xdg.RuntimeDir; dir != "" {
-			return filepath.Join(dir, name), nil
-		}
-	}
-	return filepath.Join(os.TempDir(), name), nil
+	return filepath.Join(appDataDir(), markerFile), nil
 }
 
 // WriteMarker atomically writes the discovery marker at markerPath: JSON
