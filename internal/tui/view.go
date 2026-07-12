@@ -517,23 +517,23 @@ func truncate(s string, n int) string {
 // dynamic "⇄ *") and anything that still does not fit fall back to a simple
 // ellipsis truncate. This keeps the ENDPOINT column a fixed width so STATUS /
 // UPTIME line up across rows regardless of host length.
-func fitEndpoint(s string, max int) string {
-	if lipgloss.Width(s) <= max {
+func fitEndpoint(s string, maxWidth int) string {
+	if lipgloss.Width(s) <= maxWidth {
 		return s
 	}
 	for _, sep := range []string{" → ", " ← "} {
 		if i := strings.Index(s, sep); i >= 0 {
 			left, right := s[:i+len(sep)], s[i+len(sep):]
-			if budget := max - lipgloss.Width(left); budget >= 4 {
+			if budget := maxWidth - lipgloss.Width(left); budget >= 4 {
 				return left + fitHostPort(right, budget)
 			}
 		}
 	}
-	return truncate(s, max)
+	return truncate(s, maxWidth)
 }
 
-func fitName(s string, max int) string {
-	return middleTruncate(s, max)
+func fitName(s string, maxWidth int) string {
+	return middleTruncate(s, maxWidth)
 }
 
 // fitHostPort fits a "host:port" (or bare host) into budget cells, preserving

@@ -373,7 +373,7 @@ func TestPadAlignsColumns(t *testing.T) {
 }
 
 func TestFitEndpoint(t *testing.T) {
-	const max = colEndpoint // 32
+	const maxW = colEndpoint // 32
 	cases := []struct {
 		name string
 		in   string
@@ -413,15 +413,15 @@ func TestFitEndpoint(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := fitEndpoint(tc.in, max)
+			got := fitEndpoint(tc.in, maxW)
 			if tc.unchanged {
 				if got != tc.in {
 					t.Errorf("expected unchanged %q, got %q", tc.in, got)
 				}
 				return
 			}
-			if w := lipgloss.Width(got); w > max {
-				t.Errorf("result width %d > max %d: %q", w, max, got)
+			if w := lipgloss.Width(got); w > maxW {
+				t.Errorf("result width %d > max %d: %q", w, maxW, got)
 			}
 			if tc.hasPrefix != "" && !strings.HasPrefix(got, tc.hasPrefix) {
 				t.Errorf("result %q must have prefix %q", got, tc.hasPrefix)
@@ -457,13 +457,13 @@ func TestFitName(t *testing.T) {
 	})
 	t.Run("overflow middle-truncates to exactly max", func(t *testing.T) {
 		const in = "pntr-sberhealth-browser"
-		for _, max := range []int{20, 16, 12} {
-			got := fitName(in, max)
-			if w := lipgloss.Width(got); w != max {
-				t.Errorf("max=%d: width=%d want %d (%q)", max, w, max, got)
+		for _, maxW := range []int{20, 16, 12} {
+			got := fitName(in, maxW)
+			if w := lipgloss.Width(got); w != maxW {
+				t.Errorf("max=%d: width=%d want %d (%q)", maxW, w, maxW, got)
 			}
 			if !strings.Contains(got, "…") {
-				t.Errorf("max=%d: expected a middle ellipsis, got %q", max, got)
+				t.Errorf("max=%d: expected a middle ellipsis, got %q", maxW, got)
 			}
 		}
 	})

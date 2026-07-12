@@ -25,13 +25,13 @@ func hasBraille(s string) bool {
 // used to tell the wordmark splash (~70 cells) from the compact-potato fallback
 // (~24 cells) on a narrow terminal.
 func maxLineWidth(s string) int {
-	max := 0
+	maxW := 0
 	for _, l := range strings.Split(s, "\n") {
-		if w := lipgloss.Width(l); w > max {
-			max = w
+		if w := lipgloss.Width(l); w > maxW {
+			maxW = w
 		}
 	}
-	return max
+	return maxW
 }
 
 // TestEmptyListSplashShowsLogo verifies the empty-list state renders the

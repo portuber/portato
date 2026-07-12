@@ -14,111 +14,138 @@ import (
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width, m.height = msg.Width, msg.Height
-		if m.editor != nil {
-			return m, m.editor.update(msg)
-		}
-		if m.logs != nil {
-			return m, m.logs.update(msg)
-		}
-		return m, nil
+		return m.handleWindowSize(msg)
 	case tickMsg:
-		if m.handoffing {
-			return m, nil
-		}
-		m.list = m.ctrl.List()
-		m.clampCursor()
-		// Auto-open a pending prompt for the tuber under the cursor: pressing
-		// space once to enable a tuber that then blocks on a passphrase / an
-		// unknown host should surface the prompt without a second keypress.
-		// Skipped while the user is busy (another modal/editor/filter) or after
-		// they dismissed this exact prompt (esc) — otherwise it would reopen
-		// on every tick. Phase 19 UX (also covers the TOFU host-key prompt).
-		var openCmd tea.Cmd
-		m, openCmd = m.autoOpenIfPending()
-		// Auto-close the passphrase modal once the dial accepts it
-		// (Status.PendingPassphrase clears). A wrong passphrase leaves it set,
-		// so the modal stays open for another attempt.
-		if m.enteringPassphrase && !pendingPassphraseFor(m.list, m.passphraseTarget) {
-			m.enteringPassphrase = false
-			m.passphraseTarget = ""
-			m.passphraseAttempts = 0
-			m.passphraseInput.SetValue("")
-		}
-		// Forget a stale dismissal once the cursor's tuber has no pending
-		// prompt, so a future block on it auto-opens again.
-		if m.hasCurrent() && pendingKey(m.list[m.cursor]) == "" {
-			m.dismissedPending = ""
-		}
-		if m.logs != nil {
-			m.logs.refresh()
-		}
-		return m, tea.Batch(openCmd, waitForChange(m.ctrl.Changes()))
+		return m.handleTick(msg)
 	case redrawTickMsg:
-		// Local re-render tick: refreshes time-based display fields (uptime)
-		// without fetching from the controller. Re-arm; the change-waiter is
-		// an independent pending command. See redrawTickMsg in model.go.
-		// The logs screen (transient modal) does re-fetch here — acceptable:
-		// it is not the idle tuber-status path Phase 9 made push-driven.
-		if m.logs != nil {
-			m.logs.refresh()
-		}
-		return m, redrawTick()
+		return m.handleRedrawTick(msg)
 	case handoffDoneMsg:
-		m.handoffing = false
-		m.quit = true
-		if msg.err != nil {
-			m.handoffErr = msg.err.Error()
-		}
-		return m, tea.Quit
+		return m.handleHandoffDone(msg)
 	case tea.KeyPressMsg:
-		if m.editor != nil {
-			cmd := m.editor.update(msg)
-			if m.editor.done {
-				m.editor = nil
-			}
-			return m, cmd
-		}
-		if m.logs != nil {
-			cmd := m.logs.update(msg)
-			if m.logs.done {
-				m.logs = nil
-			}
-			return m, cmd
-		}
-		if m.confirmDelete {
-			return m.handleDeleteConfirm(msg)
-		}
-		if m.confirmAccept {
-			return m.handleAcceptConfirm(msg)
-		}
-		if m.enteringPassphrase {
-			return m.handlePassphraseKey(msg)
-		}
-		return m.handleKey(msg)
+		return m.handleKeyPress(msg)
 	case tea.PasteMsg:
-		// Bracketed-paste is only meaningful in the editor's text fields, the
-		// `/` filter, and the passphrase modal; in the plain list view there is
-		// nothing to paste into, so it is a no-op.
-		if m.editor != nil {
-			cmd := m.editor.update(msg)
-			if m.editor.done {
-				m.editor = nil
-			}
-			return m, cmd
-		}
-		if m.enteringPassphrase {
-			var cmd tea.Cmd
-			m.passphraseInput, cmd = m.passphraseInput.Update(msg)
-			return m, cmd
-		}
-		if m.filtering {
-			var cmd tea.Cmd
-			m.filter, cmd = m.filter.Update(msg)
-			(&m).clampCursor()
-			return m, cmd
-		}
+		return m.handlePaste(msg)
+	}
+	return m, nil
+}
+
+func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
+	m.width, m.height = msg.Width, msg.Height
+	if m.editor != nil {
+		return m, m.editor.update(msg)
+	}
+	if m.logs != nil {
+		return m, m.logs.update(msg)
+	}
+	return m, nil
+}
+
+func (m Model) handleTick(_ tickMsg) (Model, tea.Cmd) {
+	if m.handoffing {
 		return m, nil
+	}
+	m.list = m.ctrl.List()
+	m.clampCursor()
+	// Auto-open a pending prompt for the tuber under the cursor: pressing
+	// space once to enable a tuber that then blocks on a passphrase / an
+	// unknown host should surface the prompt without a second keypress.
+	// Skipped while the user is busy (another modal/editor/filter) or after
+	// they dismissed this exact prompt (esc) — otherwise it would reopen
+	// on every tick. Phase 19 UX (also covers the TOFU host-key prompt).
+	var openCmd tea.Cmd
+	m, openCmd = m.autoOpenIfPending()
+	// Auto-close the passphrase modal once the dial accepts it
+	// (Status.PendingPassphrase clears). A wrong passphrase leaves it set,
+	// so the modal stays open for another attempt.
+	if m.enteringPassphrase && !pendingPassphraseFor(m.list, m.passphraseTarget) {
+		m.enteringPassphrase = false
+		m.passphraseTarget = ""
+		m.passphraseAttempts = 0
+		m.passphraseInput.SetValue("")
+	}
+	// Forget a stale dismissal once the cursor's tuber has no pending
+	// prompt, so a future block on it auto-opens again.
+	if m.hasCurrent() && pendingKey(m.list[m.cursor]) == "" {
+		m.dismissedPending = ""
+	}
+	if m.logs != nil {
+		m.logs.refresh()
+	}
+	return m, tea.Batch(openCmd, waitForChange(m.ctrl.Changes()))
+}
+
+func (m Model) handleRedrawTick(_ redrawTickMsg) (Model, tea.Cmd) {
+	// Local re-render tick: refreshes time-based display fields (uptime)
+	// without fetching from the controller. Re-arm; the change-waiter is
+	// an independent pending command. See redrawTickMsg in model.go.
+	// The logs screen (transient modal) does re-fetch here — acceptable:
+	// it is not the idle tuber-status path Phase 9 made push-driven.
+	if m.logs != nil {
+		m.logs.refresh()
+	}
+	return m, redrawTick()
+}
+
+func (m Model) handleHandoffDone(msg handoffDoneMsg) (Model, tea.Cmd) {
+	m.handoffing = false
+	m.quit = true
+	if msg.err != nil {
+		m.handoffErr = msg.err.Error()
+	}
+	return m, tea.Quit
+}
+
+// handleKeyPress routes a key to whichever modal/screen is active, else to the
+// list-view keymap. Returns (tea.Model, ...) because it forwards to the
+// existing tea.Model-returning modal handlers.
+func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	if m.editor != nil {
+		cmd := m.editor.update(msg)
+		if m.editor.done {
+			m.editor = nil
+		}
+		return m, cmd
+	}
+	if m.logs != nil {
+		cmd := m.logs.update(msg)
+		if m.logs.done {
+			m.logs = nil
+		}
+		return m, cmd
+	}
+	if m.confirmDelete {
+		return m.handleDeleteConfirm(msg)
+	}
+	if m.confirmAccept {
+		return m.handleAcceptConfirm(msg)
+	}
+	if m.enteringPassphrase {
+		return m.handlePassphraseKey(msg)
+	}
+	return m.handleKey(msg)
+}
+
+// handlePaste routes bracketed-paste to the active text input (the editor's
+// fields, the passphrase modal, or the `/` filter). In the plain list view
+// there is nothing to paste into, so it is a no-op.
+func (m Model) handlePaste(msg tea.PasteMsg) (Model, tea.Cmd) {
+	if m.editor != nil {
+		cmd := m.editor.update(msg)
+		if m.editor.done {
+			m.editor = nil
+		}
+		return m, cmd
+	}
+	if m.enteringPassphrase {
+		var cmd tea.Cmd
+		m.passphraseInput, cmd = m.passphraseInput.Update(msg)
+		return m, cmd
+	}
+	if m.filtering {
+		var cmd tea.Cmd
+		m.filter, cmd = m.filter.Update(msg)
+		(&m).clampCursor()
+		return m, cmd
 	}
 	return m, nil
 }
@@ -145,6 +172,27 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			return m, m.filter.Focus()
 		}
 	}
+	return m.handleListKey(k)
+}
+
+// handleListKey dispatches the list-view keys to thematic group handlers so no
+// single function holds the whole keymap (gocyclo). The groups: quit & view,
+// navigate, toggle/reload/filter-open, and editor/logs.
+func (m Model) handleListKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "q", "ctrl+c", "esc", "?":
+		return m.handleQuitAndViewKey(k)
+	case "up", "k", "down", "j":
+		return m.handleNavKey(k)
+	case "space", "p", "r", "a", "x", "R", "/":
+		return m.handleToggleKey(k)
+	case "e", "n", "C", "d", "l":
+		return m.handleEditorKey(k)
+	}
+	return m, nil
+}
+
+func (m Model) handleQuitAndViewKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch k.String() {
 	case "q", "ctrl+c":
 		if m.handoffing {
@@ -159,13 +207,22 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "esc", "?":
 		m.help = !m.help
 		return m, nil
-	case "/":
-		m.filtering = true
-		return m, m.filter.Focus()
+	}
+	return m, nil
+}
+
+func (m Model) handleNavKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
 	case "up", "k":
 		(&m).moveCursor(-1)
 	case "down", "j":
 		(&m).moveCursor(1)
+	}
+	return m, nil
+}
+
+func (m Model) handleToggleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
 	case "space":
 		if m.hasCurrent() && m.list[m.cursor].PendingHost != "" {
 			m.confirmAccept = true
@@ -187,6 +244,15 @@ func (m Model) handleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		_ = m.ctrl.Reload()
 		m.list = m.ctrl.List()
 		m.clampCursor()
+	case "/":
+		m.filtering = true
+		return m, m.filter.Focus()
+	}
+	return m, nil
+}
+
+func (m Model) handleEditorKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
 	case "e":
 		if m.hasCurrent() {
 			ed, cmd := openEditor(m.ctrl, true, m.list[m.cursor].Name, m.width, m.height)
