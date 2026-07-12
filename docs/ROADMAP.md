@@ -47,7 +47,7 @@
 | 29  | standalone/daemon enabled consistency | `[x]` | [phase-29-standalone-daemon-enabled-consistency.md](./phases/phase-29-standalone-daemon-enabled-consistency.md) |
 | 30  | TUI toggle vs passphrase-prompt  | `[x]`  | [phase-30-tui-toggle-vs-passphrase.md](./phases/phase-30-tui-toggle-vs-passphrase.md) |
 | 31  | TUI logo wordmark + drop PNG mode | `[x]` | [phase-31-logo-wordmark.md](./phases/phase-31-logo-wordmark.md) |
-| 32  | Third-party license notices in releases | `[ ]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
+| 32  | Third-party license notices in releases | `[~]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 

@@ -1,7 +1,7 @@
 ---
 phase: 32
 title: Third-party license notices in binary releases
-status: todo
+status: in-progress
 depends_on: [21]
 ---
 
