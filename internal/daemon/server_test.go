@@ -172,13 +172,18 @@ func shortDir(t *testing.T) string {
 	return dir
 }
 
+func must(t *testing.T, err error, what string) {
+	t.Helper()
+	if err != nil {
+		t.Fatalf("%s: %v", what, err)
+	}
+}
+
 func TestServer_RoundTrip(t *testing.T) {
 	dir := shortDir(t)
 	cfgPath := filepath.Join(dir, "config.yaml")
 	cfg := testConfig()
-	if err := cfg.Save(cfgPath); err != nil {
-		t.Fatalf("save config: %v", err)
-	}
+	must(t, cfg.Save(cfgPath), "save config")
 
 	sock := filepath.Join(dir, "portato.sock")
 	marker := filepath.Join(dir, "daemon.socket")
@@ -189,9 +194,7 @@ func TestServer_RoundTrip(t *testing.T) {
 	defer cancel()
 	startErr := make(chan error, 1)
 	go func() { startErr <- s.Start(ctx) }()
-	if err := waitForFile(sock, 2*time.Second); err != nil {
-		t.Fatalf("socket not created: %v", err)
-	}
+	must(t, waitForFile(sock, 2*time.Second), "socket not created")
 
 	// Socket must be owner-only (SPEC §6, DoD: 0600).
 	if info, err := os.Stat(sock); err != nil {
@@ -202,25 +205,17 @@ func TestServer_RoundTrip(t *testing.T) {
 
 	c := client.New(sock)
 
-	if err := c.Healthz(); err != nil {
-		t.Fatalf("healthz: %v", err)
-	}
+	must(t, c.Healthz(), "healthz")
 
 	list, err := c.List()
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
+	must(t, err, "list")
 	if len(list) != 1 || list[0].Name != "db" || list[0].State != forward.Off {
 		t.Fatalf("unexpected list: %+v", list)
 	}
 
-	if err := c.Enable("db"); err != nil {
-		t.Fatalf("enable: %v", err)
-	}
+	must(t, c.Enable("db"), "enable")
 	persisted, err := config.Load(cfgPath)
-	if err != nil {
-		t.Fatalf("reload cfg: %v", err)
-	}
+	must(t, err, "reload cfg")
 	if !tuberEnabled(persisted, "db") {
 		t.Fatalf("enable not persisted to YAML")
 	}
@@ -228,17 +223,11 @@ func TestServer_RoundTrip(t *testing.T) {
 		t.Fatalf("tuber not started after enable")
 	}
 
-	if err := c.Restart("db"); err != nil {
-		t.Fatalf("restart: %v", err)
-	}
+	must(t, c.Restart("db"), "restart")
 
-	if err := c.Disable("db"); err != nil {
-		t.Fatalf("disable: %v", err)
-	}
+	must(t, c.Disable("db"), "disable")
 	persisted2, err := config.Load(cfgPath)
-	if err != nil {
-		t.Fatalf("reload cfg: %v", err)
-	}
+	must(t, err, "reload cfg")
 	if tuberEnabled(persisted2, "db") {
 		t.Fatalf("disable not persisted to YAML")
 	}
@@ -246,24 +235,16 @@ func TestServer_RoundTrip(t *testing.T) {
 		t.Fatalf("tuber not stopped after disable")
 	}
 
-	if err := c.Reload(); err != nil {
-		t.Fatalf("reload: %v", err)
-	}
+	must(t, c.Reload(), "reload")
 
 	if err := c.Enable("nope"); err == nil {
 		t.Fatalf("expected error for unknown tuber")
 	}
 
 	cancel()
-	if err := <-startErr; err != nil {
-		t.Fatalf("start returned error: %v", err)
-	}
-	if err := waitForGone(sock, 2*time.Second); err != nil {
-		t.Fatalf("socket not removed on shutdown: %v", err)
-	}
-	if err := waitForGone(marker, 2*time.Second); err != nil {
-		t.Fatalf("discovery marker not removed on shutdown: %v", err)
-	}
+	must(t, <-startErr, "start returned error")
+	must(t, waitForGone(sock, 2*time.Second), "socket not removed on shutdown")
+	must(t, waitForGone(marker, 2*time.Second), "discovery marker not removed on shutdown")
 }
 
 func TestServer_EnableIdempotent(t *testing.T) {

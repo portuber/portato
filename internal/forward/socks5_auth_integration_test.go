@@ -35,30 +35,54 @@ func socks5DialUserPass(t *testing.T, proxy, dst, user, pass string) (net.Conn, 
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	// Greeting: offer only UserPass (0x02).
+	if err := socks5Greet(conn); err != nil {
+		return closeErr(conn, err)
+	}
+	// RFC 1929 user/pass sub-negotiation.
+	if err := socks5UserPassAuth(conn, user, pass); err != nil {
+		return closeErr(conn, err)
+	}
+	// CONNECT request for dst (IPv4).
+	if err := socks5Connect(conn, dst); err != nil {
+		return closeErr(conn, err)
+	}
+	_ = conn.SetDeadline(time.Time{})
+	return conn, nil
+}
+
+// closeErr closes conn and returns (nil, err) so each handshake phase can bail
+// with a one-liner.
+func closeErr(conn net.Conn, err error) (net.Conn, error) {
+	conn.Close()
+	return nil, err
+}
+
+// socks5Greet writes the SOCKS5 greeting offering only the UserPass method
+// (0x02) and reads the server's method selection.
+func socks5Greet(conn net.Conn) error {
 	if _, err := conn.Write([]byte{0x05, 0x01, 0x02}); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("write greeting: %w", err)
+		return fmt.Errorf("write greeting: %w", err)
 	}
 	gr := make([]byte, 2)
 	if _, err := io.ReadFull(conn, gr); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("read greeting resp: %w", err)
+		return fmt.Errorf("read greeting resp: %w", err)
 	}
 	if gr[0] != 0x05 {
-		conn.Close()
-		return nil, fmt.Errorf("greeting resp ver=%x, want 05", gr[0])
+		return fmt.Errorf("greeting resp ver=%x, want 05", gr[0])
 	}
 	if gr[1] != 0x02 {
-		conn.Close()
-		return nil, fmt.Errorf("server selected method %x, want 02 (UserPass)", gr[1])
+		return fmt.Errorf("server selected method %x, want 02 (UserPass)", gr[1])
 	}
+	return nil
+}
 
-	// RFC 1929 user/pass sub-negotiation: VER=0x01, ULEN, UNAME, PLEN, PASSWD.
+// socks5UserPassAuth performs the RFC 1929 user/pass sub-negotiation:
+// VER=0x01, ULEN, UNAME, PLEN, PASSWD.
+func socks5UserPassAuth(conn net.Conn, user, pass string) error {
 	ub := []byte(user)
 	pb := []byte(pass)
 	if len(ub) > 255 || len(pb) > 255 {
-		conn.Close()
-		return nil, fmt.Errorf("user/pass too long")
+		return fmt.Errorf("user/pass too long")
 	}
 	authReq := make([]byte, 0, 3+len(ub)+len(pb))
 	authReq = append(authReq, 0x01, byte(len(ub)))
@@ -66,47 +90,43 @@ func socks5DialUserPass(t *testing.T, proxy, dst, user, pass string) (net.Conn, 
 	authReq = append(authReq, byte(len(pb)))
 	authReq = append(authReq, pb...)
 	if _, err := conn.Write(authReq); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("write auth: %w", err)
+		return fmt.Errorf("write auth: %w", err)
 	}
 	ar := make([]byte, 2)
 	if _, err := io.ReadFull(conn, ar); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("read auth resp: %w", err)
+		return fmt.Errorf("read auth resp: %w", err)
 	}
 	if ar[1] != 0x00 {
-		conn.Close()
-		return nil, fmt.Errorf("auth rejected (status %x)", ar[1])
+		return fmt.Errorf("auth rejected (status %x)", ar[1])
 	}
+	return nil
+}
 
+// socks5Connect sends the SOCKS5 CONNECT request for dst (IPv4) and reads the
+// reply, draining the bound-address field (IPv4 / IPv6 / domain).
+func socks5Connect(conn net.Conn, dst string) error {
 	host, portStr, err := net.SplitHostPort(dst)
 	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("bad dst %q: %w", dst, err)
+		return fmt.Errorf("bad dst %q: %w", dst, err)
 	}
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("bad port in %q: %w", dst, err)
+		return fmt.Errorf("bad port in %q: %w", dst, err)
 	}
 	ip := net.ParseIP(host).To4()
 	if ip == nil {
-		conn.Close()
-		return nil, fmt.Errorf("dst %q is not IPv4", dst)
+		return fmt.Errorf("dst %q is not IPv4", dst)
 	}
 	req := []byte{0x05, 0x01, 0x00, 0x01, ip[0], ip[1], ip[2], ip[3], byte(port >> 8), byte(port)}
 	if _, err := conn.Write(req); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("write connect: %w", err)
+		return fmt.Errorf("write connect: %w", err)
 	}
 	hdr := make([]byte, 4)
 	if _, err := io.ReadFull(conn, hdr); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("read reply hdr: %w", err)
+		return fmt.Errorf("read reply hdr: %w", err)
 	}
 	if hdr[0] != 0x05 || hdr[1] != 0x00 {
-		conn.Close()
-		return nil, fmt.Errorf("connect reply rep=%x, want 00", hdr[1])
+		return fmt.Errorf("connect reply rep=%x, want 00", hdr[1])
 	}
 	switch hdr[3] {
 	case 0x01:
@@ -116,13 +136,11 @@ func socks5DialUserPass(t *testing.T, proxy, dst, user, pass string) (net.Conn, 
 	case 0x03:
 		l := make([]byte, 1)
 		if _, err := io.ReadFull(conn, l); err != nil {
-			conn.Close()
-			return nil, fmt.Errorf("read bnd domain len: %w", err)
+			return fmt.Errorf("read bnd domain len: %w", err)
 		}
 		_, _ = io.ReadFull(conn, make([]byte, int(l[0])+2))
 	}
-	_ = conn.SetDeadline(time.Time{})
-	return conn, nil
+	return nil
 }
 
 // TestTuberDynamicSocks5Auth is the Phase 20 SOCKS5 user/pass end-to-end test.
