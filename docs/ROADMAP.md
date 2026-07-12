@@ -48,7 +48,7 @@
 | 30  | TUI toggle vs passphrase-prompt  | `[x]`  | [phase-30-tui-toggle-vs-passphrase.md](./phases/phase-30-tui-toggle-vs-passphrase.md) |
 | 31  | TUI logo wordmark + drop PNG mode | `[x]` | [phase-31-logo-wordmark.md](./phases/phase-31-logo-wordmark.md) |
 | 32  | Third-party license notices in releases | `[x]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
-| 33  | CodeFactor cleanup + golangci-lint guardrails | `[ ]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
+| 33  | CodeFactor cleanup + golangci-lint guardrails | `[~]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -133,13 +133,13 @@ time-based (not just size-based) log rotation.
 - **Phase 32** — third-party license notices in releases: bundle each runtime dependency's LICENSE (MIT/Apache-2.0/BSD-3) into the GitHub Release archives and deb/rpm, generated at release time via `go-licenses`, closing the redistribution-notice obligation that phase 21 declared but didn't implement.
 - **Phase 33** — clear codefactor.io's 12 issues (6 builtin-`max` shadowing + 6 complex methods) and add a `golangci-lint` config + `make lint` so builtin shadowing and high-complexity production methods can't slip back in.
 
-## Next planned
+## Current work
 
-**Phase 33** (CodeFactor cleanup + golangci-lint guardrails) is `[ ]` and ready
-to start — it depends only on phase 11 (`[x]`). It is a quality/tooling phase:
-rename the `max` builtin shadows, split four high-complexity production methods
-(`Update`, `handleKey`, `doctorRunE`, `Recv`), and add a `golangci-lint`
-guardrail so neither class regresses. No behavior change.
+**Phase 33** (CodeFactor cleanup + golangci-lint guardrails) is `[~]` (in
+progress) — a quality/tooling phase: rename the `max` builtin shadows, split
+four high-complexity production methods (`Update`, `handleKey`, `doctorRunE`,
+`Recv`), and add a `golangci-lint` guardrail so neither class regresses. No
+behavior change.
 
 ## Final MVP E2E (on completing Phase 6)
 

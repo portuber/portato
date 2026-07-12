@@ -1,7 +1,7 @@
 ---
 phase: 33
 title: CodeFactor cleanup and golangci-lint guardrails
-status: todo
+status: in-progress
 depends_on: [11]
 ---
 
