@@ -8,6 +8,7 @@ require (
 	charm.land/bubbles/v2 v2.1.0
 	charm.land/bubbletea/v2 v2.0.7
 	charm.land/lipgloss/v2 v2.0.4
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/adrg/xdg v0.5.3
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/lithammer/fuzzysearch v1.1.8
