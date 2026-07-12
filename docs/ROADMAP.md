@@ -49,6 +49,7 @@
 | 31  | TUI logo wordmark + drop PNG mode | `[x]` | [phase-31-logo-wordmark.md](./phases/phase-31-logo-wordmark.md) |
 | 32  | Third-party license notices in releases | `[x]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
 | 33  | CodeFactor cleanup + golangci-lint guardrails | `[x]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
+| 34  | `portato license` command + `--license` flag | `[ ]` | [phase-34-license-command.md](./phases/phase-34-license-command.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -62,7 +63,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–16, 18–20, 22–32 are `[x]`; phase 17 (Windows) remains pending (`[ ]`), blocked on external infrastructure. Phase 21 (packaging) is done: v0.1.0 is released (GitHub Release + Homebrew cask + deb/rpm); Scoop/Windows is deferred to phase 17. Phase 32 (third-party license notices in releases) is done (`[x]`): release archives and deb/rpm now bundle a `THIRD_PARTY_LICENSES.txt` (generated via `go-licenses` in a goreleaser `before.hooks` make target), closing the redistribution-notice obligation phase 21 declared.** The single binary runs the smart launcher
+**Phases 0–16, 18–20, 22–33 are `[x]`; phase 17 (Windows) remains pending (`[ ]`), blocked on external infrastructure. Phase 21 (packaging) is done: v0.1.4 is released (GitHub Release + Homebrew cask + deb/rpm, now bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); Scoop/Windows is deferred to phase 17. Phase 34 (`portato license` command + `--license` flag) is planned (`[ ]`) — a MINOR (next release `v0.2.0`).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -132,6 +133,7 @@ time-based (not just size-based) log rotation.
 - **Phase 31** — TUI logo wordmark: a combined potato+PORTATO wordmark in the empty-config splash and `--version` (compact-potato fallback on narrow terminals), the compact potato kept in the help overlay, and the inline-PNG image mode removed (iTerm2/WezTerm render braille).
 - **Phase 32** — third-party license notices in releases: bundle each runtime dependency's LICENSE (MIT/Apache-2.0/BSD-3) into the GitHub Release archives and deb/rpm, generated at release time via `go-licenses`, closing the redistribution-notice obligation that phase 21 declared but didn't implement.
 - **Phase 33** — clear codefactor.io's 12 issues (6 builtin-`max` shadowing + 6 complex methods, incl. 2 test funcs) and add a `golangci-lint` config + `make lint` so builtin shadowing and high-complexity production methods can't slip back in.
+- **Phase 34** — `portato license` subcommand + `--license` root flag (parallel to `version`/`--version`): the binary self-reports its MIT license and points to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` prints the embedded MIT text. A MINOR (next release `v0.2.0`).
 
 ## Current work
 
