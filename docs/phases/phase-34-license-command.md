@@ -1,7 +1,7 @@
 ---
 phase: 34
 title: "`portato license` command + `--license` flag"
-status: todo
+status: in-progress
 depends_on: []
 ---
 
