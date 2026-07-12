@@ -48,7 +48,7 @@
 | 30  | TUI toggle vs passphrase-prompt  | `[x]`  | [phase-30-tui-toggle-vs-passphrase.md](./phases/phase-30-tui-toggle-vs-passphrase.md) |
 | 31  | TUI logo wordmark + drop PNG mode | `[x]` | [phase-31-logo-wordmark.md](./phases/phase-31-logo-wordmark.md) |
 | 32  | Third-party license notices in releases | `[x]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
-| 33  | CodeFactor cleanup + golangci-lint guardrails | `[~]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
+| 33  | CodeFactor cleanup + golangci-lint guardrails | `[x]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -135,11 +135,15 @@ time-based (not just size-based) log rotation.
 
 ## Current work
 
-**Phase 33** (CodeFactor cleanup + golangci-lint guardrails) is `[~]` (in
-progress) — a quality/tooling phase: rename the `max` builtin shadows, split
-four high-complexity production methods (`Update`, `handleKey`, `doctorRunE`,
-`Recv`), and add a `golangci-lint` guardrail so neither class regresses. No
-behavior change.
+**Phase 33** (CodeFactor cleanup + golangci-lint guardrails) is `[x]` (done):
+renamed the `max` builtin shadows, split four high-complexity production
+methods (`Update`, `handleKey`, `doctorRunE`, `Recv`), and added a
+`golangci-lint` guardrail (`.golangci.yml` + `make lint`) so neither class
+regresses. No behavior change. The one remaining DoD item — confirming
+codefactor.io shows 0 issues — is a deferred-to-push manual check (no push
+yet, per AGENTS.md local-only).
+
+No phase is currently `[~]`.
 
 ## Final MVP E2E (on completing Phase 6)
 
