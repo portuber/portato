@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +17,7 @@ import (
 	"github.com/portuber/portato/internal/client"
 	"github.com/portuber/portato/internal/config"
 	"github.com/portuber/portato/internal/daemon"
+	"github.com/portuber/portato/internal/daemon/transport"
 	routelog "github.com/portuber/portato/internal/log"
 	"github.com/portuber/portato/internal/service"
 )
@@ -217,12 +217,10 @@ func fileExists(p string) bool {
 	return err == nil
 }
 
-// isReachableSock reports whether a unix socket at path can be opened.
+// isReachableSock reports whether the daemon IPC address can be opened (a
+// unix-domain socket on darwin/linux, a named pipe on Windows).
 func isReachableSock(path string) bool {
-	if info, err := os.Stat(path); err != nil || info.Mode()&os.ModeSocket == 0 {
-		return false
-	}
-	c, err := net.Dial("unix", path)
+	c, err := transport.Default.Dial(context.Background(), path)
 	if c != nil {
 		_ = c.Close()
 	}

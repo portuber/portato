@@ -10,11 +10,11 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/daemon/transport"
 	"github.com/portuber/portato/internal/forward"
 	"github.com/portuber/portato/internal/ipctoken"
 	routelog "github.com/portuber/portato/internal/log"
@@ -293,17 +293,9 @@ func (s *Server) openListener() (net.Listener, error) {
 		s.log.Info("daemon listening (socket-activated)", "socket", s.socketPath, "pid", os.Getpid())
 		return ln, nil
 	}
-	if err := os.MkdirAll(filepath.Dir(s.socketPath), 0o700); err != nil {
-		return nil, fmt.Errorf("create socket dir: %w", err)
-	}
-	ln, err := net.Listen("unix", s.socketPath)
+	ln, err := transport.Default.Listen(s.socketPath)
 	if err != nil {
 		return nil, fmt.Errorf("listen %s: %w", s.socketPath, err)
-	}
-	if err := os.Chmod(s.socketPath, 0o600); err != nil {
-		_ = ln.Close()
-		s.cleanup()
-		return nil, fmt.Errorf("chmod socket: %w", err)
 	}
 	s.log.Info("daemon listening", "socket", s.socketPath, "pid", os.Getpid())
 	return ln, nil

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/portuber/portato/internal/config"
+	"github.com/portuber/portato/internal/daemon/transport"
 	"github.com/portuber/portato/internal/forward"
 	"github.com/portuber/portato/internal/ipctoken"
 	routelog "github.com/portuber/portato/internal/log"
@@ -37,8 +38,7 @@ type Client struct {
 func New(socketPath string) *Client {
 	transport := &http.Transport{
 		DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			d := net.Dialer{}
-			return d.DialContext(ctx, "unix", socketPath)
+			return transport.Default.Dial(ctx, socketPath)
 		},
 	}
 	token, _ := ipctoken.ReadToken(ipctoken.TokenPath(socketPath))

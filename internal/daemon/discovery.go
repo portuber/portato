@@ -16,6 +16,7 @@ import (
 
 	"github.com/adrg/xdg"
 
+	"github.com/portuber/portato/internal/daemon/transport"
 	"github.com/portuber/portato/internal/ipctoken"
 )
 
@@ -221,8 +222,7 @@ func probeSocket(path string) bool {
 		Timeout: probeTimeout,
 		Transport: &http.Transport{
 			DialContext: func(ctx context.Context, _, _ string) (net.Conn, error) {
-				var d net.Dialer
-				return d.DialContext(ctx, "unix", path)
+				return transport.Default.Dial(ctx, path)
 			},
 		},
 	}
