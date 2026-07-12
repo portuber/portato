@@ -60,74 +60,20 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 	checkConfigDir(d, cfgPath)
 
 	// 3. known_hosts (auto-created on first connect, so absent is only a hint).
-	hosts := cfg.Defaults.ResolvedKnownHosts()
-	if fileExists(hosts) {
-		d.ok("known_hosts", "%s", hosts)
-	} else {
-		d.info("known_hosts", "%s not found (created automatically on first connect)", hosts)
-	}
+	checkKnownHosts(d, cfg)
 
 	// 4. ssh-agent: if SSH_AUTH_SOCK points at a reachable socket, good; if it
 	// is set but unreachable, that is a failure; if unset, only a hint.
-	if sock := strings.TrimSpace(os.Getenv("SSH_AUTH_SOCK")); sock != "" {
-		if isReachableSock(sock) {
-			d.ok("ssh-agent", "%s", sock)
-		} else {
-			d.fail("ssh-agent", "SSH_AUTH_SOCK=%s is not reachable", sock)
-		}
-	} else {
-		d.info("ssh-agent", "SSH_AUTH_SOCK unset (configure an identity key or start ssh-agent)")
-	}
+	checkSSHAgent(d)
 
 	// 5. Each tuber's resolved identity file (when one is configured).
-	for _, t := range cfg.Tubers {
-		id := t.ResolvedIdentity(cfg.Defaults)
-		if id == "" {
-			continue
-		}
-		if fileExists(id) {
-			d.ok("identity", "%s (%s)", id, t.Name)
-		} else {
-			d.fail("identity", "%s not found (tuber %s)", id, t.Name)
-		}
-	}
+	checkIdentities(d, cfg)
 
-	// 6. Log file + rotation. The daemon/standalone write a size-rotated file
-	// under the state home; report its path and the most recent rotation
-	// (evidenced by the newest archive's mtime — doctor is a separate process
-	// and cannot read the in-memory RotatingWriter state).
-	paths := logStatePaths()
-	logPath := paths[0]
-	if fileExists(logPath) {
-		if t, ok := lastRotation(paths...); ok {
-			d.ok("logs", "%s (last rotated %s)", logPath, t.Format("2006-01-02 15:04:05"))
-		} else {
-			d.ok("logs", "%s (no rotation yet)", logPath)
-		}
-	} else {
-		d.info("logs", "%s (created when the daemon or standalone runs)", logPath)
-	}
+	// 6. Log file + rotation.
+	checkLogs(d)
 
-	// 7. Daemon reachability (the daemon is optional, so absent is informational).
-	socket, err := daemon.ResolveSocket()
-	if err == nil && socket != "" {
-		ctx, cancel := context.WithTimeout(context.Background(), doctorProbeTimeout)
-		herr := client.New(socket).HealthzCtx(ctx)
-		cancel()
-		if herr == nil {
-			d.ok("daemon", "reachable at %s", socket)
-			// 8. The IPC socket must be owner-only (SPEC §6: 0600).
-			if info, statErr := os.Stat(socket); statErr == nil {
-				if perm := info.Mode().Perm(); perm != 0o600 {
-					d.fail("socket perms", "%s mode %o, expected 0600", socket, perm)
-				}
-			}
-		} else {
-			d.info("daemon", "not reachable at %s (start with `portato daemon` or `portato install`)", socket)
-		}
-	} else {
-		d.info("daemon", "not running (start with `portato daemon` or `portato install`)")
-	}
+	// 7. Daemon reachability + 8. IPC socket permissions.
+	checkDaemon(d)
 
 	// 9. The binary should be on PATH so autostart can launch `portato daemon`.
 	checkBinary(d)
@@ -146,6 +92,96 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("doctor: %d check(s) failed", d.failed)
 	}
 	return nil
+}
+
+// checkKnownHosts reports the resolved known_hosts file: auto-created on first
+// connect, so absent is only a hint.
+func checkKnownHosts(d *doctor, cfg *config.Config) {
+	hosts := cfg.Defaults.ResolvedKnownHosts()
+	if fileExists(hosts) {
+		d.ok("known_hosts", "%s", hosts)
+	} else {
+		d.info("known_hosts", "%s not found (created automatically on first connect)", hosts)
+	}
+}
+
+// checkSSHAgent inspects SSH_AUTH_SOCK: if it points at a reachable socket,
+// good; if set but unreachable, a failure; if unset, only a hint.
+func checkSSHAgent(d *doctor) {
+	sock := strings.TrimSpace(os.Getenv("SSH_AUTH_SOCK"))
+	if sock == "" {
+		d.info("ssh-agent", "SSH_AUTH_SOCK unset (configure an identity key or start ssh-agent)")
+		return
+	}
+	if isReachableSock(sock) {
+		d.ok("ssh-agent", "%s", sock)
+	} else {
+		d.fail("ssh-agent", "SSH_AUTH_SOCK=%s is not reachable", sock)
+	}
+}
+
+// checkIdentities verifies each tuber's resolved identity file, when one is
+// configured.
+func checkIdentities(d *doctor, cfg *config.Config) {
+	for _, t := range cfg.Tubers {
+		id := t.ResolvedIdentity(cfg.Defaults)
+		if id == "" {
+			continue
+		}
+		if fileExists(id) {
+			d.ok("identity", "%s (%s)", id, t.Name)
+		} else {
+			d.fail("identity", "%s not found (tuber %s)", id, t.Name)
+		}
+	}
+}
+
+// checkLogs reports the log file + rotation. The daemon/standalone write a
+// size-rotated file under the state home; report its path and the most recent
+// rotation (evidenced by the newest archive's mtime — doctor is a separate
+// process and cannot read the in-memory RotatingWriter state).
+func checkLogs(d *doctor) {
+	paths := logStatePaths()
+	logPath := paths[0]
+	if !fileExists(logPath) {
+		d.info("logs", "%s (created when the daemon or standalone runs)", logPath)
+		return
+	}
+	if t, ok := lastRotation(paths...); ok {
+		d.ok("logs", "%s (last rotated %s)", logPath, t.Format("2006-01-02 15:04:05"))
+	} else {
+		d.ok("logs", "%s (no rotation yet)", logPath)
+	}
+}
+
+// checkDaemon probes daemon reachability (the daemon is optional, so absent is
+// informational) and, when reachable, that the IPC socket is owner-only.
+func checkDaemon(d *doctor) {
+	socket, err := daemon.ResolveSocket()
+	if err != nil || socket == "" {
+		d.info("daemon", "not running (start with `portato daemon` or `portato install`)")
+		return
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), doctorProbeTimeout)
+	herr := client.New(socket).HealthzCtx(ctx)
+	cancel()
+	if herr != nil {
+		d.info("daemon", "not reachable at %s (start with `portato daemon` or `portato install`)", socket)
+		return
+	}
+	d.ok("daemon", "reachable at %s", socket)
+	checkSocketPerms(d, socket)
+}
+
+// checkSocketPerms verifies the IPC socket is owner-only (SPEC §6: 0600).
+func checkSocketPerms(d *doctor, socket string) {
+	info, statErr := os.Stat(socket)
+	if statErr != nil {
+		return
+	}
+	if perm := info.Mode().Perm(); perm != 0o600 {
+		d.fail("socket perms", "%s mode %o, expected 0600", socket, perm)
+	}
 }
 
 type doctor struct {

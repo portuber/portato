@@ -108,29 +108,17 @@ func Recv(c *net.UnixConn) (map[string]net.Listener, error) {
 	// Top the payload up to the 4-byte length prefix, then to 4+length. The oob
 	// is already captured; remaining bytes are plain stream data.
 	have := buf[:n]
-	for len(have) < 4 {
-		m, rerr := c.Read(buf[len(have):])
-		if rerr != nil {
-			return out, rerr
-		}
-		if m == 0 {
-			return out, io.ErrUnexpectedEOF
-		}
-		have = buf[:len(have)+m]
+	have, err = readAtLeast(c, buf, have, 4)
+	if err != nil {
+		return out, err
 	}
 	plen := int(binary.BigEndian.Uint32(have[:4]))
 	if plen > maxMsg-4 {
 		return out, fmt.Errorf("fdpass: payload length %d exceeds max %d", plen, maxMsg-4)
 	}
-	for len(have) < 4+plen {
-		m, rerr := c.Read(buf[len(have):])
-		if rerr != nil {
-			return out, rerr
-		}
-		if m == 0 {
-			return out, io.ErrUnexpectedEOF
-		}
-		have = buf[:len(have)+m]
+	have, err = readAtLeast(c, buf, have, 4+plen)
+	if err != nil {
+		return out, err
 	}
 
 	var headers []Header
@@ -144,6 +132,31 @@ func Recv(c *net.UnixConn) (map[string]net.Listener, error) {
 	if len(fds) != len(headers) {
 		return out, fmt.Errorf("fdpass: %d headers but %d fds", len(headers), len(fds))
 	}
+	return adoptListeners(headers, fds)
+}
+
+// readAtLeast tops buf[:len(have)] up until it holds at least need bytes with
+// plain stream reads on the same socket. It returns the extended slice (an
+// alias into buf) and io.ErrUnexpectedEOF if the peer closed mid-message.
+func readAtLeast(c *net.UnixConn, buf, have []byte, need int) ([]byte, error) {
+	for len(have) < need {
+		m, err := c.Read(buf[len(have):])
+		if err != nil {
+			return have, err
+		}
+		if m == 0 {
+			return have, io.ErrUnexpectedEOF
+		}
+		have = buf[:len(have)+m]
+	}
+	return have, nil
+}
+
+// adoptListeners reconstructs each offered listener via net.FileListener,
+// keyed by tuber name (from the Headers, in offer order). It closes each
+// adopted File (the kernel dup'd the fd into this process).
+func adoptListeners(headers []Header, fds []int) (map[string]net.Listener, error) {
+	out := make(map[string]net.Listener, len(headers))
 	for i, h := range headers {
 		if h.Name == "" {
 			return out, errors.New("fdpass: header missing name")
