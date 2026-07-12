@@ -1,8 +1,8 @@
 # Versioning
 
 Portato follows **Semantic Versioning 2.0.0** ([semver.org](https://semver.org)).
-Release tags use the `v` prefix: `v0.1.0`, `v1.2.3`. Pre-releases (when used):
-`v1.0.0-rc.1`.
+Release tags use the `v` prefix: `v0.1.0`, `v1.2.3`. Tags are always stable
+`vX.Y.Z` — no pre-release, RC, beta, or alpha tags are cut.
 
 ## The stability surface
 
@@ -48,11 +48,9 @@ internals are not part of the stability surface).
 
 ## Pre-releases
 
-Format `vX.Y.Z-rc.N` (release candidate); `-beta.N` / `-alpha.N` earlier.
-Pre-releases are marked on GitHub, so `brew upgrade`, `scoop`, and
-`go install …@latest` skip them automatically. Portato currently cuts stable
-releases only; RCs will be used around risky releases (e.g. the eventual
-`v1.0.0`).
+Portato does **not** cut pre-release / RC / beta / alpha tags. Every release is
+a stable `vX.Y.Z`. (SemVer's pre-release suffixes are recognised by tooling, but
+the project never produces them.)
 
 ## Deprecation (post-1.0)
 
