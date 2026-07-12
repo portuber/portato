@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff third-party-licenses
+.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff third-party-licenses release release-patch release-minor release-major
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -84,3 +84,52 @@ third-party-licenses:
 	  done; \
 	} > THIRD_PARTY_LICENSES.txt
 	@rm -rf third_party
+
+# release cuts and pushes a release tag, which triggers the GitHub Actions
+# 'release' workflow (goreleaser). Tags are strictly vX.Y.Z (no pre-releases;
+# see docs/VERSIONING.md). Pick the version one of two ways:
+#   make release-patch | release-minor | release-major  -- bump from the latest tag
+#   make release VERSION=vX.Y.Z                        -- explicit override
+# Before touching the remote it prints latest tag, the computed new tag, the
+# HEAD commit, the commits that will land on main, and asks y/N. On y it runs
+# `git push origin main`, creates an annotated tag, and pushes it.
+release-patch:
+	@$(MAKE) --no-print-directory release LEVEL=patch
+
+release-minor:
+	@$(MAKE) --no-print-directory release LEVEL=minor
+
+release-major:
+	@$(MAKE) --no-print-directory release LEVEL=major
+
+release:
+	@set -e; \
+	latest=$$(git describe --tags --abbrev=0 2>/dev/null) || { echo "no tags found; use: make release VERSION=vX.Y.Z"; exit 1; }; \
+	base=$${latest#v}; \
+	major=$${base%%.*}; rest=$${base#*.}; minor=$${rest%%.*}; patch=$${rest##*.}; \
+	if [ -n "$(VERSION)" ]; then \
+		newtag=v$$(printf '%s' "$(VERSION)" | sed 's/^v//'); \
+	elif [ -n "$(LEVEL)" ]; then \
+		case "$(LEVEL)" in \
+			patch) patch=$$((patch+1)); newtag=v$$major.$$minor.$$patch ;; \
+			minor) minor=$$((minor+1)); newtag=v$$major.$$minor.0 ;; \
+			major) major=$$((major+1)); newtag=v$$major.0.0 ;; \
+			*) echo "bad LEVEL=$(LEVEL)"; exit 1 ;; \
+		esac; \
+	else \
+		echo "usage: make release-{patch,minor,major}  |  make release VERSION=vX.Y.Z"; exit 1; \
+	fi; \
+	case "$$newtag" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "invalid tag '$$newtag' (want vX.Y.Z)"; exit 1;; esac; \
+	(git rev-parse -q --verify "refs/tags/$$newtag" >/dev/null) && { echo "$$newtag already exists"; exit 1; } || true; \
+	echo "latest tag : $$latest"; \
+	echo "new tag    : $$newtag"; \
+	echo "main HEAD  : $$(git rev-parse --short HEAD) - $$(git log -1 --format='%s')"; \
+	if git rev-parse -q --verify origin/main >/dev/null 2>&1; then \
+		echo "commits to push to main:"; \
+		pending=$$(git log origin/main..HEAD --oneline); \
+		if [ -n "$$pending" ]; then printf '%s\n' "$$pending" | sed 's/^/    /'; else echo "    (none; main is up to date)"; fi; \
+	else echo "commits to push to main: (origin/main unknown)"; fi; \
+	echo "Pushing will trigger the 'release' GitHub Actions workflow."; \
+	printf "Push main + tag %s? [y/N] " "$$newtag"; read ans; \
+	case "$$ans" in y|Y|yes|YES) ;; *) echo "aborted"; exit 1;; esac; \
+	git push origin main && git tag -a "$$newtag" -m "Release $$newtag" && git push origin "$$newtag"
