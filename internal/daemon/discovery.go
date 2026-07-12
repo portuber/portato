@@ -3,14 +3,12 @@ package daemon
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"os"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/portuber/portato/internal/daemon/transport"
@@ -112,16 +110,6 @@ func RemoveMarker(markerPath string) error {
 		return err
 	}
 	return nil
-}
-
-// pidAlive reports whether the given PID is an existing process. EPERM (the
-// process exists but is not ours) also counts as alive.
-func pidAlive(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-	err := syscall.Kill(pid, 0)
-	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
 // --- socket override (--socket / PORTATO_SOCKET) ---------------------------

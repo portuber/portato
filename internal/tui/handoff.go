@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/portuber/portato/internal/client"
@@ -56,7 +55,7 @@ var startCmd = func(cfgPath, listenFdsPath string) error {
 		cmd.Stdout, cmd.Stderr = f, f
 		defer func() { _ = f.Close() }()
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	cmd.SysProcAttr = detachedSysProcAttr()
 	return cmd.Start()
 }
 

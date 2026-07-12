@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -30,7 +29,6 @@ var (
 var (
 	stopResolveSocket = daemon.ResolveSocket
 	stopMarkerPath    = daemon.DiscoveryPath
-	stopKill          = func(pid int) error { return syscall.Kill(pid, syscall.SIGTERM) }
 	stopProbe         = func(socket string) bool {
 		ctx, cancel := context.WithTimeout(context.Background(), stopPollInterval)
 		defer cancel()
