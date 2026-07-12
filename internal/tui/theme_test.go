@@ -11,6 +11,7 @@ import (
 func TestDetectKind(t *testing.T) {
 	// Neutralise both vars by default; each case re-sets exactly what it needs.
 	clearThemeEnv := func(t *testing.T) {
+		t.Setenv("PORTATO_THEME", "")
 		t.Setenv("NO_COLOR", "")
 		t.Setenv("COLORFGBG", "")
 	}
