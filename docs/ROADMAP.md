@@ -47,7 +47,7 @@
 | 29  | standalone/daemon enabled consistency | `[x]` | [phase-29-standalone-daemon-enabled-consistency.md](./phases/phase-29-standalone-daemon-enabled-consistency.md) |
 | 30  | TUI toggle vs passphrase-prompt  | `[x]`  | [phase-30-tui-toggle-vs-passphrase.md](./phases/phase-30-tui-toggle-vs-passphrase.md) |
 | 31  | TUI logo wordmark + drop PNG mode | `[x]` | [phase-31-logo-wordmark.md](./phases/phase-31-logo-wordmark.md) |
-| 32  | Third-party license notices in releases | `[~]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
+| 32  | Third-party license notices in releases | `[x]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -61,7 +61,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–16, 18–20, 22–31 are `[x]`; phase 17 (Windows) remains pending (`[ ]`), blocked on external infrastructure. Phase 21 (packaging) is done: v0.1.0 is released (GitHub Release + Homebrew cask + deb/rpm); Scoop/Windows is deferred to phase 17. Phase 32 (third-party license notices in releases) is planned (`[ ]`), tracking the redistribution-notice obligation of the BSD-3/MIT/Apache deps.** The single binary runs the smart launcher
+**Phases 0–16, 18–20, 22–32 are `[x]`; phase 17 (Windows) remains pending (`[ ]`), blocked on external infrastructure. Phase 21 (packaging) is done: v0.1.0 is released (GitHub Release + Homebrew cask + deb/rpm); Scoop/Windows is deferred to phase 17. Phase 32 (third-party license notices in releases) is done (`[x]`): release archives and deb/rpm now bundle a `THIRD_PARTY_LICENSES.txt` (generated via `go-licenses` in a goreleaser `before.hooks` make target), closing the redistribution-notice obligation phase 21 declared.** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports

@@ -1,7 +1,7 @@
 ---
 phase: 32
 title: Third-party license notices in binary releases
-status: in-progress
+status: done
 depends_on: [21]
 ---
 
@@ -168,11 +168,14 @@ informational).
 2. `docs(phase-32): start` — flip the frontmatter + ROADMAP row `[ ] -> [~]`. ✅
 3. `feat(build): bundle third-party license notices into releases` —
    `Makefile` + `.goreleaser.yml` + this phase file's deviation note +
-   phase-21 cross-link.
-4. `docs(phase-32): complete` — `[~] -> [x]` after the DoD passes.
+   phase-21 cross-link. ✅
+4. `docs(phase-32): complete` — `[~] -> [x]` after the DoD passes. ✅
 
 ## Start guard
 
-This phase is `status: in-progress`. It completes only on an explicit
-**"complete phase 32"** command (per `docs/CONVENTIONS.md`), after every DoD
-item is verified.
+This phase is `status: done`. It was completed by an explicit
+**"complete phase 32"** command (per `docs/CONVENTIONS.md`) after every DoD
+item was verified. A pre-existing `tui` test-isolation flake surfaced during
+the phase (unrelated ambient `PORTATO_THEME` leaking into `TestDetectKind`)
+was fixed separately in `e18b0c5` (`fix(tui): make TestDetectKind hermetic to
+PORTATO_THEME`).
