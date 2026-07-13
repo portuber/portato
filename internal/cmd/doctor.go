@@ -283,6 +283,8 @@ func defaultAutostartArtefact() string {
 		return filepath.Join(home, "Library", "LaunchAgents", service.DefaultLabel+".plist")
 	case "linux":
 		return filepath.Join(xdg.ConfigHome, "systemd", "user", "portato.service")
+	case "windows":
+		return `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
 	default:
 		return ""
 	}
@@ -322,7 +324,7 @@ func checkAutostart(d *doctor) {
 	if p == "" {
 		return
 	}
-	if fileExists(p) {
+	if autostartInstalled(p) {
 		d.ok("autostart", "%s", p)
 	} else {
 		d.info("autostart", "not installed (run `portato install`)")
