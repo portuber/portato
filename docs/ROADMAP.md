@@ -156,14 +156,23 @@ License text embedded via a new module-root `licensetext` package
 (`//go:embed LICENSE`, single source — no drift). `--version` is unchanged. A
 MINOR: the next release is `v0.2.0`.
 
-**Phase 17** (Windows support) is `[~]` (in progress): IPC transport is being
-abstracted behind a build-tagged seam (unix-domain socket on darwin/linux,
-named pipe via `go-winio` on windows), the daemon/client/probe/doctor call
-sites are routed through it, autostart is implemented via the HKCU registry Run
-key, and the remaining unix-only primitives (`syscall.Kill`, the hand-off
-`Setsid`) are build-tagged. darwin/linux are unaffected (build tags fully
-isolated). The build cross-compiles for windows; the runtime round-trip over
-the named pipe will be verified on a Windows CI runner (M2).
+**Phase 17** (Windows support) is `[~]` (in progress): all code, packaging and
+CI config are implemented and verified off-Windows, but the phase cannot flip
+to `[x]` until the Windows-runtime DoD items actually run on a Windows host
+(see the phase-17 `## Blockers` block). Done so far: a build-tagged IPC
+transport seam (`internal/daemon/transport` — unix-domain socket on
+darwin/linux, named pipe via `go-winio` on windows) that the
+daemon/client/probe/doctor call sites route through; per-OS paths
+(`paths_unix.go`/`paths_windows.go`, `ipctoken.TokenPath` split); the
+unix-only primitives build-tagged (`pidAlive`, `stopKill`, the hand-off
+`Setsid`); HKCU registry Run-key autostart (`service_windows.go`) with
+`doctor` reporting it; the FD hand-off gated to the clean close+rebind path
+off unix (`fdpass.Supported()`); `windows` in the goreleaser matrix (zip +
+`portuber/scoop-bucket`); and a `windows-smoke` CI job (daemon+list
+round-trip over the named pipe + install/uninstall). Verified locally:
+`GOOS=windows go build/vet ./...` clean, a PE32+ binary builds,
+`make fmt/vet/test/lint` green on darwin. Blocked on: pushing so the
+`windows-smoke` job runs, and a `portato doctor` check on Windows.
 
 ## Final MVP E2E (on completing Phase 6)
 

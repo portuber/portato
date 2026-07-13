@@ -14,47 +14,55 @@ supported platform matrix (SPEC §15/§16).
 
 ## Tasks
 
-- [ ] Abstract the IPC transport behind a build-tagged interface
+- [x] Abstract the IPC transport behind a build-tagged interface
       (`internal/daemon/transport`): unix-domain socket on darwin/linux
       (`net.Listen("unix", ...)`), named pipe on windows
       (`\\.\pipe\portato` via `github.com/Microsoft/go-winio` or
       `gopkg.in/natefinch/npipe.v2`).
-- [ ] `internal/client`: build-tagged dialer (unix socket vs named pipe) behind
+- [x] `internal/client`: build-tagged dialer (unix socket vs named pipe) behind
       the existing `client.New` surface.
-- [ ] `internal/daemon/paths.go`: per-OS paths — Windows has no socket file;
+- [x] `internal/daemon/paths.go`: per-OS paths — Windows has no socket file;
       the PID file and the discovery marker live in `%LOCALAPPDATA%\portato\`.
-- [ ] `internal/service/service_windows.go` (`//go:build windows`): autostart
+      (Implemented as `paths_unix.go` / `paths_windows.go`; `ipctoken.TokenPath`
+      is split per OS too.)
+- [x] `internal/service/service_windows.go` (`//go:build windows`): autostart
       via `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` — write/remove a
       `REG_SZ` value `Portato` pointing at `portato daemon --config <abs>`.
       Implement `Install/Uninstall/Status`.
-- [ ] Update `service_other.go` build tag to `//go:build !darwin && !linux &&
+- [x] Update `service_other.go` build tag to `//go:build !darwin && !linux &&
       !windows` so exactly one `newInstaller` exists per platform.
-- [ ] Build-tag the hand-off `Setsid` (`syscall.SysProcAttr{Setsid: true}` is
+- [x] Build-tag the hand-off `Setsid` (`syscall.SysProcAttr{Setsid: true}` is
       unix-only) — Windows uses `SysProcAttr{CreationFlags:
-      windows.CREATE_NEW_PROCESS_GROUP | windows.DETACHED_PROCESS}`.
-- [ ] Build-tag the two `syscall.Kill` call sites (unix-only) found during the
+      windows.CREATE_NEW_PROCESS_GROUP | windows.DETACHED_PROCESS}`. (Behind a
+      `detachedSysProcAttr()` seam; the FD hand-off is also gated off-unix via
+      `fdpass.Supported()`.)
+- [x] Build-tag the two `syscall.Kill` call sites (unix-only) found during the
       phase-21 windows build attempt: `pidAlive` in
       `internal/daemon/discovery.go` (PID-liveness check) and `stopKill` in
       `internal/cmd/stop.go` (`portato stop` sends SIGTERM). Windows needs an
       equivalent `OpenProcess`+`TerminateProcess` (or `taskkill`) path behind a
       build-tagged seam (the `stopKill` var in stop.go is already a seam).
-- [ ] Packaging follow-up (phase 21): re-add `windows` to the `.goreleaser.yml`
+- [x] Packaging follow-up (phase 21): re-add `windows` to the `.goreleaser.yml`
       build matrix, restore the zip `format_overrides`, and add back the
       `scoops:` section (`portuber/scoop-bucket`) so a Scoop manifest publishes
       alongside the windows archive.
-- [ ] CI: add `windows/amd64` (and `windows/arm64` when Go supports it) to the
+- [x] CI: add `windows/amd64` (and `windows/arm64` when Go supports it) to the
       cross-compile matrix; add a Windows smoke test (`portato daemon` +
       `portato list` round-trip).
 
 ## Definition of Done
 
-- [ ] `GOOS=windows go build ./...` is clean.
+- [x] `GOOS=windows go build ./...` is clean.
 - [ ] On a Windows host/CI runner: `portato daemon` + `portato list`
       round-trip works over the named pipe; the smart launcher attaches.
+      (The `windows-smoke` CI job covers the round-trip; it has not run yet —
+      see Blockers.)
 - [ ] `portato install` adds the HKCU `Run` value; `uninstall` removes it;
       `portato doctor` reports the autostart state.
-- [ ] darwin/linux are unaffected (build tags fully isolated).
-- [ ] `go vet ./...`, `gofmt -l .` clean on all platforms.
+      (The `windows-smoke` CI job covers install/uninstall; `doctor` and the
+      runtime itself are unverified — see Blockers.)
+- [x] darwin/linux are unaffected (build tags fully isolated).
+- [x] `go vet ./...`, `gofmt -l .` clean on all platforms.
 
 ## Verification
 
@@ -81,3 +89,41 @@ portato uninstall
   not sufficient.
 - Out of scope here: Windows service (Service Control Manager) autostart; the
   Run key is the MVP-equivalent. SCM can be a later refinement.
+
+## Blockers
+
+All code, packaging and CI config for the phase is implemented and verified
+**off-Windows** (the status stays `[~]` — it cannot move to `[x]` until the
+Windows-runtime DoD items are actually exercised on a Windows host).
+
+Verified locally (macOS dev host):
+
+- `GOOS=windows GOARCH=amd64 go build ./...` — clean.
+- `GOOS=windows GOARCH=amd64 go vet ./...` (with and without `-tags=e2e`) —
+  clean.
+- A real `PE32+ executable (console) x86-64, for MS Windows` binary is
+  produced from `./cmd/portato`.
+- `gofmt -l .` empty; `make vet`, `make test`, `make lint` green on darwin.
+- darwin/linux behaviour unchanged (the named-pipe / registry / process
+  code is fully build-tagged out there).
+
+Remaining (need a Windows environment):
+
+1. **`windows-smoke` CI job must run.** It is written
+   (`.github/workflows/ci.yml`) and asserts the `portato daemon` + `portato
+   list` round-trip over `\\.\pipe\portato` and the HKCU Run-key
+   install/uninstall. It runs only on push/PR — which is blocked until the
+   maintainer authorises a push (AGENTS.md: local commits only unless asked).
+2. **`portato doctor` autostart reporting on Windows** is implemented
+   (`autostart_windows.go` queries the Run value) but not asserted by the CI
+   job and not run by hand yet.
+3. **Known limitations already accepted** (documented in commit bodies and
+   SPEC caveats): `portato stop` terminates rather than SIGTERMs (no
+   `portato stop` graceful path); a detached daemon gets no ctrl-C at logout;
+   named-pipe ACL relies on the Phase 18 bearer token (no per-user SDDL
+   hardening yet); the seamless FD hand-off is intentionally skipped (clean
+   close+rebind instead).
+
+Unblock: push to a branch/PR so the `windows-smoke` job runs; on green, verify
+`portato doctor` on a Windows host, then flip the status to `[x]`
+(`docs(phase-17): complete`).
