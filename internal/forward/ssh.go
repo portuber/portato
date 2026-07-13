@@ -87,15 +87,10 @@ func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log
 		methods []ssh.AuthMethod
 		closers []io.Closer
 	)
-	if sock := strings.TrimSpace(os.Getenv("SSH_AUTH_SOCK")); sock != "" {
-		conn, err := net.Dial("unix", sock)
-		if err != nil {
-			log.Warn("dial ssh-agent failed; falling back to identity", "err", err)
-		} else {
-			ag := agent.NewClient(conn)
-			methods = append(methods, ssh.PublicKeysCallback(ag.Signers))
-			closers = append(closers, conn)
-		}
+	if conn, ok := dialAgent(ctx, log); ok {
+		ag := agent.NewClient(conn)
+		methods = append(methods, ssh.PublicKeysCallback(ag.Signers))
+		closers = append(closers, conn)
 	}
 	if idPath := cfg.ResolvedIdentity(def); idPath != "" {
 		signer, err := loadIdentityWithPassphrase(ctx, idPath, provider, passSink)
