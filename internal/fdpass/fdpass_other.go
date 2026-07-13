@@ -7,6 +7,11 @@ import (
 	"net"
 )
 
+// Supported reports whether this platform can transfer live listeners between
+// processes (SCM_RIGHTS). Off unix it is false, so the hand-off takes the
+// Phase 5 close+rebind fallback.
+func Supported() bool { return false }
+
 // Send is unsupported off unix: SCM_RIGHTS is a unix facility (Phase 17 covers
 // Windows). The hand-off falls back to the Phase 5 close+rebind path here.
 func Send(_ *net.UnixConn, _ []Offer) error {

@@ -92,6 +92,12 @@ var probeSocket = func() bool {
 // pre-spawn step fails), it falls back to the Phase 5 close+rebind path (a brief
 // port blip). Either way the daemon comes up and the standalone exits.
 func handoffToDaemon(ctrl controller.Controller, cfgPath string) error {
+	// The seamless FD hand-off needs SCM_RIGHTS (unix). Off unix it would spawn
+	// a daemon that cannot receive the listeners and then conflict on the ports
+	// the standalone still holds, so go straight to the clean close+rebind path.
+	if !fdpass.Supported() {
+		return handoffLegacy(ctrl, cfgPath)
+	}
 	spawned, err := handoffWithFDs(ctrl, cfgPath)
 	if err == nil {
 		return nil

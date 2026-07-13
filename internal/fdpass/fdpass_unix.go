@@ -24,6 +24,11 @@ const maxMsg = 16 * 1024
 // than silently dropped fds.
 const maxFDs = 128
 
+// Supported reports whether this platform can transfer live listeners between
+// processes (SCM_RIGHTS). The standalone->daemon hand-off uses it to decide
+// between the seamless FD path and the Phase 5 close+rebind fallback.
+func Supported() bool { return true }
+
 // Send hands every offer to the receiver in a single message: the JSON list of
 // Headers (name/type, in offer order), length-prefixed, as the payload, and ALL
 // the listener fds packed into one SCM_RIGHTS ancillary message in the same
