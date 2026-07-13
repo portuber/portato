@@ -34,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        goos: [darwin, linux]
+        goos: [darwin, linux, windows]
         goarch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
@@ -44,3 +44,54 @@ jobs:
           cache: true
       - name: build
         run: GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o bin/portato-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/portato
+
+  windows-smoke:
+    # Phase 17: prove the Windows build actually runs there — cross-compiling is
+    # necessary but not sufficient (named-pipe IPC + registry autostart need a
+    # real Windows host). Mirrors the phase-17 DoD: daemon + list round-trip
+    # over the named pipe, and install/uninstall of the HKCU Run key.
+    name: windows smoke (named-pipe round-trip + autostart)
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: build
+        run: go build -o portato.exe ./cmd/portato
+      - name: daemon + list round-trip over the named pipe
+        shell: pwsh
+        run: |
+          $exe = ".\portato.exe"
+          $p = Start-Process -FilePath $exe -ArgumentList "daemon" -PassThru -WindowStyle Hidden -RedirectStandardError daemon.err
+          $ok = $false
+          $last = ""
+          foreach ($i in 1..50) {
+            $last = & $exe list 2>&1 | Out-String
+            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            Start-Sleep -Milliseconds 200
+          }
+          if (-not $ok) {
+            Write-Host "portato list output:`n$last"
+            if (Test-Path daemon.err) { Write-Host "daemon stderr:`n$(Get-Content daemon.err -Raw)" }
+            throw "portato list did not succeed within ~10s (daemon never answered on the named pipe)"
+          }
+          Write-Host "daemon reachable over the named pipe; list output:`n$last"
+          Stop-Process -Id $p.Id -Force
+      - name: autostart install / uninstall (HKCU Run key)
+        shell: pwsh
+        run: |
+          $exe = ".\portato.exe"
+          & $exe install
+          if ($LASTEXITCODE -ne 0) { throw "portato install failed" }
+          $run = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+          $v = (Get-ItemProperty -Path $run -Name Portato -ErrorAction SilentlyContinue).Portato
+          if (-not $v) { throw "HKCU Run value 'Portato' missing after install" }
+          Write-Host "installed Run value: $v"
+          & $exe uninstall
+          if ($LASTEXITCODE -ne 0) { throw "portato uninstall failed" }
+          $gone = (Get-ItemProperty -Path $run -Name Portato -ErrorAction SilentlyContinue).Portato
+          if ($gone) { throw "HKCU Run value 'Portato' still present after uninstall" }
+          Write-Host "Run value removed after uninstall"
