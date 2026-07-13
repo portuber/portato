@@ -21,6 +21,7 @@ builds:
     goos:
       - linux
       - darwin
+      - windows
     goarch:
       - amd64
       - arm64
@@ -35,11 +36,15 @@ builds:
 archives:
   - id: default
     formats: [tar.gz]
-    # Human-friendly archive name (macOS, x86_64) matching `make build-all`.
-    # Windows is not built yet (see phase 17); Scoop is deferred with it.
+    # Windows ships a zip instead of a tar.gz (Phase 17).
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    # Human-friendly archive name (macOS, Windows, x86_64) matching
+    # `make build-all`.
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_
-      {{- if eq .Os "darwin"}}macOS{{- else}}{{ .Os }}{{- end}}_
+      {{- if eq .Os "darwin"}}macOS{{- else if eq .Os "windows"}}Windows{{- else}}{{ .Os }}{{- end}}_
       {{- if eq .Arch "amd64"}}x86_64{{- else}}{{ .Arch }}{{- end}}
     # Pack the dependency license notices (Phase 32) alongside the project's
     # own LICENSE and README. Setting `files` overrides goreleaser's defaults,
@@ -87,6 +92,27 @@ homebrew_casks:
           if OS.mac?
             system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/portato"]
           end
+
+scoops:
+  # Scoop manifest -> https://github.com/portuber/scoop-bucket (bucket/portato.json)
+  # `scoop bucket add portuber https://github.com/portuber/scoop-bucket`
+  # `scoop install portato/portato`
+  # Windows-only (Scoop is a Windows installer); published alongside the
+  # windows zip archive on release (Phase 17).
+  - name: portato
+    homepage: https://github.com/portuber/portato
+    description: SSH port-forwarding manager with a TUI
+    license: MIT
+    repository:
+      owner: portuber
+      name: scoop-bucket
+      branch: main
+      # A PAT with push rights to the bucket repo (cross-repo publish); the
+      # default GITHUB_TOKEN cannot push to portuber/scoop-bucket.
+      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
+    commit_author:
+      name: Valerii Kipkaev
+      email: kipkaev@kipkaev.name
 
 nfpms:
   # deb + rpm from one config (linux builds only).
