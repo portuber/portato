@@ -50,6 +50,7 @@
 | 32  | Third-party license notices in releases | `[x]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
 | 33  | CodeFactor cleanup + golangci-lint guardrails | `[x]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
 | 34  | `portato license` command + `--license` flag | `[x]` | [phase-34-license-command.md](./phases/phase-34-license-command.md) |
+| 35  | SSH password authentication (opt-in) | `[ ]` | [phase-35-ssh-password.md](./phases/phase-35-ssh-password.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -134,6 +135,7 @@ time-based (not just size-based) log rotation.
 - **Phase 32** — third-party license notices in releases: bundle each runtime dependency's LICENSE (MIT/Apache-2.0/BSD-3) into the GitHub Release archives and deb/rpm, generated at release time via `go-licenses`, closing the redistribution-notice obligation that phase 21 declared but didn't implement.
 - **Phase 33** — clear codefactor.io's 12 issues (6 builtin-`max` shadowing + 6 complex methods, incl. 2 test funcs) and add a `golangci-lint` config + `make lint` so builtin shadowing and high-complexity production methods can't slip back in.
 - **Phase 34** — `portato license` subcommand + `--license` root flag (parallel to `version`/`--version`): the binary self-reports its MIT license and points to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` prints the embedded MIT text. A MINOR (next release `v0.2.0`).
+- **Phase 35** — SSH password authentication (planned, `[ ]`): an opt-in `password_auth` tunnel authenticates to a password-only SSH server with a password supplied interactively (TUI/CLI) and, opt-in, the OS keyring — mirroring the Phase 19/30 passphrase flow. Keys stay the default and are tried first; the password is never stored in config (plaintext invariant preserved). depends_on [19, 30]. Surfaced while verifying Phase 17 on a password-only server.
 
 ## Current work
 
