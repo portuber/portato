@@ -49,6 +49,11 @@ supported platform matrix (SPEC §15/§16).
 - [x] CI: add `windows/amd64` (and `windows/arm64` when Go supports it) to the
       cross-compile matrix; add a Windows smoke test (`portato daemon` +
       `portato list` round-trip).
+- [x] Build-tag the ssh-agent dial (Phase 17 follow-up, surfaced during Windows
+      verification): `internal/forward/agentdial_unix.go` (`SSH_AUTH_SOCK`
+      unix socket) / `agentdial_windows.go` (`\\.\pipe\openssh-ssh-agent` via
+      go-winio, 2s timeout), so a tunnel with a key in the OpenSSH ssh-agent
+      authenticates on Windows. `authMethods` calls the `dialAgent` seam.
 
 ## Definition of Done
 
@@ -63,6 +68,9 @@ supported platform matrix (SPEC §15/§16).
       runtime itself are unverified — see Blockers.)
 - [x] darwin/linux are unaffected (build tags fully isolated).
 - [x] `go vet ./...`, `gofmt -l .` clean on all platforms.
+- [ ] On a Windows host with a key loaded into the OpenSSH ssh-agent, a tunnel
+      authenticates via the agent (`agentdial_windows.go`, named pipe).
+      (Manual check; not covered by the `windows-smoke` CI job — see Blockers.)
 
 ## Verification
 
@@ -117,7 +125,11 @@ Remaining (need a Windows environment):
 2. **`portato doctor` autostart reporting on Windows** is implemented
    (`autostart_windows.go` queries the Run value) but not asserted by the CI
    job and not run by hand yet.
-3. **Known limitations already accepted** (documented in commit bodies and
+3. **ssh-agent over the Windows named pipe** is implemented
+   (`agentdial_windows.go` dials `\\.\pipe\openssh-ssh-agent`) and
+   cross-compiles/vets clean, but a tunnel authenticating via a key loaded in
+   the Windows OpenSSH agent has not been exercised on a real host.
+4. **Known limitations already accepted** (documented in commit bodies and
    SPEC caveats): `portato stop` terminates rather than SIGTERMs (no
    `portato stop` graceful path); a detached daemon gets no ctrl-C at logout;
    named-pipe ACL relies on the Phase 18 bearer token (no per-user SDDL

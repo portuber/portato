@@ -364,6 +364,7 @@ otherwise NoAuth (the pre-Phase-20 behaviour).
 
 - `ssh.Dial` to the server with an `ssh.ClientConfig`:
   - **Auth:** try `ssh.PublicKeysCallback` from the agent, then `ssh.PublicKeys` from the `identity`.
+    - **Agent transport:** the agent is reached over the `SSH_AUTH_SOCK` unix-domain socket on darwin/linux; on Windows over the OpenSSH agent's named pipe `\\.\pipe\openssh-ssh-agent` (no `SSH_AUTH_SOCK` there). The dial is build-taged (`internal/forward/agentdial_*`); on failure it silently falls back to the identity key.
   - **Passphrase-protected identity (Phase 19):** if `ssh.ParsePrivateKey` reports a missing passphrase, the dial obtains one from the passphrase store (`internal/secret` — an in-memory cache backed by the OS keyring) and retries with `ssh.ParsePrivateKeyWithPassphrase`. With none available it surfaces `Status.PendingPassphrase` and **blocks** (the store's `Wait`) until the TUI/CLI provides one, instead of spinning the reconnect backoff. A wrong passphrase is invalidated and re-prompted.
   - **HostKeyCallback:** `knownhosts.New(hostsFile)`; with `accept_new_hosts: true` — a wrapper that appends a new key (TOFU).
   - **Timeout:** an explicit connect timeout (5s).
