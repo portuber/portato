@@ -52,6 +52,22 @@ type Defaults struct {
 	// re-prompt); this flag only gates cross-restart persistence.
 	IdentityPassphraseStore bool `yaml:"identity_passphrase_store" json:"identity_passphrase_store"`
 
+	// PasswordAuth (Phase 35) opts in to SSH password authentication as a
+	// last-resort auth method for a tuber whose server offers no usable key
+	// (agent → identity → password). Default false: avoids surprise prompts and
+	// keeps public-key auth the default. The password itself is NEVER stored in
+	// config — only this boolean; a password is supplied interactively and, when
+	// SSHPasswordStore is set, held in the OS keyring.
+	PasswordAuth bool `yaml:"password_auth" json:"password_auth"`
+
+	// SSHPasswordStore (Phase 35) opts in to persisting SSH passwords in the OS
+	// keyring (per account, "password:<user>@<host>:<port>") so they survive a
+	// daemon restart. Default false: nothing is stored without explicit consent.
+	// A password is still cached in memory for the process either way (so
+	// reconnects don't re-prompt); this flag only gates cross-restart
+	// persistence, mirroring IdentityPassphraseStore.
+	SSHPasswordStore bool `yaml:"ssh_password_store" json:"ssh_password_store"`
+
 	// Log configures the persistent file's size-capped rotation (Phase 22). The
 	// fields are hints: a zero/negative value falls back to the rotating
 	// writer's package defaults at setup time, so an absent `log:` block keeps
@@ -83,6 +99,12 @@ type Tuber struct {
 	SSH      string `yaml:"ssh" json:"ssh"`
 	Identity string `yaml:"identity" json:"identity"`
 	Enabled  bool   `yaml:"enabled" json:"enabled"`
+
+	// PasswordAuth (Phase 35) opts this tuber into SSH password auth as a
+	// last-resort method after agent + identity. A per-tuber value wins over
+	// Defaults.PasswordAuth. The password is never stored here (only this flag);
+	// see Defaults.SSHPasswordStore for keyring persistence.
+	PasswordAuth bool `yaml:"password_auth" json:"password_auth"`
 
 	// Socks5User/Socks5Password override Defaults for type=dynamic tubers
 	// (Phase 20). A tuber-level pair wins over the defaults pair; an empty
@@ -295,6 +317,15 @@ func (t Tuber) ResolvedIdentity(d Defaults) string {
 	return ""
 }
 
+// ResolvedPasswordAuth reports whether SSH password authentication is enabled
+// for this tuber (Phase 35). It is an opt-in: enabled if either the tuber or
+// the defaults set password_auth (so it can be turned on globally or per
+// tuber). Public-key auth (agent → identity) is always tried first; password
+// is only a last resort. The password itself is never in config.
+func (t Tuber) ResolvedPasswordAuth(d Defaults) bool {
+	return t.PasswordAuth || d.PasswordAuth
+}
+
 // ResolvedSocks5User returns the SOCKS5 username a type=dynamic tuber should
 // authenticate with: the tuber-level value wins, otherwise the defaults value
 // (Phase 20). Empty means no auth (a password alone is meaningless — see
@@ -413,6 +444,7 @@ type tuberRaw struct {
 	SSH            string `yaml:"ssh"`
 	Identity       string `yaml:"identity"`
 	Enabled        bool   `yaml:"enabled"`
+	PasswordAuth   bool   `yaml:"password_auth"`
 	Socks5User     string `yaml:"socks5_user"`
 	Socks5Password string `yaml:"socks5_password"`
 }
@@ -428,6 +460,7 @@ func (t *Tuber) UnmarshalYAML(value *yaml.Node) error {
 	t.SSH = raw.SSH
 	t.Identity = raw.Identity
 	t.Enabled = raw.Enabled
+	t.PasswordAuth = raw.PasswordAuth
 	t.Socks5User = raw.Socks5User
 	t.Socks5Password = raw.Socks5Password
 	switch v := raw.Local.(type) {
