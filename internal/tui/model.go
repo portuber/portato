@@ -55,10 +55,20 @@ type Model struct {
 	passphraseTarget   string
 	passphraseInput    textinput.Model
 	passphraseAttempts int
-	// dismissedPending is the pending-prompt key (a passphrase path or a host
-	// line) the user cancelled with esc, so the auto-open on tick does not
-	// re-pop the same prompt endlessly. Cleared once the cursor's tuber has no
-	// pending prompt. A manual space still reopens it on demand. Phase 19 UX.
+	// enteringPassword shows the SSH-password prompt modal (Phase 35). Raised
+	// by pressing space on a tuber whose dial is blocked on a password-only
+	// account (Status.PendingPassword). The input is masked; enter submits via
+	// Controller.AcceptPassword, esc cancels. passwordAttempts counts submits
+	// so a wrong password shows a retry hint.
+	enteringPassword bool
+	passwordTarget   string
+	passwordInput    textinput.Model
+	passwordAttempts int
+	// dismissedPending is the pending-prompt key (a passphrase path, a password
+	// account, or a host line) the user cancelled with esc, so the auto-open on
+	// tick does not re-pop the same prompt endlessly. Cleared once the cursor's
+	// tuber has no pending prompt. A manual space still reopens it on demand.
+	// Phase 19/35 UX.
 	dismissedPending string
 
 	// logs is the Phase 11 per-tuber log screen sub-model (nil when inactive).
@@ -80,6 +90,7 @@ func New(ctrl controller.Controller, opt Options) Model {
 	}
 	m.filter = newFilterInput()
 	m.passphraseInput = newPassphraseInput()
+	m.passwordInput = newPasswordInput()
 	m.clampCursor()
 	return m
 }
@@ -100,6 +111,18 @@ func newFilterInput() textinput.Model {
 func newPassphraseInput() textinput.Model {
 	ti := textinput.New()
 	ti.Prompt = "passphrase: "
+	ti.EchoMode = textinput.EchoPassword
+	ti.EchoCharacter = '•'
+	ti.CharLimit = 256
+	return ti
+}
+
+// newPasswordInput builds the masked input for the SSH-password modal (Phase
+// 35), mirroring newPassphraseInput. EchoPassword renders the mask so the typed
+// password is never shown in the clear.
+func newPasswordInput() textinput.Model {
+	ti := textinput.New()
+	ti.Prompt = "password: "
 	ti.EchoMode = textinput.EchoPassword
 	ti.EchoCharacter = '•'
 	ti.CharLimit = 256

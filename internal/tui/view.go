@@ -118,6 +118,9 @@ func (m Model) render() string {
 	if m.enteringPassphrase {
 		return m.centered(m.passphraseView())
 	}
+	if m.enteringPassword {
+		return m.centered(m.passwordView())
+	}
 	if m.confirmQuit {
 		return m.centered(m.confirmQuitView())
 	}
@@ -263,6 +266,12 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 	// press space and type the passphrase.
 	if s.PendingPassphrase != "" {
 		status += " " + dimStyle.Render("passphrase?")
+	}
+	// Phase 35: a dial blocked on a password-only account is in Connecting
+	// with PendingPassword set; flag it so the user knows to press space and
+	// type the password.
+	if s.PendingPassword != "" {
+		status += " " + dimStyle.Render("password?")
 	}
 
 	name, typ, ep, up := fitName(s.Name, nameW), s.Type, endpoint, uptime(s)
@@ -450,6 +459,22 @@ func (m Model) passphraseView() string {
 	line := fmt.Sprintf(
 		"Passphrase for %s's identity\n%s[enter] submit  ·  [esc] cancel%s",
 		m.passphraseTarget, m.passphraseInput.View(), hint,
+	)
+	return modalStyle.Render(line)
+}
+
+// passwordView renders the Phase 35 SSH-password modal: the tuber's dial is
+// blocked on a password-only account, and the user types the password (masked)
+// and submits it via Controller.AcceptPassword. After a rejected attempt a hint
+// line appears.
+func (m Model) passwordView() string {
+	hint := ""
+	if m.passwordAttempts > 0 {
+		hint = fmt.Sprintf("\nwrong password, try again (attempt %d)", m.passwordAttempts+1)
+	}
+	line := fmt.Sprintf(
+		"Password for %s\n%s[enter] submit  ·  [esc] cancel%s",
+		m.passwordTarget, m.passwordInput.View(), hint,
 	)
 	return modalStyle.Render(line)
 }

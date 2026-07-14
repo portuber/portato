@@ -40,6 +40,7 @@ func (h *handoffFakeCtrl) DeleteTuber(string) error               { return nil }
 func (h *handoffFakeCtrl) Logs(string) ([]routelog.Entry, error)  { return nil, nil }
 func (h *handoffFakeCtrl) AcceptHost(string) error                { return nil }
 func (h *handoffFakeCtrl) AcceptPassphrase(string, string) error  { return nil }
+func (h *handoffFakeCtrl) AcceptPassword(string, string) error    { return nil }
 func (h *handoffFakeCtrl) LiveListenerFiles() (map[string]*os.File, error) {
 	if h.liveErr != nil {
 		return nil, h.liveErr

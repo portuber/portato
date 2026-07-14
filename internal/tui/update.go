@@ -63,6 +63,14 @@ func (m Model) handleTick(_ tickMsg) (Model, tea.Cmd) {
 		m.passphraseAttempts = 0
 		m.passphraseInput.SetValue("")
 	}
+	// Auto-close the password modal the same way (Status.PendingPassword
+	// clears on success). A wrong password leaves it set for another attempt.
+	if m.enteringPassword && !pendingPasswordFor(m.list, m.passwordTarget) {
+		m.enteringPassword = false
+		m.passwordTarget = ""
+		m.passwordAttempts = 0
+		m.passwordInput.SetValue("")
+	}
 	// Forget a stale dismissal once the cursor's tuber has no pending
 	// prompt, so a future block on it auto-opens again.
 	if m.hasCurrent() && pendingKey(m.list[m.cursor]) == "" {
@@ -122,6 +130,9 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if m.enteringPassphrase {
 		return m.handlePassphraseKey(msg)
 	}
+	if m.enteringPassword {
+		return m.handlePasswordKey(msg)
+	}
 	return m.handleKey(msg)
 }
 
@@ -139,6 +150,11 @@ func (m Model) handlePaste(msg tea.PasteMsg) (Model, tea.Cmd) {
 	if m.enteringPassphrase {
 		var cmd tea.Cmd
 		m.passphraseInput, cmd = m.passphraseInput.Update(msg)
+		return m, cmd
+	}
+	if m.enteringPassword {
+		var cmd tea.Cmd
+		m.passwordInput, cmd = m.passwordInput.Update(msg)
 		return m, cmd
 	}
 	if m.filtering {
@@ -184,7 +200,7 @@ func (m Model) handleListKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleQuitAndViewKey(k)
 	case "up", "k", "down", "j":
 		return m.handleNavKey(k)
-	case "space", "p", "r", "a", "x", "R", "/":
+	case "space", "p", "o", "r", "a", "x", "R", "/":
 		return m.handleToggleKey(k)
 	case "e", "n", "C", "d", "l":
 		return m.handleEditorKey(k)
@@ -233,6 +249,12 @@ func (m Model) handleToggleKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "p":
 		if m.hasCurrent() && m.list[m.cursor].PendingPassphrase != "" {
 			return m.openPassphraseModal(m.list[m.cursor].Name)
+		}
+	case "o":
+		// `o` opens the SSH-password modal (Phase 35); `p` is taken by the
+		// identity passphrase. Only acts when the tuber is awaiting a password.
+		if m.hasCurrent() && m.list[m.cursor].PendingPassword != "" {
+			return m.openPasswordModal(m.list[m.cursor].Name)
 		}
 	case "r":
 		(&m).restartCurrent()
@@ -365,11 +387,15 @@ func pendingPassphraseFor(list []controller.Status, name string) bool {
 }
 
 // pendingKey returns a stable identifier for whatever prompt a tuber is
-// blocked on (a passphrase path or a host-key line), or "" when it is not
-// blocked. Used so a dismissed prompt is not auto-reopened until it changes.
+// blocked on (a passphrase path, a password account, or a host-key line), or
+// "" when it is not blocked. Used so a dismissed prompt is not auto-reopened
+// until it changes.
 func pendingKey(s controller.Status) string {
 	if s.PendingPassphrase != "" {
 		return "pp:" + s.PendingPassphrase
+	}
+	if s.PendingPassword != "" {
+		return "pw:" + s.PendingPassword
 	}
 	if s.PendingHostLine != "" {
 		return "hk:" + s.PendingHostLine
@@ -392,7 +418,8 @@ func pendingKeyForName(list []controller.Status, name string) string {
 // the `/` filter, the help overlay, or an in-flight daemon hand-off).
 func (m Model) isBusy() bool {
 	return m.editor != nil || m.logs != nil || m.filtering || m.confirmDelete ||
-		m.confirmQuit || m.confirmAccept || m.enteringPassphrase || m.handoffing || m.help
+		m.confirmQuit || m.confirmAccept || m.enteringPassphrase || m.enteringPassword ||
+		m.handoffing || m.help
 }
 
 // autoOpenIfPending surfaces a pending passphrase / unknown-host prompt for the
@@ -411,6 +438,9 @@ func (m Model) autoOpenIfPending() (Model, tea.Cmd) {
 	if s.PendingPassphrase != "" {
 		return m.openPassphraseModal(s.Name)
 	}
+	if s.PendingPassword != "" {
+		return m.openPasswordModal(s.Name)
+	}
 	m.confirmAccept = true
 	m.acceptTarget = s.Name
 	return m, nil
@@ -426,6 +456,60 @@ func (m Model) openPassphraseModal(name string) (Model, tea.Cmd) {
 	m.passphraseAttempts = 0
 	m.passphraseInput.SetValue("")
 	return m, m.passphraseInput.Focus()
+}
+
+// handlePasswordKey owns the SSH-password modal (Phase 35): printable keys edit
+// the masked input; enter submits via Controller.AcceptPassword (the blocked
+// dial wakes on the store; the modal auto-closes once Status.PendingPassword
+// clears — see the tick handler — or stays open with a retry hint on a wrong
+// password); esc cancels.
+func (m Model) handlePasswordKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "enter":
+		pw := m.passwordInput.Value()
+		name := m.passwordTarget
+		_ = m.ctrl.AcceptPassword(name, pw)
+		m.passwordInput.SetValue("")
+		m.passwordAttempts++
+		m.list = m.ctrl.List()
+		// Re-arm the cursor blink in case the server rejects it and the modal
+		// stays open for another attempt.
+		return m, m.passwordInput.Focus()
+	case "esc":
+		// Record which prompt was dismissed so the tick auto-open does not
+		// immediately re-pop it; a manual `o` still reopens on demand.
+		m.dismissedPending = pendingKeyForName(m.list, m.passwordTarget)
+		m.enteringPassword = false
+		m.passwordTarget = ""
+		m.passwordAttempts = 0
+		m.passwordInput.SetValue("")
+		return m, nil
+	}
+	var cmd tea.Cmd
+	m.passwordInput, cmd = m.passwordInput.Update(k)
+	return m, cmd
+}
+
+// pendingPasswordFor reports whether the tuber named name currently has a
+// pending password need in the status snapshot. Drives the modal auto-close.
+func pendingPasswordFor(list []controller.Status, name string) bool {
+	for _, s := range list {
+		if s.Name == name {
+			return s.PendingPassword != ""
+		}
+	}
+	return false
+}
+
+// openPasswordModal arms the SSH-password modal for the named tuber (resetting
+// the masked input and the attempt counter) and returns the masked-input focus
+// command. Shared by the manual `o` affordance and the tick auto-open. Phase 35.
+func (m Model) openPasswordModal(name string) (Model, tea.Cmd) {
+	m.enteringPassword = true
+	m.passwordTarget = name
+	m.passwordAttempts = 0
+	m.passwordInput.SetValue("")
+	return m, m.passwordInput.Focus()
 }
 
 // openEditor builds the tuber editor form. For edit mode the current tuber

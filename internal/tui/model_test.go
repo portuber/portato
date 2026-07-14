@@ -31,7 +31,9 @@ type fakeCtrl struct {
 	accepted  []string
 	// passphrases records AcceptPassphrase submissions (name -> passphrase).
 	passphrases map[string]string
-	changes     chan struct{}
+	// passwords records AcceptPassword submissions (name -> password).
+	passwords map[string]string
+	changes   chan struct{}
 }
 
 func (f *fakeCtrl) List() []controller.Status {
@@ -137,6 +139,16 @@ func (f *fakeCtrl) AcceptPassphrase(name, passphrase string) error {
 		f.passphrases = map[string]string{}
 	}
 	f.passphrases[name] = passphrase
+	return f.tunErr
+}
+
+func (f *fakeCtrl) AcceptPassword(name, password string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.passwords == nil {
+		f.passwords = map[string]string{}
+	}
+	f.passwords[name] = password
 	return f.tunErr
 }
 
