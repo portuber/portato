@@ -52,13 +52,17 @@ type Defaults struct {
 	// re-prompt); this flag only gates cross-restart persistence.
 	IdentityPassphraseStore bool `yaml:"identity_passphrase_store" json:"identity_passphrase_store"`
 
-	// PasswordAuth (Phase 35) opts in to SSH password authentication as a
-	// last-resort auth method for a tuber whose server offers no usable key
-	// (agent → identity → password). Default false: avoids surprise prompts and
-	// keeps public-key auth the default. The password itself is NEVER stored in
-	// config — only this boolean; a password is supplied interactively and, when
-	// SSHPasswordStore is set, held in the OS keyring.
-	PasswordAuth bool `yaml:"password_auth" json:"password_auth"`
+	// PasswordAuth (Phase 35) controls the SSH password-auth fallback. A tunnel
+	// whose keys (agent → identity) don't authenticate falls back to an
+	// interactive password prompt (OpenSSH-style) — ON BY DEFAULT. Set
+	// password_auth: false to opt a tunnel (or, here in defaults, every tunnel)
+	// OUT — e.g. a deployment that only ever uses keys and never wants a prompt
+	// (including avoiding a premature prompt while an agent finishes starting at
+	// boot). nil (absent) and true both mean "on". The password itself is NEVER
+	// stored in config — it is supplied interactively and, when SSHPasswordStore
+	// is set, held in the OS keyring. A *bool distinguishes absent (on) from an
+	// explicit false (off).
+	PasswordAuth *bool `yaml:"password_auth,omitempty" json:"password_auth,omitempty"`
 
 	// SSHPasswordStore (Phase 35) opts in to persisting SSH passwords in the OS
 	// keyring (per account, "password:<user>@<host>:<port>") so they survive a
@@ -100,11 +104,13 @@ type Tuber struct {
 	Identity string `yaml:"identity" json:"identity"`
 	Enabled  bool   `yaml:"enabled" json:"enabled"`
 
-	// PasswordAuth (Phase 35) opts this tuber into SSH password auth as a
-	// last-resort method after agent + identity. A per-tuber value wins over
-	// Defaults.PasswordAuth. The password is never stored here (only this flag);
-	// see Defaults.SSHPasswordStore for keyring persistence.
-	PasswordAuth bool `yaml:"password_auth" json:"password_auth"`
+	// PasswordAuth (Phase 35) controls this tuber's SSH password-auth fallback
+	// (see Defaults.PasswordAuth). nil (absent) → inherit the on-by-default
+	// behaviour; password_auth: false → opt this tunnel out of the prompt and
+	// keep it key-only (with reconnect retries); true is redundant with absent.
+	// The password is never stored here (only this flag); see
+	// Defaults.SSHPasswordStore for keyring persistence.
+	PasswordAuth *bool `yaml:"password_auth,omitempty" json:"password_auth,omitempty"`
 
 	// Socks5User/Socks5Password override Defaults for type=dynamic tubers
 	// (Phase 20). A tuber-level pair wins over the defaults pair; an empty
@@ -318,12 +324,45 @@ func (t Tuber) ResolvedIdentity(d Defaults) string {
 }
 
 // ResolvedPasswordAuth reports whether SSH password authentication is enabled
-// for this tuber (Phase 35). It is an opt-in: enabled if either the tuber or
-// the defaults set password_auth (so it can be turned on globally or per
-// tuber). Public-key auth (agent → identity) is always tried first; password
-// is only a last resort. The password itself is never in config.
+// for this tuber (Phase 35). It is ON BY DEFAULT (OpenSSH-style): when keys
+// (agent → identity) don't authenticate, the dial falls back to an interactive
+// password prompt. A single explicit password_auth: false — on the tuber or in
+// the defaults — opts OUT (key-only, with reconnect retries). nil/true both
+// mean "on". Public-key auth is always tried first; password is only a last
+// resort. The password itself is never in config.
 func (t Tuber) ResolvedPasswordAuth(d Defaults) bool {
-	return t.PasswordAuth || d.PasswordAuth
+	if t.PasswordAuth != nil && !*t.PasswordAuth {
+		return false
+	}
+	if d.PasswordAuth != nil && !*d.PasswordAuth {
+		return false
+	}
+	return true
+}
+
+// Equal reports whether two Defaults are value-equal, dereferencing PasswordAuth
+// (a *bool) so two parses of the same file compare equal even though the
+// pointers differ. Engine.Reload restarts tubers only when defaults actually
+// change, so this must not report spurious differences.
+func (d Defaults) Equal(o Defaults) bool {
+	return d.Identity == o.Identity &&
+		d.KnownHosts == o.KnownHosts &&
+		d.AcceptNewHosts == o.AcceptNewHosts &&
+		d.Socks5User == o.Socks5User &&
+		d.Socks5Password == o.Socks5Password &&
+		d.IdentityPassphraseStore == o.IdentityPassphraseStore &&
+		d.SSHPasswordStore == o.SSHPasswordStore &&
+		d.Log == o.Log &&
+		boolPtrEqual(d.PasswordAuth, o.PasswordAuth)
+}
+
+// boolPtrEqual compares two *bool by value (nil == nil; nil != &x; &x == &y by
+// pointed value).
+func boolPtrEqual(a, b *bool) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }
 
 // PasswordAccountKey is the shared provider key under which a tuber's SSH
@@ -454,7 +493,7 @@ type tuberRaw struct {
 	SSH            string `yaml:"ssh"`
 	Identity       string `yaml:"identity"`
 	Enabled        bool   `yaml:"enabled"`
-	PasswordAuth   bool   `yaml:"password_auth"`
+	PasswordAuth   *bool  `yaml:"password_auth"`
 	Socks5User     string `yaml:"socks5_user"`
 	Socks5Password string `yaml:"socks5_password"`
 }

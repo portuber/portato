@@ -24,15 +24,14 @@ func passwordConfig(t *testing.T) *config.Config {
 	cfgPath := filepath.Join(dir, "config.yaml")
 	cfg := &config.Config{
 		Tubers: []config.Tuber{{
-			Name:         "db",
-			Type:         "local",
-			Local:        "5432",
-			Remote:       "db:5432",
-			SSH:          "u@h:22",
-			PasswordAuth: true,
-			User:         "u",
-			Host:         "h",
-			Port:         22,
+			Name:   "db",
+			Type:   "local",
+			Local:  "5432",
+			Remote: "db:5432",
+			SSH:    "u@h:22",
+			User:   "u",
+			Host:   "h",
+			Port:   22,
 		}},
 	}
 	if err := cfg.Save(cfgPath); err != nil {

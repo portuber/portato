@@ -10,11 +10,16 @@ depends_on: [19, 30]
 A tunnel whose SSH server requires a password (no usable key) authenticates
 with a password supplied interactively (TUI modal / CLI) and, opt-in, persisted
 to the OS keyring. **The password is never stored in the config in plaintext**
-(the §9 invariant is preserved); only an opt-in `password_auth` boolean is
-configured. Public-key auth remains the default and is always tried first, so a
-working key never triggers a password prompt. This unblocks password-only SSH
-servers (the case that surfaced while verifying Phase 17 on Windows) on every
-platform.
+(the §9 invariant is preserved); only an opt-out `password_auth` boolean is
+configured. The password fallback is **on by default** (OpenSSH-style): when
+keys don't authenticate, the dial prompts for a password, so existing
+password-only hosts and servers that switch key→password need no config change.
+`password_auth: false` opts out (per-tuber or `defaults`). Public-key auth is
+always tried first, so a working key never triggers a password prompt. This
+unblocks password-only SSH servers (the case that surfaced while verifying Phase
+17 on Windows) on every platform. (The phase was originally specced as opt-in;
+it was switched to on-by-default + opt-out before release for graceful handling
+of existing users and server-side key→password changes — see Background.)
 
 ## Background
 
@@ -59,12 +64,14 @@ never triggers a password prompt.
 - [x] `internal/forward/state.go`: add a `Status.PendingPassword string` field
       (mirror `PendingPassphrase`, `state.go:85`); `State` stays `Connecting`
       while blocked.
-- [x] `internal/config`: add per-tuber `password_auth` and `defaults.password_auth`
-      (bool, default false — opt-in, avoids surprise prompts); add
-      `defaults.ssh_password_store` (bool, default false — opt-in keyring,
-      mirror `IdentityPassphraseStore` at `config.go:53`). **No password field
-      anywhere in the schema.** (Validation already only covers `Tubers`, so a
-      bool needs no validation wiring.)
+- [x] `internal/config`: `password_auth` (a `*bool`, on by default) on tubers and
+      `defaults`, plus `defaults.ssh_password_store` (bool, default false — opt-in
+      keyring, mirror `IdentityPassphraseStore` at `config.go:53`). `nil`/true →
+      on (OpenSSH-style prompt when keys fail); an explicit `false` opts out. A
+      `*bool` distinguishes absent (on) from explicit false. ResolvedPasswordAuth
+      is on unless either the tuber or defaults sets false; Defaults.Equal
+      dereferences the pointer so a no-op reload doesn't spuriously restart
+      tubers. **No password field anywhere in the schema.**
 - [x] `internal/secret`: serve passwords by reusing `secret.Store` with a
       namespaced key `password:<user>@<host>:<port>` (passwords are per-account,
       identities per-file); gate keyring persistence on `ssh_password_store`
@@ -86,19 +93,24 @@ never triggers a password prompt.
 - [ ] (optional) `internal/cmd`: `portato add-password <user@host>` /
       `forget-password` keyed by account (keyring), mirroring `add-identity`/
       `forget-identity` (`identity.go:23`).
-- [x] `docs/SPEC.md` §9/§16: document password auth (opt-in, key-preferred,
-      never plaintext, keyring opt-in) and resolve the open question.
+- [x] `docs/SPEC.md` §9/§16: document password auth (on by default/opt-out,
+      key-preferred, never plaintext, keyring opt-in) and resolve the open
+      question.
 - [x] Tests mirroring the passphrase tests: provider blocking + wake, wrong
       password re-prompt, key-preferred ordering (no prompt when a key works),
-      opt-in gating, keyring opt-in.
+      opt-out gating (auto-on default + password_auth:false → key-only),
+      keyring opt-in.
 
 ## Definition of Done
 
-- [x] A tunnel with `password_auth: true` to a password-only SSH server
+- [x] A tunnel (on by default — no flag needed) to a password-only SSH server
       authenticates after the password is supplied via the TUI (and via the
       CLI/HTTP endpoint); the password is never written to config or logs.
-- [x] Public-key auth stays the default and is tried first; a tunnel with a
-      working key never prompts for a password.
+- [x] Public-key auth is always tried first; a tunnel with a working key never
+      prompts for a password.
+- [x] `password_auth: false` opts a tunnel (or, in `defaults`, every tunnel) out
+      of the password fallback (key-only, with reconnect retries; provider never
+      consulted).
 - [x] A wrong password is re-prompted; disabling/restarting a tunnel cancels a
       blocked prompt (ctx cancellation).
 - [ ] With `defaults.ssh_password_store: true` the password persists across

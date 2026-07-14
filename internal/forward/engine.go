@@ -329,7 +329,7 @@ func (e *Engine) Reload(cfg *config.Config) {
 			}
 			continue
 		}
-		if tuberChanged(old, t) || oldDefaults != cfg.Defaults {
+		if tuberChanged(old, t) || !oldDefaults.Equal(cfg.Defaults) {
 			// Reconfigure (not bare Restart): update the tuber's cfg so Status()
 			// reflects the new Local/Remote, and restart only if it was running —
 			// editing an off tuber must not start it.
@@ -374,8 +374,18 @@ func tuberChanged(a, b config.Tuber) bool {
 	if a.User != b.User || a.Host != b.Host || a.Port != b.Port {
 		return true
 	}
-	if a.PasswordAuth != b.PasswordAuth {
+	if !sameBoolPtr(a.PasswordAuth, b.PasswordAuth) {
 		return true
 	}
 	return false
+}
+
+// sameBoolPtr reports whether two *bool are value-equal (nil == nil; nil != &x;
+// &x == &y by pointed value). PasswordAuth is a *bool (Phase 35 opt-out), so a
+// plain != would compare pointers and falsely report a change on every reload.
+func sameBoolPtr(a, b *bool) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return *a == *b
 }

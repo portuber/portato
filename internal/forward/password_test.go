@@ -65,13 +65,12 @@ func passwordTestSetup(t *testing.T, srv *sshtest.SSHD, dir string) (config.Tube
 	knownHosts := filepath.Join(dir, "known_hosts")
 	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
 	cfg := config.Tuber{
-		Name:         "pw-test",
-		Type:         "local",
-		SSH:          "u@" + srv.Addr(),
-		User:         "u",
-		Host:         "127.0.0.1",
-		Port:         srv.Port,
-		PasswordAuth: true,
+		Name: "pw-test",
+		Type: "local",
+		SSH:  "u@" + srv.Addr(),
+		User: "u",
+		Host: "127.0.0.1",
+		Port: srv.Port,
 	}
 	return cfg, def
 }
@@ -313,5 +312,74 @@ func TestPasswordAuthAvailable(t *testing.T) {
 		if got := passwordAuthAvailable(fmt.Errorf("%s", tc.msg)); got != tc.expect {
 			t.Errorf("passwordAuthAvailable(%q) = %v, want %v", tc.msg, got, tc.expect)
 		}
+	}
+}
+
+// pbool returns a pointer to b (Phase 35 password_auth is a *bool opt-out).
+func pbool(b bool) *bool { return &b }
+
+// TestDialSSH_AutoPromptsByDefault asserts the dispatcher routes to the password
+// loop with NO password_auth set (the on-by-default behaviour): a no-key tuber
+// against a password-only server connects once the password is supplied.
+func TestDialSSH_AutoPromptsByDefault(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+	srv := sshtest.NewSSHDPassword(t, "secret")
+	srv.Start()
+	defer srv.Stop()
+	cfg, def := passwordTestSetup(t, srv, t.TempDir())
+	// cfg.PasswordAuth left nil → on by default.
+	if !cfg.ResolvedPasswordAuth(def) {
+		t.Fatal("password auth should be on by default when unset")
+	}
+	provider := newFakePasswordProvider()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	done := make(chan error, 1)
+	var client *ssh.Client
+	go func() {
+		c, err := dialSSH(ctx, cfg, def, slog.Default(), nil, nil, nil, provider, func(string) {})
+		client = c
+		done <- err
+	}()
+	provider.waitCh <- "secret"
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("auto-on default should connect; got %v", err)
+		}
+		_ = client.Close()
+	case <-time.After(15 * time.Second):
+		t.Fatal("dialSSH did not connect via the password loop on the default")
+	}
+}
+
+// TestDialSSH_OptOutIsKeyOnly asserts an explicit password_auth: false keeps the
+// tuber key-only (no password prompt): the provider is never consulted and the
+// dial fails with the standard "no ssh auth method" error rather than blocking.
+func TestDialSSH_OptOutIsKeyOnly(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+	srv := sshtest.NewSSHDPassword(t, "secret")
+	srv.Start()
+	defer srv.Stop()
+	cfg, def := passwordTestSetup(t, srv, t.TempDir())
+	cfg.PasswordAuth = pbool(false) // opt out → key-only
+	if cfg.ResolvedPasswordAuth(def) {
+		t.Fatal("password auth should be off when explicitly false")
+	}
+	provider := newFakePasswordProvider()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := dialSSH(ctx, cfg, def, slog.Default(), nil, nil, nil, provider, func(string) {})
+	if err == nil {
+		t.Fatal("expected a key-only failure (no key, password opted out)")
+	}
+	if !strings.Contains(err.Error(), "no ssh auth method available") {
+		t.Fatalf("expected the key-only 'no ssh auth method' error; got %v", err)
+	}
+	if provider.gets.Load()+provider.waits.Load() != 0 {
+		t.Errorf("opt-out must not consult the password provider (gets=%d waits=%d)",
+			provider.gets.Load(), provider.waits.Load())
 	}
 }
