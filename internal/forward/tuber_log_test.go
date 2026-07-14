@@ -22,7 +22,7 @@ func TestSetStateErrLogsToRing(t *testing.T) {
 	}
 	defer closer.Close()
 
-	tn := NewTuber(context.Background(), tuberCfg("db"), config.Defaults{}, logger, nil)
+	tn := NewTuber(context.Background(), tuberCfg("db"), config.Defaults{}, logger, nil, nil)
 	const msg = "listen 0.0.0.0:9090 on server: boom"
 	tn.setStateErr(Error, msg)
 

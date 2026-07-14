@@ -266,7 +266,7 @@ func TestEngineReloadDefaultsChangedRestarts(t *testing.T) {
 // bug: after editing a tuber, Status() must show the new Local/Remote (the cfg
 // is swapped in place), and an off tuber must not be started.
 func TestTuberReconfigureUpdatesStatus(t *testing.T) {
-	tn := NewTuber(context.Background(), tuberCfg("a"), config.Defaults{}, slog.Default(), nil)
+	tn := NewTuber(context.Background(), tuberCfg("a"), config.Defaults{}, slog.Default(), nil, nil)
 
 	newCfg := tuberCfg("a")
 	newCfg.Remote = "changed:9"

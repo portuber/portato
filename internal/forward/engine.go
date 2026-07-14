@@ -43,6 +43,10 @@ type Engine struct {
 	// provider (Phase 19) supplies identity passphrases to every tuber; nil
 	// disables passphrase support. Set once at construction.
 	provider PassphraseProvider
+	// passwordProvider (Phase 35) supplies SSH account passwords to every tuber
+	// that opts into password_auth; nil disables password support. Set once at
+	// construction.
+	passwordProvider PasswordProvider
 
 	// Event broker (Phase 9): every tuber state change fans out to
 	// subscribers as a non-blocking "something changed" signal. The local
@@ -96,7 +100,9 @@ func (e *Engine) notify() {
 // NewEngine builds an Engine with all tubers constructed but not started.
 // provider (optional, Phase 19) supplies identity passphrases to the tubers;
 // nil disables passphrase support (passphrase-protected keys need an agent).
-func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger, provider PassphraseProvider) *Engine {
+// passwordProvider (optional, Phase 35) supplies SSH account passwords to the
+// tubers that opt into password_auth; nil disables password support.
+func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger, provider PassphraseProvider, passwordProvider PasswordProvider) *Engine {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -104,16 +110,17 @@ func NewEngine(ctx context.Context, cfg *config.Config, log *slog.Logger, provid
 		ctx = context.Background()
 	}
 	e := &Engine{
-		ctx:      ctx,
-		cfg:      cfg,
-		log:      log,
-		defaults: cfg.Defaults,
-		tubers:   make(map[string]tuberer),
-		configs:  make(map[string]config.Tuber),
-		provider: provider,
+		ctx:              ctx,
+		cfg:              cfg,
+		log:              log,
+		defaults:         cfg.Defaults,
+		tubers:           make(map[string]tuberer),
+		configs:          make(map[string]config.Tuber),
+		provider:         provider,
+		passwordProvider: passwordProvider,
 	}
 	e.factory = func(t config.Tuber, d config.Defaults, l *slog.Logger) tuberer {
-		tn := NewTuber(ctx, t, d, l, e.provider)
+		tn := NewTuber(ctx, t, d, l, e.provider, e.passwordProvider)
 		tn.onChange = e.notify
 		return tn
 	}
@@ -365,6 +372,9 @@ func tuberChanged(a, b config.Tuber) bool {
 		return true
 	}
 	if a.User != b.User || a.Host != b.Host || a.Port != b.Port {
+		return true
+	}
+	if a.PasswordAuth != b.PasswordAuth {
 		return true
 	}
 	return false

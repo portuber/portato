@@ -39,7 +39,7 @@ var forwardCmd = &cobra.Command{
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
-		engine := forward.NewEngine(ctx, cfg, log, nil)
+		engine := forward.NewEngine(ctx, cfg, log, nil, nil)
 		if err := engine.Enable(name); err != nil {
 			return fmt.Errorf("enable %q: %w", name, err)
 		}

@@ -32,18 +32,36 @@ const connectTimeout = 5 * time.Second
 // line. Nil-safe: a nil sink records nothing.
 type hostKeySink func(host, fingerprint, line string)
 
-// dialSSH establishes an SSH client connection to the tuber's server.
-// The TCP dial is context-aware so it can be interrupted by tuber shutdown.
-// sink, when non-nil, receives any rejected unknown host key (TOFU prompt).
-// provider, when non-nil, lets a passphrase-protected identity load by
-// obtaining its passphrase (blocking until one is provided); passSink surfaces
-// the identity path that needs a passphrase via Status.PendingPassphrase.
-func dialSSH(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, sink hostKeySink, provider PassphraseProvider, passSink passphraseSink) (*ssh.Client, error) {
-	auths, closeAgent, err := authMethods(ctx, cfg, def, log, provider, passSink)
-	if err != nil {
-		return nil, err
+// dialSSH establishes an SSH client connection to the tuber's server. The TCP
+// dial is context-aware so it can be interrupted by tuber shutdown. sink, when
+// non-nil, receives any rejected unknown host key (TOFU prompt). provider/passSink
+// enable passphrase-protected identity loading (Phase 19); pwProvider/pwSink
+// enable interactive SSH password auth (Phase 35). All may be nil.
+//
+// When password_auth is off (the default) it is the key-only path — agent →
+// identity, one dial — failing with "no ssh auth method available" if neither
+// yields a usable method. When password_auth is on it runs
+// dialWithPasswordPrompt, which probes keys first (so a working key never
+// prompts) and otherwise loops a password dial, re-prompting on a wrong
+// password with no backoff.
+func dialSSH(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, sink hostKeySink, provider PassphraseProvider, passSink passphraseSink, pwProvider PasswordProvider, pwSink passwordSink) (*ssh.Client, error) {
+	if !cfg.ResolvedPasswordAuth(def) {
+		auths, closeAgent := authMethods(ctx, cfg, def, log, provider, passSink)
+		defer closeAgent()
+		if len(auths) == 0 {
+			return nil, errors.New("no ssh auth method available: start ssh-agent (SSH_AUTH_SOCK) or configure an identity key, or enable password_auth")
+		}
+		return dialOnce(ctx, cfg, def, log, sink, auths)
 	}
-	defer closeAgent()
+	return dialWithPasswordPrompt(ctx, cfg, def, log, sink, provider, passSink, pwProvider, pwSink)
+}
+
+// dialOnce performs a single SSH dial with the given auth methods. The TCP dial
+// is context-aware; the handshake is bounded by connectTimeout. sink receives a
+// rejected unknown host key. Extracted from dialSSH (Phase 35) so both the
+// key-only path and dialWithPasswordPrompt's password loop share one dial
+// primitive. mapDialError translates raw handshake errors into readable ones.
+func dialOnce(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, sink hostKeySink, auths []ssh.AuthMethod) (*ssh.Client, error) {
 	hostCb, err := hostKeyCallback(def, log, sink)
 	if err != nil {
 		return nil, err
@@ -77,12 +95,17 @@ func dialSSH(ctx context.Context, cfg config.Tuber, def config.Defaults, log *sl
 	return ssh.NewClient(sc, chans, reqs), nil
 }
 
-// authMethods builds the SSH auth-method chain. The returned closer must be
-// invoked once the SSH handshake is done; it keeps the ssh-agent connection
-// open for the lifetime of the agent-backed signers (which sign lazily during
-// the handshake) and is a no-op when no agent is used. provider/passSink enable
-// passphrase-protected identity loading (Phase 19); both may be nil.
-func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, provider PassphraseProvider, passSink passphraseSink) ([]ssh.AuthMethod, func() error, error) {
+// authMethods builds the public-key auth-method chain (ssh-agent then the
+// configured identity). It returns only key methods — never a password method
+// (Phase 35 handles that separately in dialWithPasswordPrompt). The returned
+// closer must be invoked once the SSH handshake is done; it keeps the
+// ssh-agent connection open for the lifetime of the agent-backed signers (which
+// sign lazily during the handshake) and is a no-op when no agent is used.
+// provider/passSink enable passphrase-protected identity loading (Phase 19); all
+// may be nil. An empty method slice (no agent, no loadable identity) is returned
+// without error: the caller decides whether that is fatal (key-only dial) or a
+// cue to fall back to password auth.
+func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, provider PassphraseProvider, passSink passphraseSink) ([]ssh.AuthMethod, func() error) {
 	var (
 		methods []ssh.AuthMethod
 		closers []io.Closer
@@ -100,16 +123,13 @@ func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log
 			log.Warn("failed to load identity key", "path", idPath, "err", err)
 		}
 	}
-	if len(methods) == 0 {
-		return nil, nil, errors.New("no ssh auth method available: start ssh-agent (SSH_AUTH_SOCK) or configure an identity key")
-	}
 	closeAgent := func() error {
 		for _, c := range closers {
 			_ = c.Close()
 		}
 		return nil
 	}
-	return methods, closeAgent, nil
+	return methods, closeAgent
 }
 
 func hostKeyCallback(def config.Defaults, log *slog.Logger, sink hostKeySink) (ssh.HostKeyCallback, error) {

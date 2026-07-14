@@ -83,6 +83,14 @@ type Status struct {
 	// blocks (PassphraseProvider.Wait) until a passphrase arrives, rather than
 	// spinning the reconnect backoff. Empty when not applicable.
 	PendingPassphrase string `json:"pending_passphrase,omitempty"`
+
+	// Password (Phase 35): when the tuber has opted into password_auth, no
+	// usable key authenticated, and no password is available yet, this carries
+	// the server account ("password:<user>@<host>:<port>") that needs one, so
+	// the TUI/CLI can prompt. The dial blocks (PasswordProvider.Wait) until a
+	// password arrives, rather than spinning the reconnect backoff. Empty when
+	// not applicable. State stays Connecting while blocked.
+	PendingPassword string `json:"pending_password,omitempty"`
 }
 
 func (s Status) Uptime() time.Duration {

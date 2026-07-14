@@ -82,7 +82,7 @@ func TestPassphraseIdentity_ConnectsNoAgent(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTuber(ctx, cfg, def, slog.Default(), store)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), store, nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestPassphraseIdentity_BlocksThenProvided(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTuber(ctx, cfg, def, slog.Default(), store)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), store, nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -169,7 +169,7 @@ func TestPassphraseIdentity_WrongThenRight(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTuber(ctx, cfg, def, slog.Default(), store)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), store, nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}

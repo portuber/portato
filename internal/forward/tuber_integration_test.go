@@ -168,7 +168,7 @@ func TestTuberTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -281,7 +281,7 @@ func TestTuberHonoursKnownHostKeyType(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -352,7 +352,7 @@ func TestTuberAuthViaAgent(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -433,7 +433,7 @@ func TestTuberRemoteTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -604,7 +604,7 @@ func TestTuberDynamicTrafficAndReconnect(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	tun := NewTuber(ctx, cfg, def, slog.Default(), nil)
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
 	if err := tun.Start(ctx); err != nil {
 		t.Fatalf("Start: %v", err)
 	}

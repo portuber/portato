@@ -11,7 +11,7 @@ import (
 
 func mustTuber(t *testing.T, cfg config.Tuber) *Tuber {
 	t.Helper()
-	return NewTuber(context.Background(), cfg, config.Defaults{}, slog.Default(), nil)
+	return NewTuber(context.Background(), cfg, config.Defaults{}, slog.Default(), nil, nil)
 }
 
 // TestStartBindFailureSetsErrorNotRunning reproduces the wedge root cause: a

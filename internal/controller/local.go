@@ -24,6 +24,10 @@ type Local struct {
 	// them to the OS keyring when cfg.Defaults.IdentityPassphraseStore is on).
 	// nil only in tests that build a Local literal directly.
 	secrets *secret.Store
+	// passwords caches SSH account passwords for the engine's dials (Phase 35),
+	// keyed by "password:<user>@<host>:<port>", and persists them to the OS
+	// keyring when cfg.Defaults.SSHPasswordStore is on. nil only in tests.
+	passwords *secret.Store
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -45,15 +49,21 @@ func NewLocal(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routel
 	store := secret.NewStore(secret.DefaultBackend(), func() bool {
 		return cfg.Defaults.IdentityPassphraseStore
 	})
+	// Passwords live in a separate store (per-account keys) with their own
+	// persist flag (ssh_password_store), so the two opt-ins are independent.
+	passwordStore := secret.NewStore(secret.DefaultBackend(), func() bool {
+		return cfg.Defaults.SSHPasswordStore
+	})
 	return &Local{
-		engine:  forward.NewEngine(ctx, cfg, log, store),
-		cfg:     cfg,
-		cfgPath: cfgPath,
-		log:     log,
-		ring:    ring,
-		secrets: store,
-		ctx:     ctx,
-		cancel:  cancel,
+		engine:    forward.NewEngine(ctx, cfg, log, store, passwordStore),
+		cfg:       cfg,
+		cfgPath:   cfgPath,
+		log:       log,
+		ring:      ring,
+		secrets:   store,
+		passwords: passwordStore,
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 }
 
@@ -215,6 +225,41 @@ func identityPathFor(statuses []forward.Status, cfg *config.Config, name string)
 	for _, t := range cfg.Tubers {
 		if t.Name == name {
 			return t.ResolvedIdentity(cfg.Defaults)
+		}
+	}
+	return ""
+}
+
+// AcceptPassword stores the password for the tuber's SSH account and unblocks a
+// dial waiting on it (Phase 35). The account key is the one the dial reported
+// pending (Status.PendingPassword), falling back to the tuber's configured
+// user@host:port. No Restart: the blocked dial wakes on the store.
+func (l *Local) AcceptPassword(name, password string) error {
+	if l.passwords == nil {
+		return fmt.Errorf("password storage unavailable")
+	}
+	key := accountKeyFor(l.engine.List(), l.cfg, name)
+	if key == "" {
+		return fmt.Errorf("no SSH account to store a password for %q", name)
+	}
+	if err := l.passwords.Set(key, password); err != nil {
+		return fmt.Errorf("store password: %w", err)
+	}
+	return nil
+}
+
+// accountKeyFor resolves the account key a password applies to: the key the
+// dial reported pending (Status.PendingPassword), or the tuber's configured
+// account (config.Tuber.PasswordAccountKey). "" when the tuber is unknown.
+func accountKeyFor(statuses []forward.Status, cfg *config.Config, name string) string {
+	for _, st := range statuses {
+		if st.Name == name && st.PendingPassword != "" {
+			return st.PendingPassword
+		}
+	}
+	for _, t := range cfg.Tubers {
+		if t.Name == name {
+			return t.PasswordAccountKey()
 		}
 	}
 	return ""

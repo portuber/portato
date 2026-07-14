@@ -62,6 +62,14 @@ type Tuber struct {
 	// the one-shot `portato forward` command → no passphrase support).
 	provider PassphraseProvider
 
+	// Password (Phase 35): the server account currently awaiting a password
+	// (set by passwordSink while the dial blocks on PasswordProvider.Wait),
+	// surfaced through Status.PendingPassword. Empty when none is needed.
+	pendingPassword string
+	// passwordProvider obtains the password for a password-only account (nil
+	// disables password support even if password_auth is on).
+	passwordProvider PasswordProvider
+
 	// onChange is wired by the Engine (Phase 9) so every state transition
 	// fans out to event subscribers. Nil-safe: standalone tests / fakes
 	// leave it unset. Fires after the state mutex is released.
@@ -78,7 +86,8 @@ func (t *Tuber) notifyChange() {
 
 // NewTuber constructs a tuber. baseCtx is reused for manual Restart. provider
 // (optional) enables passphrase-protected identity loading (Phase 19).
-func NewTuber(baseCtx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, provider PassphraseProvider) *Tuber {
+// passwordProvider (optional) enables interactive password auth (Phase 35).
+func NewTuber(baseCtx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, provider PassphraseProvider, passwordProvider PasswordProvider) *Tuber {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -86,11 +95,12 @@ func NewTuber(baseCtx context.Context, cfg config.Tuber, def config.Defaults, lo
 		baseCtx = context.Background()
 	}
 	return &Tuber{
-		baseCtx:  baseCtx,
-		cfg:      cfg,
-		defaults: def,
-		log:      log.With("tuber", cfg.Name),
-		provider: provider,
+		baseCtx:          baseCtx,
+		cfg:              cfg,
+		defaults:         def,
+		log:              log.With("tuber", cfg.Name),
+		provider:         provider,
+		passwordProvider: passwordProvider,
 	}
 }
 
@@ -282,6 +292,7 @@ func (t *Tuber) Status() Status {
 		PendingFingerprint: t.pendingFingerprint,
 		PendingHostLine:    t.pendingHostLine,
 		PendingPassphrase:  t.pendingPassphrase,
+		PendingPassword:    t.pendingPassword,
 	}
 }
 
@@ -333,6 +344,30 @@ func (t *Tuber) clearPendingPassphrase() {
 	t.notifyChange()
 }
 
+// passwordSink is wired into dialSSH: it records the server account awaiting a
+// password (account != "") so Status.PendingPassword surfaces it for the UI to
+// prompt, or clears it (account == "") once the password is accepted. Called
+// from the dial goroutine.
+func (t *Tuber) passwordSink(account string) {
+	t.mu.Lock()
+	t.pendingPassword = account
+	t.mu.Unlock()
+	t.notifyChange()
+}
+
+// clearPendingPassword forgets a recorded password need. Called at the start of
+// each dial so a stale entry does not outlive the attempt that produced it.
+func (t *Tuber) clearPendingPassword() {
+	t.mu.Lock()
+	if t.pendingPassword == "" {
+		t.mu.Unlock()
+		return
+	}
+	t.pendingPassword = ""
+	t.mu.Unlock()
+	t.notifyChange()
+}
+
 // PendingHostLine returns the known_hosts line for the last rejected unknown
 // host (and ok=false when there is none). AcceptHost (controller) reads it.
 func (t *Tuber) PendingHostLine() (line string, ok bool) {
@@ -378,7 +413,8 @@ func (t *Tuber) run(ctx context.Context, ln net.Listener, done chan<- struct{}) 
 		t.setState(Connecting)
 		t.clearPendingHost()
 		t.clearPendingPassphrase()
-		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink)
+		t.clearPendingPassword()
+		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink, t.passwordProvider, t.passwordSink)
 		if err != nil {
 			t.setStateErr(Error, err.Error())
 			attempt++
@@ -527,7 +563,8 @@ func (t *Tuber) runRemote(ctx context.Context, done chan<- struct{}) {
 		t.setState(Connecting)
 		t.clearPendingHost()
 		t.clearPendingPassphrase()
-		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink)
+		t.clearPendingPassword()
+		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink, t.passwordProvider, t.passwordSink)
 		if err != nil {
 			t.setStateErr(Error, err.Error())
 			attempt++

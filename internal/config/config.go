@@ -326,6 +326,16 @@ func (t Tuber) ResolvedPasswordAuth(d Defaults) bool {
 	return t.PasswordAuth || d.PasswordAuth
 }
 
+// PasswordAccountKey is the shared provider key under which a tuber's SSH
+// password is cached/stored (Phase 35): "password:<user>@<host>:<port>". It is
+// namespaced ("password:") so it never collides with an identity-passphrase key
+// (which is the identity file path). Both the forward dial (Get) and the
+// controller/daemon handlers (Set) build it from this one method so the two
+// sides can never disagree. User/Host/Port are populated by prepare() from SSH.
+func (t Tuber) PasswordAccountKey() string {
+	return fmt.Sprintf("password:%s@%s:%d", t.User, t.Host, t.Port)
+}
+
 // ResolvedSocks5User returns the SOCKS5 username a type=dynamic tuber should
 // authenticate with: the tuber-level value wins, otherwise the defaults value
 // (Phase 20). Empty means no auth (a password alone is meaningless — see

@@ -82,6 +82,12 @@ type Server struct {
 	// store the passphrase handler writes to. nil only in handler tests that
 	// build a server without the engine/provider path.
 	secrets *secret.Store
+	// passwords caches SSH account passwords for the engine's dials (Phase 35),
+	// keyed by "password:<user>@<host>:<port>", and persists them to the OS
+	// keyring when cfg.Defaults.SSHPasswordStore is on. It is the
+	// forward.PasswordProvider injected into the engine and the store the
+	// password handler writes to. nil only in handler tests.
+	passwords *secret.Store
 
 	// ipcToken controls whether Start generates and enforces a bearer token.
 	// Set on the production server from the escape-hatch flag; the test helper
@@ -182,7 +188,13 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ri
 		return s.cfg.Defaults.IdentityPassphraseStore
 	})
 	s.secrets = store
-	s.engine = forward.NewEngine(s.ctx, cfg, log, store)
+	// Passwords live in a separate store (per-account keys) with their own
+	// persist flag (ssh_password_store), so the two opt-ins are independent.
+	passwordStore := secret.NewStore(secret.DefaultBackend(), func() bool {
+		return s.cfg.Defaults.SSHPasswordStore
+	})
+	s.passwords = passwordStore
+	s.engine = forward.NewEngine(s.ctx, cfg, log, store, passwordStore)
 	s.ipcToken = !ipcTokenDisabled
 	s.watcher = newWatcher(cfgPath, s.reloadFromWatch, log)
 	return s, nil
