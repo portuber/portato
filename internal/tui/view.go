@@ -367,7 +367,7 @@ func formatUptime(d time.Duration) string {
 }
 
 func (m Model) footer() string {
-	return footerStyle.Render("↑↓/jk move · space toggle · p passphrase · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · / filter · R reload · ? help · q quit")
+	return footerStyle.Render("↑↓/jk move · space toggle · p passphrase · o password · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · / filter · R reload · ? help · q quit")
 }
 
 func (m Model) helpBlock() string {
@@ -376,6 +376,7 @@ func (m Model) helpBlock() string {
 		"↓ / j        move cursor down",
 		"space        toggle selected tuber (on/off)",
 		"p            enter passphrase for the selected tuber",
+		"o            enter SSH password for the selected tuber (also auto-opens)",
 		"r            restart selected tuber",
 		"a            enable all tubers",
 		"x            disable all tubers",
@@ -465,18 +466,30 @@ func (m Model) passphraseView() string {
 
 // passwordView renders the Phase 35 SSH-password modal: the tuber's dial is
 // blocked on a password-only account, and the user types the password (masked)
-// and submits it via Controller.AcceptPassword. After a rejected attempt a hint
-// line appears.
+// and submits it via Controller.AcceptPassword. The "wrong password" hint is
+// driven by Status.PasswordAttempts (the dial's real rejection count), so it
+// only appears when the server actually rejected a submitted password.
 func (m Model) passwordView() string {
 	hint := ""
-	if m.passwordAttempts > 0 {
-		hint = fmt.Sprintf("\nwrong password, try again (attempt %d)", m.passwordAttempts+1)
+	if n := passwordAttemptsFor(m.list, m.passwordTarget); n > 0 {
+		hint = fmt.Sprintf("\nwrong password, try again (rejected %d)", n)
 	}
 	line := fmt.Sprintf(
 		"Password for %s\n%s[enter] submit  ·  [esc] cancel%s",
 		m.passwordTarget, m.passwordInput.View(), hint,
 	)
 	return modalStyle.Render(line)
+}
+
+// passwordAttemptsFor looks up a tuber's PasswordAttempts (server rejections)
+// in a status snapshot, for the password modal's retry hint. 0 when absent.
+func passwordAttemptsFor(list []controller.Status, name string) int {
+	for _, s := range list {
+		if s.Name == name {
+			return s.PasswordAttempts
+		}
+	}
+	return 0
 }
 
 func joinRight(left, right string, width int) string {

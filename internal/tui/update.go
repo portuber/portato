@@ -68,7 +68,6 @@ func (m Model) handleTick(_ tickMsg) (Model, tea.Cmd) {
 	if m.enteringPassword && !pendingPasswordFor(m.list, m.passwordTarget) {
 		m.enteringPassword = false
 		m.passwordTarget = ""
-		m.passwordAttempts = 0
 		m.passwordInput.SetValue("")
 	}
 	// Forget a stale dismissal once the cursor's tuber has no pending
@@ -349,6 +348,11 @@ func (m Model) handleAcceptConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // PendingPassphrase clears — see the tick handler — or stays open with a retry
 // hint on a wrong passphrase); esc cancels.
 func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// Leading space on an empty masked field: invisible and almost always
+	// accidental — drop it (same guard as the password modal).
+	if m.passphraseInput.Value() == "" && (k.String() == "space" || k.Text == " ") {
+		return m, nil
+	}
 	switch k.String() {
 	case "enter":
 		pass := m.passphraseInput.Value()
@@ -462,15 +466,20 @@ func (m Model) openPassphraseModal(name string) (Model, tea.Cmd) {
 // the masked input; enter submits via Controller.AcceptPassword (the blocked
 // dial wakes on the store; the modal auto-closes once Status.PendingPassword
 // clears — see the tick handler — or stays open with a retry hint on a wrong
-// password); esc cancels.
+// password); esc cancels. A leading space on an empty field is ignored so an
+// accidental space-press (invisible under the mask) can't corrupt the value.
 func (m Model) handlePasswordKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// Leading space on an empty masked field: invisible and almost always
+	// accidental — drop it. Spaces inside a password are kept (field non-empty).
+	if m.passwordInput.Value() == "" && (k.String() == "space" || k.Text == " ") {
+		return m, nil
+	}
 	switch k.String() {
 	case "enter":
 		pw := m.passwordInput.Value()
 		name := m.passwordTarget
 		_ = m.ctrl.AcceptPassword(name, pw)
 		m.passwordInput.SetValue("")
-		m.passwordAttempts++
 		m.list = m.ctrl.List()
 		// Re-arm the cursor blink in case the server rejects it and the modal
 		// stays open for another attempt.
@@ -481,7 +490,6 @@ func (m Model) handlePasswordKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.dismissedPending = pendingKeyForName(m.list, m.passwordTarget)
 		m.enteringPassword = false
 		m.passwordTarget = ""
-		m.passwordAttempts = 0
 		m.passwordInput.SetValue("")
 		return m, nil
 	}
@@ -502,12 +510,11 @@ func pendingPasswordFor(list []controller.Status, name string) bool {
 }
 
 // openPasswordModal arms the SSH-password modal for the named tuber (resetting
-// the masked input and the attempt counter) and returns the masked-input focus
-// command. Shared by the manual `o` affordance and the tick auto-open. Phase 35.
+// the masked input) and returns the masked-input focus command. Shared by the
+// manual `o` affordance and the tick auto-open. Phase 35.
 func (m Model) openPasswordModal(name string) (Model, tea.Cmd) {
 	m.enteringPassword = true
 	m.passwordTarget = name
-	m.passwordAttempts = 0
 	m.passwordInput.SetValue("")
 	return m, m.passwordInput.Focus()
 }

@@ -91,6 +91,11 @@ type Status struct {
 	// password arrives, rather than spinning the reconnect backoff. Empty when
 	// not applicable. State stays Connecting while blocked.
 	PendingPassword string `json:"pending_password,omitempty"`
+	// PasswordAttempts (Phase 35) is how many times the server has rejected a
+	// submitted password for this tuber. The TUI uses it to show an accurate
+	// "wrong password" hint only on a real rejection. 0 when none / on a fresh
+	// dial attempt.
+	PasswordAttempts int `json:"password_attempts,omitempty"`
 }
 
 func (s Status) Uptime() time.Duration {

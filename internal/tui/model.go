@@ -56,14 +56,14 @@ type Model struct {
 	passphraseInput    textinput.Model
 	passphraseAttempts int
 	// enteringPassword shows the SSH-password prompt modal (Phase 35). Raised
-	// by pressing space on a tuber whose dial is blocked on a password-only
-	// account (Status.PendingPassword). The input is masked; enter submits via
-	// Controller.AcceptPassword, esc cancels. passwordAttempts counts submits
-	// so a wrong password shows a retry hint.
+	// by pressing `o` on (or auto-opening on) a tuber whose dial is blocked on
+	// a password-only account (Status.PendingPassword). The input is masked;
+	// enter submits via Controller.AcceptPassword, esc cancels. The "wrong
+	// password" hint is driven by Status.PasswordAttempts (the dial's real
+	// rejection count), not a local counter.
 	enteringPassword bool
 	passwordTarget   string
 	passwordInput    textinput.Model
-	passwordAttempts int
 	// dismissedPending is the pending-prompt key (a passphrase path, a password
 	// account, or a host line) the user cancelled with esc, so the auto-open on
 	// tick does not re-pop the same prompt endlessly. Cleared once the cursor's

@@ -66,6 +66,11 @@ type Tuber struct {
 	// (set by passwordSink while the dial blocks on PasswordProvider.Wait),
 	// surfaced through Status.PendingPassword. Empty when none is needed.
 	pendingPassword string
+	// passwordAttempts counts how many times the server rejected a submitted
+	// password for this tuber (driven by passwordSink re-prompts). Surfaced via
+	// Status.PasswordAttempts so the TUI shows an accurate "wrong password"
+	// hint only on a real rejection, not on every submit. Reset on a new dial.
+	passwordAttempts int
 	// passwordProvider obtains the password for a password-only account (nil
 	// disables password support even if password_auth is on).
 	passwordProvider PasswordProvider
@@ -199,7 +204,9 @@ func (t *Tuber) Stop() error {
 		// bind: Start set state=Error but never flipped running, so it never
 		// reached the teardown path below. Fold it back to Off so Disable (and
 		// the TUI toggle) can clear the error and a subsequent Enable rebinds.
-		changed := t.state != Off || t.errMsg != ""
+		// Also drop any stale pending prompt so no "password?"/"passphrase?"
+		// hint or modal lingers over a stopped tuber.
+		changed := t.state != Off || t.errMsg != "" || t.clearPendingLocked()
 		t.state = Off
 		t.errMsg = ""
 		t.connectedAt = time.Time{}
@@ -213,6 +220,7 @@ func (t *Tuber) Stop() error {
 	t.state = Off
 	t.errMsg = ""
 	t.connectedAt = time.Time{}
+	t.clearPendingLocked()
 	ln := t.listener
 	cancel := t.cancel
 	done := t.done
@@ -259,13 +267,17 @@ func (t *Tuber) Reconfigure(cfg config.Tuber, def config.Defaults) error {
 	t.defaults = def
 	// A failed bind leaves state=Error with running=false; updating cfg (e.g.
 	// a new Local port) must not keep showing the stale error referencing the
-	// old address. Reset a non-running tuber to a clean Off.
+	// old address. Reset a non-running tuber to a clean Off, and drop any
+	// stale pending prompt.
 	changed := false
-	if !running && (t.state != Off || t.errMsg != "") {
-		t.state = Off
-		t.errMsg = ""
-		t.connectedAt = time.Time{}
-		changed = true
+	if !running {
+		pc := t.clearPendingLocked()
+		if t.state != Off || t.errMsg != "" || pc {
+			t.state = Off
+			t.errMsg = ""
+			t.connectedAt = time.Time{}
+			changed = true
+		}
 	}
 	t.mu.Unlock()
 	if running {
@@ -293,6 +305,7 @@ func (t *Tuber) Status() Status {
 		PendingHostLine:    t.pendingHostLine,
 		PendingPassphrase:  t.pendingPassphrase,
 		PendingPassword:    t.pendingPassword,
+		PasswordAttempts:   t.passwordAttempts,
 	}
 }
 
@@ -347,25 +360,54 @@ func (t *Tuber) clearPendingPassphrase() {
 // passwordSink is wired into dialSSH: it records the server account awaiting a
 // password (account != "") so Status.PendingPassword surfaces it for the UI to
 // prompt, or clears it (account == "") once the password is accepted. Called
-// from the dial goroutine.
+// from the dial goroutine. Each re-prompt (a non-empty account while one was
+// already pending) means the server rejected the previous password, so it
+// bumps passwordAttempts for an accurate TUI hint.
 func (t *Tuber) passwordSink(account string) {
 	t.mu.Lock()
-	t.pendingPassword = account
+	if account == "" {
+		t.pendingPassword = ""
+	} else {
+		if t.pendingPassword != "" {
+			t.passwordAttempts++
+		}
+		t.pendingPassword = account
+	}
 	t.mu.Unlock()
 	t.notifyChange()
 }
 
-// clearPendingPassword forgets a recorded password need. Called at the start of
-// each dial so a stale entry does not outlive the attempt that produced it.
+// clearPendingPassword forgets a recorded password need and the rejection
+// counter. Called at the start of each dial so a stale entry does not outlive
+// the attempt that produced it. Always resets (even if the pending account was
+// already cleared by a success), so a fresh dial starts at 0 attempts.
 func (t *Tuber) clearPendingPassword() {
 	t.mu.Lock()
-	if t.pendingPassword == "" {
-		t.mu.Unlock()
-		return
-	}
+	changed := t.pendingPassword != "" || t.passwordAttempts != 0
 	t.pendingPassword = ""
+	t.passwordAttempts = 0
 	t.mu.Unlock()
-	t.notifyChange()
+	if changed {
+		t.notifyChange()
+	}
+}
+
+// clearPendingLocked resets every pending prompt (unknown host, passphrase,
+// password) and the password rejection counter. Caller must hold t.mu. It
+// returns whether any field was non-empty so Stop/Reconfigure can decide
+// whether to fire notifyChange. Used on stop/reconfigure/dial-error so an Off
+// or errored tuber shows no stale "password?"/"passphrase?" hint and no modal
+// auto-opens over a dead tuber (Phase 35 dogfooding fix).
+func (t *Tuber) clearPendingLocked() bool {
+	changed := t.pendingHost != "" || t.pendingFingerprint != "" ||
+		t.pendingHostLine != "" || t.pendingPassphrase != "" || t.pendingPassword != ""
+	t.pendingHost = ""
+	t.pendingFingerprint = ""
+	t.pendingHostLine = ""
+	t.pendingPassphrase = ""
+	t.pendingPassword = ""
+	t.passwordAttempts = 0
+	return changed
 }
 
 // PendingHostLine returns the known_hosts line for the last rejected unknown
@@ -416,6 +458,12 @@ func (t *Tuber) run(ctx context.Context, ln net.Listener, done chan<- struct{}) 
 		t.clearPendingPassword()
 		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink, t.passwordProvider, t.passwordSink)
 		if err != nil {
+			// The dial exited (error/bail/cancel) and is no longer waiting on a
+			// prompt — drop pending prompts so no modal lingers during the
+			// backoff before the next attempt re-surfaces them.
+			t.clearPendingHost()
+			t.clearPendingPassphrase()
+			t.clearPendingPassword()
 			t.setStateErr(Error, err.Error())
 			attempt++
 			if !t.sleep(ctx, nextBackoff(attempt)) {
@@ -566,6 +614,12 @@ func (t *Tuber) runRemote(ctx context.Context, done chan<- struct{}) {
 		t.clearPendingPassword()
 		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink, t.passwordProvider, t.passwordSink)
 		if err != nil {
+			// The dial exited (error/bail/cancel) and is no longer waiting on a
+			// prompt — drop pending prompts so no modal lingers during the
+			// backoff before the next attempt re-surfaces them.
+			t.clearPendingHost()
+			t.clearPendingPassphrase()
+			t.clearPendingPassword()
 			t.setStateErr(Error, err.Error())
 			attempt++
 			if !t.sleep(ctx, nextBackoff(attempt)) {

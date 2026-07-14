@@ -122,6 +122,31 @@ never triggers a password prompt.
       covered by unit tests.
 - [x] SPEC §9/§16 updated.
 
+## Follow-ups from dogfooding
+
+A real standalone run (connect a password host → quit → re-run) exposed a state
+bug and two UX traps. Root cause: pressing `space` on a password-pending tuber
+DISABLES it (space toggles; the modal opens via `o` or auto-open), which cancels
+the dial — but `Tuber.Stop()` did not clear the `pending*` fields, so the tuber
+still reported `PendingPassword`, the tick re-opened the modal over an already-
+dead tuber, and submits went into the cache with no dial consuming them (the
+"wrong password, try again" counter just climbed per enter). A later re-enable
+connected from the cache without prompting.
+
+- [x] **Fix 1 (must):** `Tuber.Stop()` (and `Reconfigure`, and the run-loop error
+      branch) clear `pendingHost/Passphrase/Password`, so an Off/errored tuber
+      shows no stale "password?" and no modal auto-opens over a dead tuber.
+- [x] **Fix 2:** the password/passphrase modal ignores a leading space when the
+      field is empty — an accidental space-press (masked, invisible) no longer
+      corrupts the value. Tradeoff: a password/passphrase that genuinely starts
+      with a space can't be entered as the first char (rare).
+- [x] **Fix 3:** the "wrong password" hint is now driven by the dial's actual
+      rejection count (`Status.PasswordAttempts`, derived in `passwordSink`),
+      not a per-submit TUI counter — so it only appears when the server really
+      rejected the password.
+- [x] **Fix 4:** the help overlay documents `o` (and that the modal auto-opens);
+      `space` is toggle-only.
+
 ## Verification
 
 ```sh

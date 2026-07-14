@@ -42,9 +42,6 @@ func TestPasswordModal_OpenTypeSubmitCancel(t *testing.T) {
 	if got := f.passwords["db"]; got != "secret" {
 		t.Errorf("AcceptPassword not called with the typed value; got %q", got)
 	}
-	if m.passwordAttempts != 1 {
-		t.Errorf("attempts = %d, want 1 after a submit", m.passwordAttempts)
-	}
 	if m.passwordInput.Value() != "" {
 		t.Errorf("input should clear after submit; got %q", m.passwordInput.Value())
 	}
@@ -97,9 +94,6 @@ func TestPasswordModal_AutoCloseOnAccept(t *testing.T) {
 	if m.enteringPassword {
 		t.Error("modal should auto-close once PendingPassword clears")
 	}
-	if m.passwordAttempts != 0 {
-		t.Errorf("attempts should reset on close; got %d", m.passwordAttempts)
-	}
 }
 
 // TestPasswordModal_SpaceDisablesPending is the Phase 30 regression applied to
@@ -122,6 +116,34 @@ func TestPasswordModal_SpaceDisablesPending(t *testing.T) {
 	}
 	if len(f.enabled) != 0 {
 		t.Errorf("space must not enable a pending tuber; got enabled=%v", f.enabled)
+	}
+}
+
+// TestPasswordModal_LeadingSpaceIgnored asserts Fix 2: a space pressed on an
+// empty password field is ignored (an accidental space-press is invisible under
+// the mask and would otherwise corrupt the value), while a normal character is
+// still accepted.
+func TestPasswordModal_LeadingSpaceIgnored(t *testing.T) {
+	f := newFake(controller.Status{
+		Name: "db", Type: "local", Local: "1", Remote: "r",
+		State: controller.Connecting, PendingPassword: "password:u@h:22",
+	})
+	m := New(f, Options{Mode: "standalone"})
+	next, _ := m.handleKey(keyPress("o"))
+	m = next.(Model)
+
+	// A leading spacebar on the empty field must not be added.
+	next, _ = m.handlePasswordKey(specialKey(tea.KeySpace))
+	m = next.(Model)
+	if got := m.passwordInput.Value(); got != "" {
+		t.Fatalf("leading space should be ignored; input = %q", got)
+	}
+
+	// A normal character is still accepted.
+	next, _ = m.handlePasswordKey(keyPress("a"))
+	m = next.(Model)
+	if got := m.passwordInput.Value(); got != "a" {
+		t.Fatalf("letter should be accepted; input = %q want %q", got, "a")
 	}
 }
 
