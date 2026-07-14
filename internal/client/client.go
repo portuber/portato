@@ -138,6 +138,15 @@ func (c *Client) SetPassphrase(name, passphrase string) error {
 		map[string]string{"passphrase": passphrase})
 }
 
+// SetPassword sends the tuber's SSH password to the daemon, which stores it
+// (in-memory cache, plus the OS keyring when ssh_password_store is on) and
+// unblocks a dial waiting on it. The password is keyed by server account, not
+// persisted in config. Phase 35.
+func (c *Client) SetPassword(name, password string) error {
+	return c.sendBody(http.MethodPost, fmt.Sprintf("/tubers/%s/password", name),
+		map[string]string{"password": password})
+}
+
 // AddIdentity tells the daemon to store a passphrase for an identity PATH (not a
 // tuber), loading it into the cache and waking any dial blocked on it. Used by
 // `portato add-identity` after it has written the keyring out-of-band. Phase 19.

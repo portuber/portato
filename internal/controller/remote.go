@@ -31,6 +31,7 @@ type daemonClient interface {
 	Logs(name string) ([]routelog.Entry, error)
 	AcceptHost(name string) error
 	SetPassphrase(name, passphrase string) error
+	SetPassword(name, password string) error
 }
 
 // Remote is a Controller backed by the daemon via an HTTP client over a unix
@@ -100,6 +101,13 @@ func (r *Remote) AcceptHost(name string) error { return r.client.AcceptHost(name
 // stores it and unblocks a dial waiting on it (Phase 19 passphrase prompt).
 func (r *Remote) AcceptPassphrase(name, passphrase string) error {
 	return r.client.SetPassphrase(name, passphrase)
+}
+
+// AcceptPassword sends the tuber's SSH password to the daemon, which stores it
+// and unblocks a dial waiting on it (Phase 35 password prompt). A wrong
+// password is rejected by the server and re-prompted by the daemon's dial loop.
+func (r *Remote) AcceptPassword(name, password string) error {
+	return r.client.SetPassword(name, password)
 }
 
 // LiveListenerFiles is a no-op for the remote (attach) controller: it owns no

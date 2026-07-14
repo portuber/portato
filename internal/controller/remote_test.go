@@ -71,6 +71,8 @@ func (f *fakeClient) AcceptHost(string) error { return f.err }
 
 func (f *fakeClient) SetPassphrase(string, string) error { return f.err }
 
+func (f *fakeClient) SetPassword(string, string) error { return f.err }
+
 // Events pops the next queued stream; when none remain it blocks on ctx,
 // modelling a daemon that is up but produces no further events. This lets the
 // reconnect loop be exercised deterministically without a real server.

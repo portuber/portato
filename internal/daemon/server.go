@@ -363,6 +363,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /tubers/{name}/restart", s.handleRestart)
 	mux.HandleFunc("POST /tubers/{name}/accept-host", s.handleAcceptHost)
 	mux.HandleFunc("POST /tubers/{name}/passphrase", s.handlePassphrase)
+	mux.HandleFunc("POST /tubers/{name}/password", s.handlePassword)
 	mux.HandleFunc("POST /identities", s.handleSetIdentity)
 	mux.HandleFunc("DELETE /identities", s.handleForgetIdentity)
 	mux.HandleFunc("POST /reload", s.handleReload)
@@ -605,6 +606,60 @@ func identityPathForTuber(statuses []forward.Status, cfg *config.Config, name st
 	for _, t := range cfg.Tubers {
 		if t.Name == name {
 			return t.ResolvedIdentity(cfg.Defaults)
+		}
+	}
+	return ""
+}
+
+// handlePassword stores the submitted SSH password for the tuber's account and
+// unblocks a dial waiting on it (Phase 35). The account key is the one the dial
+// reported pending (Status.PendingPassword), falling back to the tuber's
+// configured user@host:port. No Restart: the blocked dial wakes on the store.
+// The password is sent over the authenticated 0600 unix socket and never
+// written to disk in plaintext (cache + keyring); it is keyed by server account.
+func (s *Server) handlePassword(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	var body struct {
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "decode body: %v", err)
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
+		return
+	}
+	if s.passwords == nil {
+		writeError(w, http.StatusInternalServerError, "password storage unavailable")
+		return
+	}
+	key := accountKeyForTuber(s.engine.List(), s.cfg, name)
+	if key == "" {
+		writeError(w, http.StatusConflict, "no SSH account to store a password for %q", name)
+		return
+	}
+	if err := s.passwords.Set(key, body.Password); err != nil {
+		writeError(w, http.StatusInternalServerError, "store password: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "stored", "tuber": name})
+}
+
+// accountKeyForTuber resolves the account key a password applies to: the key
+// the dial reported pending (Status.PendingPassword), or the tuber's configured
+// account (config.Tuber.PasswordAccountKey). "" when the tuber is unknown.
+func accountKeyForTuber(statuses []forward.Status, cfg *config.Config, name string) string {
+	for _, st := range statuses {
+		if st.Name == name && st.PendingPassword != "" {
+			return st.PendingPassword
+		}
+	}
+	for _, t := range cfg.Tubers {
+		if t.Name == name {
+			return t.PasswordAccountKey()
 		}
 	}
 	return ""

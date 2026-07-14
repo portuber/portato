@@ -61,6 +61,14 @@ type Controller interface {
 	// dial wakes on the store. Phase 19 (passphrase prompt in the TUI/CLI).
 	AcceptPassphrase(name, passphrase string) error
 
+	// AcceptPassword provides the SSH password for the tuber's account
+	// (Status.PendingPassword) and unblocks a dial waiting on it. The password
+	// is stored in the process cache (and the OS keyring when
+	// ssh_password_store is on); no Restart is needed — the blocked dial wakes
+	// on the store. Phase 35 (password prompt in the TUI/CLI). A wrong password
+	// is rejected by the server and re-prompted by the dial loop.
+	AcceptPassword(name, password string) error
+
 	// LiveListenerFiles returns a dup'd fd for each running local/dynamic
 	// tuber's local listener, keyed by tuber name, for the standalone->daemon
 	// hand-off (Phase 16). An empty map means there is nothing to pass (no live
