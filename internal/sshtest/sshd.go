@@ -88,6 +88,61 @@ type SSHD struct {
 // Start to bind and serve.
 func NewSSHD(tb testing.TB, authorizedKey ssh.PublicKey) *SSHD {
 	tb.Helper()
+	cfg, edPub := hostKeyConfig(tb)
+	cfg.PublicKeyCallback = func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+		if bytes.Equal(key.Marshal(), authorizedKey.Marshal()) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unknown public key")
+	}
+	return &SSHD{tb: tb, cfg: cfg, tracker: &connTracker{}, Ed25519Pub: edPub}
+}
+
+// NewSSHDPassword builds a test SSH server that authenticates ONLY with the
+// given password (no public-key method offered). It is the Phase 35 password
+// dial fixture: a wrong password yields a clean auth failure and the correct
+// one succeeds, exercising the dial-level re-prompt loop.
+func NewSSHDPassword(tb testing.TB, password string) *SSHD {
+	tb.Helper()
+	cfg, edPub := hostKeyConfig(tb)
+	want := []byte(password)
+	cfg.PasswordCallback = func(_ ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
+		if bytes.Equal(pw, want) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("wrong password")
+	}
+	return &SSHD{tb: tb, cfg: cfg, tracker: &connTracker{}, Ed25519Pub: edPub}
+}
+
+// NewSSHDKeyAndPassword builds a test SSH server that accepts BOTH the given
+// public key and the given password (it offers both methods). It is the Phase 35
+// key-preferred fixture: a client with a working key authenticates via the key
+// and is never prompted for a password.
+func NewSSHDKeyAndPassword(tb testing.TB, authorizedKey ssh.PublicKey, password string) *SSHD {
+	tb.Helper()
+	cfg, edPub := hostKeyConfig(tb)
+	want := []byte(password)
+	cfg.PublicKeyCallback = func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
+		if bytes.Equal(key.Marshal(), authorizedKey.Marshal()) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("unknown public key")
+	}
+	cfg.PasswordCallback = func(_ ssh.ConnMetadata, pw []byte) (*ssh.Permissions, error) {
+		if bytes.Equal(pw, want) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("wrong password")
+	}
+	return &SSHD{tb: tb, cfg: cfg, tracker: &connTracker{}, Ed25519Pub: edPub}
+}
+
+// hostKeyConfig returns a fresh ssh.ServerConfig carrying both an ED25519 and an
+// ECDSA host key (the dual-key setup documented on SSHD) with no auth callback
+// set; the caller installs PublicKeyCallback and/or PasswordCallback.
+func hostKeyConfig(tb testing.TB) (*ssh.ServerConfig, ssh.PublicKey) {
+	tb.Helper()
 	_, edPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		tb.Fatalf("gen ed25519 host key: %v", err)
@@ -104,17 +159,10 @@ func NewSSHD(tb testing.TB, authorizedKey ssh.PublicKey) *SSHD {
 	if err != nil {
 		tb.Fatalf("ecdsa signer: %v", err)
 	}
-	cfg := &ssh.ServerConfig{
-		PublicKeyCallback: func(_ ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permissions, error) {
-			if bytes.Equal(key.Marshal(), authorizedKey.Marshal()) {
-				return nil, nil
-			}
-			return nil, fmt.Errorf("unknown public key")
-		},
-	}
+	cfg := &ssh.ServerConfig{}
 	cfg.AddHostKey(edSigner)
 	cfg.AddHostKey(ecSigner)
-	return &SSHD{tb: tb, cfg: cfg, tracker: &connTracker{}, Ed25519Pub: edSigner.PublicKey()}
+	return cfg, edSigner.PublicKey()
 }
 
 // Start binds the server on 127.0.0.1:0 and serves until Stop. Port is set on
