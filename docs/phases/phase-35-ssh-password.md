@@ -1,7 +1,7 @@
 ---
 phase: 35
 title: SSH password authentication
-status: todo
+status: in-progress
 depends_on: [19, 30]
 ---
 
@@ -20,25 +20,42 @@ platform.
 
 The current `authMethods` (`internal/forward/ssh.go:85`) builds only
 `ssh.PublicKeys*` methods (agent + identity). With neither, the dial fails with
-"no ssh auth method available" — by design (SPEC §9). This phase adds a
-`ssh.PasswordCallback` branch that mirrors the existing passphrase flow
-(Phase 19/30): a `PasswordProvider` blocks the dial until a password arrives,
-surfaces a pending state to the UI, and re-prompts on a wrong password.
+"no ssh auth method available" — by design (SPEC §9). This phase adds a password
+branch that mirrors the existing passphrase flow (Phase 19/30): a
+`PasswordProvider` blocks the dial until a password arrives, surfaces a pending
+state to the UI, and re-prompts on a wrong password.
+
+Unlike a passphrase (validated locally by `ssh.ParsePrivateKeyWithPassphrase`),
+a password can only be validated by the server. `golang.org/x/crypto/ssh@v0.53.0`
+calls `ssh.PasswordCallback` **once** per handshake (`client_auth.go:202`) and
+`authenticate` dedupes methods via `tried` (`client_auth.go:97,137`), so there is
+no within-handshake retry — and portato's 5s handshake deadline
+(`internal/forward/ssh.go:67`) would time out an interactive prompt anyway. The
+re-prompt loop is therefore **dial-level**: each iteration does a full `dialSSH`
+with `ssh.Password(pw)`; an auth failure invalidates the password
+(`provider.Delete`) and re-prompts with no backoff, and any other error returns
+for the tuber's normal reconnect backoff. Keys are probed first, so a working key
+never triggers a password prompt.
 
 ## Tasks
 
 - [ ] `internal/forward`: add a `PasswordProvider` interface and a `passwordSink`
       mirroring `PassphraseProvider`/`passphraseSink`
-      (`internal/forward/passphrase.go:20-30,42-82`), plus a
-      `loadPasswordWithPrompt` loop (Get → sink → Wait → callback → Delete on
-      reject). `forward` must stay free of an `internal/secret` import — the
-      provider is injected at `NewEngine` (`engine.go:99`) and threaded
-      `Engine → NewTuber → dialSSH`, exactly like the passphrase provider.
-- [ ] `internal/forward/ssh.go` `authMethods`: add a `ssh.PasswordCallback(cb)`
-      branch, **after** the agent and identity methods (keys preferred), gated
-      by the opt-in flag below. The callback surfaces `PendingPassword`, blocks
-      in `provider.Wait`, returns the password; `ssh` retries it on rejection
-      so `provider.Delete` drives the re-prompt.
+      (`internal/forward/passphrase.go:20-30`), plus a `dialWithPasswordPrompt`
+      loop mirroring `loadIdentityWithPassphrase` (`passphrase.go:42-82`) whose
+      validation step is a full `dialSSH` (Get → sink → Wait → dial → on
+      auth-fail Delete + re-prompt with no backoff; on success sink("") +
+      return; any other error returns for the tuber backoff). `forward` must
+      stay free of an `internal/secret` import — the provider is injected at
+      `NewEngine` (`engine.go:99`) and threaded `Engine → NewTuber → dialSSH`,
+      exactly like the passphrase provider.
+- [ ] `internal/forward/ssh.go`: split the single-dial body of `dialSSH` into a
+      reusable `dialOnce`, and make `dialSSH` a dispatcher — when `password_auth`
+      is off it is today's key-only single dial (keeping the "no ssh auth method
+      available" error); when on it runs `dialWithPasswordPrompt` (keys probed
+      first, then the password loop). Add `isAuthFailed` reusing `mapDialError`'s
+      auth-failed sentinel (`"unable to authenticate"` / `"no supported methods
+      remain"`).
 - [ ] `internal/forward/state.go`: add a `Status.PendingPassword string` field
       (mirror `PendingPassphrase`, `state.go:85`); `State` stays `Connecting`
       while blocked.
@@ -107,13 +124,22 @@ make fmt && make vet && make test && make lint
 
 ## Technical details
 
-- `golang.org/x/crypto/ssh` provides `ssh.PasswordCallback(func() (string, error))`
-  for the `password` method. Servers that only offer `keyboard-interactive`
-  (common with PAM) are **out of scope** for this phase (a follow-up may add
+- `golang.org/x/crypto/ssh` provides `ssh.Password(secret)` for the `password`
+  method. Servers that only offer `keyboard-interactive` (common with PAM) are
+  **out of scope** for this phase (a follow-up may add
   `ssh.KeyboardInteractive`); most password servers accept the `password`
   method.
-- Ordering: `Auth` slice order is agent → identity → password, so a successful
-  key short-circuits before the password callback is ever invoked.
+- Re-prompt model: a wrong password cannot be detected locally — only the server
+  knows. Because x/crypto/ssh does not retry the password method within one
+  handshake (see Background), the loop spans multiple dials: a key-probe dial
+  first (so a working key never prompts), then for each password a single dial
+  with `ssh.Password(pw)`; auth-failed → `Delete` + re-prompt (no backoff, the
+  tuber stays `Connecting` with `PendingPassword` set). A server that offers no
+  `password` method must not loop forever — the error string carries the
+  "attempted methods", which distinguishes a wrong password from "password not
+  offered".
+- Ordering: keys (agent → identity) are always tried before a password, so a
+  successful key short-circuits before any password dial.
 - Security: the password lives in process memory (the secret cache) and, only
   when opted in, in the OS keyring; it is sent to the server over SSH as a
   standard password auth — never to disk in plaintext.

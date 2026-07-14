@@ -50,7 +50,7 @@
 | 32  | Third-party license notices in releases | `[x]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
 | 33  | CodeFactor cleanup + golangci-lint guardrails | `[x]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
 | 34  | `portato license` command + `--license` flag | `[x]` | [phase-34-license-command.md](./phases/phase-34-license-command.md) |
-| 35  | SSH password authentication (opt-in) | `[ ]` | [phase-35-ssh-password.md](./phases/phase-35-ssh-password.md) |
+| 35  | SSH password authentication (opt-in) | `[~]` | [phase-35-ssh-password.md](./phases/phase-35-ssh-password.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -64,7 +64,13 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–16, 18–20, 22–34 are `[x]`; phase 17 (Windows) is in progress (`[~]`) — IPC over a named pipe (`go-winio`), autostart via the HKCU registry Run key; runtime verification is deferred to a Windows CI runner. Phase 21 (packaging) is done: v0.1.4 is released (GitHub Release + Homebrew cask + deb/rpm, now bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); Scoop/Windows is deferred to phase 17. Phase 34 (`portato license` command + `--license` flag) is done (`[x]`) — a MINOR (next release `v0.2.0`).** The single binary runs the smart launcher
+**Phases 0–16, 18–20, 22–34 are `[x]`. Phases 17 (Windows) and 35 (SSH password
+auth) are both `[~]` — a deliberate, maintainer-authorised exception to the
+single-`[~]` rule: 35 was surfaced while verifying 17 on a password-only server,
+and both share a Windows verification pass. 35 will be implemented and verified
+on darwin/linux first; 17 stays `[~]` (blocked on a push so the `windows-smoke`
+CI job runs + `portato doctor` on Windows), then both flip to `[x]` together
+after the Windows check. Phase 17 (Windows): IPC over a named pipe (`go-winio`), autostart via the HKCU registry Run key; runtime verification is deferred to a Windows CI runner. Phase 21 (packaging) is done: v0.1.4 is released (GitHub Release + Homebrew cask + deb/rpm, now bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); Scoop/Windows is deferred to phase 17. Phase 34 (`portato license` command + `--license` flag) is done (`[x]`) — a MINOR (next release `v0.2.0`).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
