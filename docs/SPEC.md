@@ -295,6 +295,8 @@ defaults:
   socks5_user: alice              # optional (Phase 20): default SOCKS5 user/pass
   socks5_password: $secret        # for type=dynamic tunnels; empty -> NoAuth
   identity_passphrase_store: false # opt-in (Phase 19): persist identity passphrases in the OS keyring
+  password_auth: false            # opt-in (Phase 35): enable SSH password auth as a last resort (keys first)
+  ssh_password_store: false       # opt-in (Phase 35): persist SSH passwords in the OS keyring (per account)
   log:                            # optional (Phase 22): persistent log-rotation knobs
     max_size_mb: 1                # rotate the log file at this size; 0 -> default (1 MiB)
     max_age_days: 0               # purge rotated archives older than N days; 0 -> disabled
@@ -308,6 +310,7 @@ tubers:
     ssh: user@bastion.example.com:22   # required; user and port are optional
     identity: ~/.ssh/id_ed25519   # optional; overrides defaults
     enabled: false                # off by default; the daemon persists toggles here
+    password_auth: false          # opt-in (Phase 35): enable SSH password auth for this tunnel (keys first)
     # socks5_user / socks5_password (Phase 20): per-tunnel override of defaults,
     # honoured only by type=dynamic. Both empty (after fallback) -> NoAuth.
 ```
@@ -366,6 +369,7 @@ otherwise NoAuth (the pre-Phase-20 behaviour).
   - **Auth:** try `ssh.PublicKeysCallback` from the agent, then `ssh.PublicKeys` from the `identity`.
     - **Agent transport:** the agent is reached over the `SSH_AUTH_SOCK` unix-domain socket on darwin/linux; on Windows over the OpenSSH agent's named pipe `\\.\pipe\openssh-ssh-agent` (no `SSH_AUTH_SOCK` there). The dial is build-taged (`internal/forward/agentdial_*`); on failure it silently falls back to the identity key.
   - **Passphrase-protected identity (Phase 19):** if `ssh.ParsePrivateKey` reports a missing passphrase, the dial obtains one from the passphrase store (`internal/secret` — an in-memory cache backed by the OS keyring) and retries with `ssh.ParsePrivateKeyWithPassphrase`. With none available it surfaces `Status.PendingPassphrase` and **blocks** (the store's `Wait`) until the TUI/CLI provides one, instead of spinning the reconnect backoff. A wrong passphrase is invalidated and re-prompted.
+  - **Password auth (Phase 35, opt-in):** when `password_auth` is set (per-tuber or `defaults`), and no usable key authenticates, the dial falls back to a password. Unlike a passphrase (validated locally), a password is only checked by the server, so the re-prompt loop is **dial-level**: it probes keys first (a working key never prompts), then for each password does a single dial with `ssh.Password(pw)` — on a wrong password it invalidates the value and re-prompts with no backoff, staying in `Connecting` with `Status.PendingPassword` set; a server that does not offer the `password` method at all bails out rather than looping. The password comes from the password store (in-memory cache, plus the OS keyring when `defaults.ssh_password_store` is on), keyed by server account `password:<user>@<host>:<port>`, and is supplied via the TUI modal / `POST /tubers/{name}/password` / the controller's `AcceptPassword`. **The password is never stored in config** (only the boolean opt-in), preserving the §9 plaintext invariant.
   - **HostKeyCallback:** `knownhosts.New(hostsFile)`; with `accept_new_hosts: true` — a wrapper that appends a new key (TOFU).
   - **Timeout:** an explicit connect timeout (5s).
 - Readable errors: `host key not in known_hosts` / `auth failed` / `connect refused` / `connect timeout`.
@@ -399,6 +403,7 @@ otherwise NoAuth (the pre-Phase-20 behaviour).
 | `↑`/`↓`, `j`/`k` | navigate the list                                   |
 | `space`        | toggle the selected tunnel on/off                     |
 | `p`            | enter the passphrase for a passphrase-blocked selected tunnel (manual affordance; the modal also auto-opens on block); `space` always toggles (Phase 30) |
+| `o`            | enter the SSH password for a password-blocked selected tunnel (Phase 35; `p` is taken by the identity passphrase); the modal also auto-opens on block |
 | `r`            | restart the selected tunnel                           |
 | `a` / `x`      | enable all / disable all                              |
 | `e` / `n` / `d`| edit / create / delete the selected tunnel            |
@@ -530,5 +535,6 @@ the pure-Go single binary — socket activation there is deferred.
 
 - IPC authorization: only filesystem permissions (0600) or a token? -> **resolved (Phase 18)**: a 32-byte bearer token in `<socketDir>/portato.token`, layered on the `0600` socket; `--ipc-token off` disables it. See §6.
 - Where to store a passphrase for an identity when the agent is unavailable? -> **resolved (Phase 19)**: an in-memory cache (per process, so reconnects don't re-prompt) plus the OS keyring (macOS Keychain / Linux Secret Service / Windows Credential Manager via `zalando/go-keyring`) for cross-restart persistence. Opt-in keyring persistence via `defaults.identity_passphrase_store` (off by default); explicit `portato add-identity`/`forget-identity` always write/clear the keyring. Nothing is ever written to disk in plaintext. See §9.
+- How to authenticate to a password-only SSH server (no usable key)? -> **resolved (Phase 35)**: an opt-in `password_auth` (per-tuber or `defaults`) adds password auth as a last resort after agent/identity. The password is supplied interactively (TUI modal / `POST /tubers/{name}/password` / `controller.AcceptPassword`) and held in an in-memory cache plus, opt-in, the OS keyring (`defaults.ssh_password_store`, keyed by account) — never in config. `golang.org/x/crypto/ssh` does not retry the password method within one handshake, so the re-prompt is a dial-level loop (no backoff, stays `Connecting`); a key-only server bails out cleanly. Keys stay the default and are tried first. See §9.
 - Passing live listener FDs to the new daemon during hand-off (a seamless transition) -> **resolved (Phase 16)**: the standalone dups its local listeners and sends them (SCM_RIGHTS) over a one-shot transfer socket; the daemon adopts them via `net.FileListener`, so the local ports never go down. The SSH session itself is re-dialed (no cross-process resume in `golang.org/x/crypto/ssh`); only local-port availability is seamless. See §12.
 - Windows support -> **resolved (Phase 17)**: IPC over a named pipe (`\\.\pipe\portato` via `go-winio`), autostart via the HKCU registry Run key. See §6/§13.

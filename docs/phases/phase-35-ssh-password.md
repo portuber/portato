@@ -39,7 +39,7 @@ never triggers a password prompt.
 
 ## Tasks
 
-- [ ] `internal/forward`: add a `PasswordProvider` interface and a `passwordSink`
+- [x] `internal/forward`: add a `PasswordProvider` interface and a `passwordSink`
       mirroring `PassphraseProvider`/`passphraseSink`
       (`internal/forward/passphrase.go:20-30`), plus a `dialWithPasswordPrompt`
       loop mirroring `loadIdentityWithPassphrase` (`passphrase.go:42-82`) whose
@@ -49,36 +49,36 @@ never triggers a password prompt.
       stay free of an `internal/secret` import — the provider is injected at
       `NewEngine` (`engine.go:99`) and threaded `Engine → NewTuber → dialSSH`,
       exactly like the passphrase provider.
-- [ ] `internal/forward/ssh.go`: split the single-dial body of `dialSSH` into a
+- [x] `internal/forward/ssh.go`: split the single-dial body of `dialSSH` into a
       reusable `dialOnce`, and make `dialSSH` a dispatcher — when `password_auth`
       is off it is today's key-only single dial (keeping the "no ssh auth method
       available" error); when on it runs `dialWithPasswordPrompt` (keys probed
       first, then the password loop). Add `isAuthFailed` reusing `mapDialError`'s
       auth-failed sentinel (`"unable to authenticate"` / `"no supported methods
       remain"`).
-- [ ] `internal/forward/state.go`: add a `Status.PendingPassword string` field
+- [x] `internal/forward/state.go`: add a `Status.PendingPassword string` field
       (mirror `PendingPassphrase`, `state.go:85`); `State` stays `Connecting`
       while blocked.
-- [ ] `internal/config`: add per-tuber `password_auth` and `defaults.password_auth`
+- [x] `internal/config`: add per-tuber `password_auth` and `defaults.password_auth`
       (bool, default false — opt-in, avoids surprise prompts); add
       `defaults.ssh_password_store` (bool, default false — opt-in keyring,
       mirror `IdentityPassphraseStore` at `config.go:53`). **No password field
       anywhere in the schema.** (Validation already only covers `Tubers`, so a
       bool needs no validation wiring.)
-- [ ] `internal/secret`: serve passwords by reusing `secret.Store` with a
+- [x] `internal/secret`: serve passwords by reusing `secret.Store` with a
       namespaced key `password:<user>@<host>:<port>` (passwords are per-account,
       identities per-file); gate keyring persistence on `ssh_password_store`
       via a live closure (`secret.NewStore`, `server.go:181-184` /
       `local.go:45-47`).
-- [ ] `internal/daemon/server.go`: `POST /tubers/{name}/password` handler
+- [x] `internal/daemon/server.go`: `POST /tubers/{name}/password` handler
       mirroring `handlePassphrase` (`server.go:553`), body `{"password":"…"}`
       → `secrets.Set(accountKey, …)` (caches + wakes the blocked dial).
-- [ ] `internal/client`: `SetPassword(name, password)` → the endpoint above
+- [x] `internal/client`: `SetPassword(name, password)` → the endpoint above
       (mirror `client.go:136`).
-- [ ] `internal/controller`: `AcceptPassword(name, password)` on the interface
+- [x] `internal/controller`: `AcceptPassword(name, password)` on the interface
       (`controller.go:62`); `Local` writes the local store (`local.go:192`),
       `Remote` posts to the daemon (`remote.go:101`).
-- [ ] `internal/tui`: auto-open a password modal on `PendingPassword` (mirror
+- [x] `internal/tui`: auto-open a password modal on `PendingPassword` (mirror
       `autoOpenIfPending`, `update.go:402`), a manual key (e.g. `o` — `p` is
       taken by passphrase), and `openPasswordModal`/`handlePasswordKey`/
       `passwordView` + a "password?" row hint (mirror `update.go:323,423`,
@@ -86,26 +86,29 @@ never triggers a password prompt.
 - [ ] (optional) `internal/cmd`: `portato add-password <user@host>` /
       `forget-password` keyed by account (keyring), mirroring `add-identity`/
       `forget-identity` (`identity.go:23`).
-- [ ] `docs/SPEC.md` §9/§16: document password auth (opt-in, key-preferred,
+- [x] `docs/SPEC.md` §9/§16: document password auth (opt-in, key-preferred,
       never plaintext, keyring opt-in) and resolve the open question.
-- [ ] Tests mirroring the passphrase tests: provider blocking + wake, wrong
+- [x] Tests mirroring the passphrase tests: provider blocking + wake, wrong
       password re-prompt, key-preferred ordering (no prompt when a key works),
       opt-in gating, keyring opt-in.
 
 ## Definition of Done
 
-- [ ] A tunnel with `password_auth: true` to a password-only SSH server
+- [x] A tunnel with `password_auth: true` to a password-only SSH server
       authenticates after the password is supplied via the TUI (and via the
       CLI/HTTP endpoint); the password is never written to config or logs.
-- [ ] Public-key auth stays the default and is tried first; a tunnel with a
+- [x] Public-key auth stays the default and is tried first; a tunnel with a
       working key never prompts for a password.
-- [ ] A wrong password is re-prompted; disabling/restarting a tunnel cancels a
+- [x] A wrong password is re-prompted; disabling/restarting a tunnel cancels a
       blocked prompt (ctx cancellation).
 - [ ] With `defaults.ssh_password_store: true` the password persists across
       daemon restarts via the OS keyring; off (default) keeps it in-memory only.
-- [ ] `make fmt && make vet && make test && make lint` green; the new flows are
+      (Wiring + the in-memory path are covered by unit tests; the cross-restart
+      keyring path is identical to the Phase 19 passphrase store and awaits a
+      runtime/keyring verification — see the dual-[~] note below.)
+- [x] `make fmt && make vet && make test && make lint` green; the new flows are
       covered by unit tests.
-- [ ] SPEC §9/§16 updated.
+- [x] SPEC §9/§16 updated.
 
 ## Verification
 
