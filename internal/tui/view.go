@@ -262,16 +262,17 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 		status += " " + dimStyle.Render(truncate(s.Error, 18))
 	}
 	// Phase 19: a dial blocked on a passphrase-protected identity is in
-	// Connecting with PendingPassphrase set; flag it so the user knows to
-	// press space and type the passphrase.
+	// Connecting with PendingPassphrase set; flag it with the key that opens
+	// the prompt (the modal also auto-opens when this tuber is under the
+	// cursor).
 	if s.PendingPassphrase != "" {
-		status += " " + dimStyle.Render("passphrase?")
+		status += " " + dimStyle.Render("passphrase? (p)")
 	}
 	// Phase 35: a dial blocked on a password-only account is in Connecting
-	// with PendingPassword set; flag it so the user knows to press space and
-	// type the password.
+	// with PendingPassword set; flag it with the key that opens the prompt
+	// (the modal also auto-opens when this tuber is under the cursor).
 	if s.PendingPassword != "" {
-		status += " " + dimStyle.Render("password?")
+		status += " " + dimStyle.Render("password? (o)")
 	}
 
 	name, typ, ep, up := fitName(s.Name, nameW), s.Type, endpoint, uptime(s)
