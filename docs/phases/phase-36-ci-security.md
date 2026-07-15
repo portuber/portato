@@ -1,7 +1,7 @@
 ---
 phase: 36
 title: CI security hardening (govulncheck + lint in CI)
-status: in-progress
+status: done
 depends_on: [33]
 ---
 
@@ -136,7 +136,7 @@ and the README badge renders.
 
 ## Start guard
 
-This phase is `status: in-progress`. It was started on an explicit
-"start phase 36" command (per docs/CONVENTIONS.md). The `[~]` flip and the
-implementation commits are landing now; it returns to `status: done` on
-"complete phase 36" once the DoD is met.
+This phase is `status: done`. It was started on an explicit "start phase
+36" command and completed on "complete phase 36" after every DoD item was
+met (locally verified; the CI-green-on-main and badge-rendering checks are
+deferred-to-push, per the phase-33 precedent and AGENTS.md local-only rule).
