@@ -30,7 +30,10 @@ func runCommand(o Options) string {
 }
 
 func (windowsInstaller) Install(o Options) (string, error) {
-	key, err := registry.OpenKey(registry.CURRENT_USER, runKeyPath, registry.SET_VALUE|registry.QUERY_VALUE)
+	// CreateKey opens the key if present, or creates it (and any missing parent)
+	// if absent. A fresh user profile — e.g. a CI runner — may not have the HKCU
+	// Run key yet, so a plain OpenKey fails with "file not found".
+	key, _, err := registry.CreateKey(registry.CURRENT_USER, runKeyPath, registry.SET_VALUE|registry.QUERY_VALUE)
 	if err != nil {
 		return "", fmt.Errorf("open HKCU Run key: %w", err)
 	}
@@ -44,7 +47,9 @@ func (windowsInstaller) Install(o Options) (string, error) {
 func (windowsInstaller) Uninstall(Options) error {
 	key, err := registry.OpenKey(registry.CURRENT_USER, runKeyPath, registry.SET_VALUE)
 	if err != nil {
-		return fmt.Errorf("open HKCU Run key: %w", err)
+		// Run key absent (fresh profile or never installed) — nothing to remove;
+		// uninstall is an idempotent no-op.
+		return nil
 	}
 	defer key.Close()
 	if err := key.DeleteValue(runValueName); err != nil && err != registry.ErrNotExist {
