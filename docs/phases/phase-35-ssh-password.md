@@ -153,6 +153,13 @@ connected from the cache without prompting.
       (on-brand: portato = potato, tubers sprout) instead of an empty input that
       looked like "enter again"; it closes on success or returns to the input on
       a rejection. Applied to both the password and passphrase modals.
+- [x] **Fix 6 (Windows dogfooding):** the TOFU "accept host key?" prompt stopped
+      appearing on a host-key failure — the dial-error branch (added in Fix 1)
+      cleared `PendingHost` before the TUI could show it. The error branch now
+      clears only the passphrase/password prompt state, keeping `PendingHost` so
+      the accept prompt surfaces. Also, when a tuber has no usable key, the host
+      key is now verified BEFORE a password is prompted (a nil-auth probe), so an
+      untrusted host surfaces TOFU rather than a pointless password prompt.
 
 ## Verification
 

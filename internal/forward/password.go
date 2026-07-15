@@ -51,6 +51,46 @@ type passwordSink func(account string)
 //
 // State stays Connecting throughout (no reconnect spin); ctx cancellation
 // (disable/shutdown) aborts the Wait.
+// probeBeforePassword is step 1 of dialWithPasswordPrompt: it tries the
+// available keys, and when there are none it still runs a nil-auth dial so the
+// host key is verified BEFORE a password is prompted. It returns:
+//   - (client, nil): a key authenticated, or the server needs no auth — done;
+//   - (nil, err): a non-auth failure (host key, refused, timeout) — bail (a
+//     host-key rejection leaves PendingHost set for the TUI TOFU prompt);
+//   - (nil, nil): no key authenticated on a trusted host — fall through to the
+//     password loop.
+func probeBeforePassword(
+	ctx context.Context,
+	cfg config.Tuber,
+	def config.Defaults,
+	log *slog.Logger,
+	sink hostKeySink,
+	provider PassphraseProvider,
+	passSink passphraseSink,
+) (*ssh.Client, error) {
+	keyMethods, closeAgent := authMethods(ctx, cfg, def, log, provider, passSink)
+	defer closeAgent()
+	if len(keyMethods) > 0 {
+		client, err := dialOnce(ctx, cfg, def, log, sink, keyMethods)
+		if err == nil {
+			return client, nil
+		}
+		if !isAuthFailed(err) {
+			return nil, err // refused, timeout, host key... — bail
+		}
+		return nil, nil // keys rejected → password loop
+	}
+	// No key to try — verify the host key before prompting (TOFU must surface
+	// first, not a pointless password prompt). A nil-auth dial runs the host-key
+	// check then fails at auth; a host-key rejection returns here.
+	if c, err := dialOnce(ctx, cfg, def, log, sink, nil); err == nil {
+		return c, nil // server accepted "none" auth (no auth required)
+	} else if !isAuthFailed(err) {
+		return nil, err
+	}
+	return nil, nil // host trusted, no key → password loop
+}
+
 func dialWithPasswordPrompt(
 	ctx context.Context,
 	cfg config.Tuber,
@@ -62,20 +102,11 @@ func dialWithPasswordPrompt(
 	pwProvider PasswordProvider,
 	pwSink passwordSink,
 ) (*ssh.Client, error) {
-	// 1. Probe keys first: a working key must never prompt for a password.
-	keyMethods, closeAgent := authMethods(ctx, cfg, def, log, provider, passSink)
-	defer closeAgent()
-	if len(keyMethods) > 0 {
-		client, err := dialOnce(ctx, cfg, def, log, sink, keyMethods)
-		if err == nil {
-			return client, nil
-		}
-		if !isAuthFailed(err) {
-			// A non-auth failure (refused, timeout, host key...) — a password
-			// won't help; return for the tuber's normal reconnect backoff.
-			return nil, err
-		}
-		// Keys were rejected: fall through to the password loop.
+	// 1. Probe keys / verify the host key before prompting (see helper).
+	if c, err := probeBeforePassword(ctx, cfg, def, log, sink, provider, passSink); err != nil {
+		return nil, err
+	} else if c != nil {
+		return c, nil
 	}
 
 	if pwProvider == nil {

@@ -315,6 +315,36 @@ func TestPasswordAuthAvailable(t *testing.T) {
 	}
 }
 
+// TestDialPassword_HostKeyCheckedBeforePrompt asserts Fix B: with no usable
+// key, the host key is verified BEFORE a password is prompted. Against an
+// untrusted host (not in known_hosts, accept_new_hosts=false) the dial returns
+// the host-key error and never consults the password provider — so the TUI
+// surfaces the TOFU accept prompt, not a pointless password prompt.
+func TestDialPassword_HostKeyCheckedBeforePrompt(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+	srv := sshtest.NewSSHDPassword(t, "secret")
+	srv.Start()
+	defer srv.Stop()
+
+	cfg, def := passwordTestSetup(t, srv, t.TempDir())
+	def.AcceptNewHosts = false // known_hosts is empty → host key unknown/untrusted
+	provider := newFakePasswordProvider()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := dialWithPasswordPrompt(ctx, cfg, def, slog.Default(), nil, nil, nil, provider, func(string) {})
+	if err == nil {
+		t.Fatal("expected a host-key failure for an untrusted host")
+	}
+	if !strings.Contains(err.Error(), "host key not in known_hosts") {
+		t.Fatalf("expected a host-key error; got %v", err)
+	}
+	if provider.gets.Load()+provider.waits.Load() != 0 {
+		t.Errorf("password provider must not be consulted when the host key is untrusted (gets=%d waits=%d)",
+			provider.gets.Load(), provider.waits.Load())
+	}
+}
+
 // pbool returns a pointer to b (Phase 35 password_auth is a *bool opt-out).
 func pbool(b bool) *bool { return &b }
 

@@ -122,6 +122,48 @@ func waitForPortDown(addr string, timeout time.Duration) bool {
 	return false
 }
 
+// TestTuberHostKeyErrorKeepsPending is the Phase 35 regression test (Fix A):
+// a tuber whose dial fails on an untrusted host key must KEEP PendingHost set in
+// Status so the TUI can surface the TOFU accept prompt. Previously the dial-error
+// branch cleared PendingHost before the notify, suppressing the prompt.
+func TestTuberHostKeyErrorKeepsPending(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "") // no agent → no key methods
+	srv := sshtest.NewSSHDPassword(t, "secret")
+	srv.Start()
+	defer srv.Stop()
+
+	dir := t.TempDir()
+	knownHosts := filepath.Join(dir, "known_hosts") // absent → host key unknown
+	cfg := config.Tuber{
+		Name:   "hk",
+		Type:   "local",
+		Local:  strconv.Itoa(freePort(t)),
+		Remote: "127.0.0.1:9", // unused: the dial fails at the host key first
+		SSH:    "u@" + srv.Addr(),
+		User:   "u", Host: "127.0.0.1", Port: srv.Port,
+	}
+	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: false}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	// PendingHost must surface (host-key error retained per Fix A) and remain
+	// visible across retries (the dial-error branch no longer clears it).
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if tun.Status().PendingHost != "" {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("PendingHost never surfaced; status=%+v", tun.Status())
+}
+
 func TestTuberTrafficAndReconnect(t *testing.T) {
 	// Hermetic: ignore the host's ssh-agent so only the identity-file auth
 	// path is exercised.

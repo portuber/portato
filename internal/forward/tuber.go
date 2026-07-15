@@ -474,10 +474,12 @@ func (t *Tuber) run(ctx context.Context, ln net.Listener, done chan<- struct{}) 
 		t.clearPendingPassword()
 		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink, t.passwordProvider, t.passwordSink)
 		if err != nil {
-			// The dial exited (error/bail/cancel) and is no longer waiting on a
-			// prompt — drop pending prompts so no modal lingers during the
-			// backoff before the next attempt re-surfaces them.
-			t.clearPendingHost()
+			// The dial exited and is no longer waiting on a passphrase/password
+			// prompt — drop those so their modals don't linger during the
+			// backoff. PendingHost is intentionally KEPT: a host-key rejection
+			// (TOFU) records it inside the dial, and the TUI must surface the
+			// accept prompt — clearing it here (before setStateErr's notify)
+			// would suppress that prompt (Phase 35 regression fix).
 			t.clearPendingPassphrase()
 			t.clearPendingPassword()
 			t.setStateErr(Error, err.Error())
@@ -630,10 +632,12 @@ func (t *Tuber) runRemote(ctx context.Context, done chan<- struct{}) {
 		t.clearPendingPassword()
 		client, err := dialSSH(ctx, t.cfg, t.defaults, t.log, t.recordUnknownHost, t.provider, t.passphraseSink, t.passwordProvider, t.passwordSink)
 		if err != nil {
-			// The dial exited (error/bail/cancel) and is no longer waiting on a
-			// prompt — drop pending prompts so no modal lingers during the
-			// backoff before the next attempt re-surfaces them.
-			t.clearPendingHost()
+			// The dial exited and is no longer waiting on a passphrase/password
+			// prompt — drop those so their modals don't linger during the
+			// backoff. PendingHost is intentionally KEPT: a host-key rejection
+			// (TOFU) records it inside the dial, and the TUI must surface the
+			// accept prompt — clearing it here (before setStateErr's notify)
+			// would suppress that prompt (Phase 35 regression fix).
 			t.clearPendingPassphrase()
 			t.clearPendingPassword()
 			t.setStateErr(Error, err.Error())
