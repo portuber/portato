@@ -26,8 +26,10 @@ var doctorCmd = &cobra.Command{
 	Use:   "doctor",
 	Short: "Diagnose the Portato setup (config, keys, agent, daemon)",
 	Long: `Diagnose the local Portato setup: config validity, identity keys and
-ssh-agent, known_hosts, daemon reachability and IPC socket permissions, and
-(Linux) lingering. Prints a line per check and exits non-zero on any failure.`,
+ssh-agent, known_hosts, daemon reachability over the local IPC socket (or named
+pipe on Windows) and its owner-only permissions, the autostart entry (launchd
+plist / systemd unit / Windows Run key), and (Linux) lingering. Prints a line
+per check and exits non-zero on any failure.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE:          doctorRunE,

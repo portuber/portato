@@ -254,8 +254,10 @@ Portato runs natively on Windows (built and shipped from the same release):
   across the whole surface (a real light mode), so it reads as a strong inverse
   of dark regardless of your terminal's own background.
 - **`portato doctor`** — checks config validity, identity keys and `ssh-agent`,
-  `known_hosts`, daemon reachability and socket permissions, and (Linux)
-  lingering. Prints a `✓`/`✗` line per check and exits non-zero on any failure.
+  `known_hosts`, daemon reachability over the local IPC socket (or named pipe on
+  Windows) and its owner-only permissions, the autostart entry (launchd plist /
+  systemd unit / Windows Run key), and (Linux) lingering. Prints a `✓`/`✗` line
+  per check and exits non-zero on any failure.
 
 ### Unknown host keys (TOFU)
 
