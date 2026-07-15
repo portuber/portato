@@ -70,3 +70,27 @@ func TestPasswordSinkRejectionCount(t *testing.T) {
 		t.Fatalf("after clearPendingPassword: PasswordAttempts = %d, want 0", got)
 	}
 }
+
+// TestPassphraseSinkRejectionCount is the Phase 19 parity of the above:
+// passphraseSink derives the dial's rejection count (first prompt 0, each
+// re-prompt +1), surfaced via Status.PassphraseAttempts.
+func TestPassphraseSinkRejectionCount(t *testing.T) {
+	tn := NewTuber(context.Background(), config.Tuber{Name: "x", Type: "local", Local: "1", Remote: "r", Host: "h", Port: 22}, config.Defaults{}, slog.Default(), nil, nil)
+
+	tn.passphraseSink("/keys/id") // initial prompt
+	if got := tn.Status().PassphraseAttempts; got != 0 {
+		t.Fatalf("initial prompt: PassphraseAttempts = %d, want 0", got)
+	}
+	tn.passphraseSink("/keys/id") // re-prompt = a wrong passphrase was rejected
+	if got := tn.Status().PassphraseAttempts; got != 1 {
+		t.Fatalf("after one rejection: PassphraseAttempts = %d, want 1", got)
+	}
+	tn.passphraseSink("") // success — clears pending, keeps the count
+	if st := tn.Status(); st.PendingPassphrase != "" || st.PassphraseAttempts != 1 {
+		t.Fatalf("success should clear pending but keep the count; got %+v", st)
+	}
+	tn.clearPendingPassphrase() // new dial resets
+	if got := tn.Status().PassphraseAttempts; got != 0 {
+		t.Fatalf("after clearPendingPassphrase: PassphraseAttempts = %d, want 0", got)
+	}
+}

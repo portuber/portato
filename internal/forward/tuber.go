@@ -58,6 +58,11 @@ type Tuber struct {
 	// (set by passphraseSink while the dial blocks on PassphraseProvider.Wait),
 	// surfaced through Status.PendingPassphrase. Empty when none is needed.
 	pendingPassphrase string
+	// passphraseAttempts counts how many times a submitted identity passphrase
+	// was wrong (driven by passphraseSink re-prompts). Surfaced via
+	// Status.PassphraseAttempts so the TUI shows an accurate "wrong passphrase"
+	// hint only on a real rejection, not on every submit. Reset on a new dial.
+	passphraseAttempts int
 	// provider obtains the passphrase for a protected identity (nil in tests /
 	// the one-shot `portato forward` command → no passphrase support).
 	provider PassphraseProvider
@@ -304,6 +309,7 @@ func (t *Tuber) Status() Status {
 		PendingFingerprint: t.pendingFingerprint,
 		PendingHostLine:    t.pendingHostLine,
 		PendingPassphrase:  t.pendingPassphrase,
+		PassphraseAttempts: t.passphraseAttempts,
 		PendingPassword:    t.pendingPassword,
 		PasswordAttempts:   t.passwordAttempts,
 	}
@@ -334,27 +340,35 @@ func (t *Tuber) clearPendingHost() {
 // passphraseSink is wired into dialSSH: it records the identity path awaiting a
 // passphrase (path != "") so Status.PendingPassphrase surfaces it for the UI to
 // prompt, or clears it (path == "") once the passphrase is accepted. Called
-// from the dial goroutine.
+// from the dial goroutine. Each re-prompt (a non-empty path while one was
+// already pending) means the dial rejected the previous passphrase, so it bumps
+// passphraseAttempts for an accurate TUI hint.
 func (t *Tuber) passphraseSink(path string) {
 	t.mu.Lock()
-	t.pendingPassphrase = path
+	if path == "" {
+		t.pendingPassphrase = ""
+	} else {
+		if t.pendingPassphrase != "" {
+			t.passphraseAttempts++
+		}
+		t.pendingPassphrase = path
+	}
 	t.mu.Unlock()
 	t.notifyChange()
 }
 
-// clearPendingPassphrase forgets a recorded passphrase need. Called at the
-// start of each dial so a stale entry does not outlive the attempt that
-// produced it (e.g. the identity changed, or the dial failed for another
-// reason).
+// clearPendingPassphrase forgets a recorded passphrase need and the rejection
+// counter. Called at the start of each dial so a stale entry does not outlive
+// the attempt that produced it. Always resets so a fresh dial starts at 0.
 func (t *Tuber) clearPendingPassphrase() {
 	t.mu.Lock()
-	if t.pendingPassphrase == "" {
-		t.mu.Unlock()
-		return
-	}
+	changed := t.pendingPassphrase != "" || t.passphraseAttempts != 0
 	t.pendingPassphrase = ""
+	t.passphraseAttempts = 0
 	t.mu.Unlock()
-	t.notifyChange()
+	if changed {
+		t.notifyChange()
+	}
 }
 
 // passwordSink is wired into dialSSH: it records the server account awaiting a
@@ -400,12 +414,14 @@ func (t *Tuber) clearPendingPassword() {
 // auto-opens over a dead tuber (Phase 35 dogfooding fix).
 func (t *Tuber) clearPendingLocked() bool {
 	changed := t.pendingHost != "" || t.pendingFingerprint != "" ||
-		t.pendingHostLine != "" || t.pendingPassphrase != "" || t.pendingPassword != ""
+		t.pendingHostLine != "" || t.pendingPassphrase != "" || t.pendingPassword != "" ||
+		t.passphraseAttempts != 0 || t.passwordAttempts != 0
 	t.pendingHost = ""
 	t.pendingFingerprint = ""
 	t.pendingHostLine = ""
 	t.pendingPassphrase = ""
 	t.pendingPassword = ""
+	t.passphraseAttempts = 0
 	t.passwordAttempts = 0
 	return changed
 }

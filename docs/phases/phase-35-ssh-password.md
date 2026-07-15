@@ -143,7 +143,9 @@ connected from the cache without prompting.
 - [x] **Fix 3:** the "wrong password" hint is now driven by the dial's actual
       rejection count (`Status.PasswordAttempts`, derived in `passwordSink`),
       not a per-submit TUI counter — so it only appears when the server really
-      rejected the password.
+      rejected the password. The same treatment was applied to the Phase 19
+      passphrase modal (`Status.PassphraseAttempts` / `passphraseSink`) for
+      parity — same misleading-counter class of bug, same fix.
 - [x] **Fix 4:** the help overlay documents `o` (and that the modal auto-opens);
       `space` is toggle-only.
 

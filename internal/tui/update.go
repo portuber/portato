@@ -60,7 +60,6 @@ func (m Model) handleTick(_ tickMsg) (Model, tea.Cmd) {
 	if m.enteringPassphrase && !pendingPassphraseFor(m.list, m.passphraseTarget) {
 		m.enteringPassphrase = false
 		m.passphraseTarget = ""
-		m.passphraseAttempts = 0
 		m.passphraseInput.SetValue("")
 	}
 	// Auto-close the password modal the same way (Status.PendingPassword
@@ -346,7 +345,9 @@ func (m Model) handleAcceptConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // keys edit the masked input; enter submits via Controller.AcceptPassphrase
 // (the blocked dial wakes on the store; the modal auto-closes once Status.
 // PendingPassphrase clears — see the tick handler — or stays open with a retry
-// hint on a wrong passphrase); esc cancels.
+// hint on a wrong passphrase); esc cancels. A leading space on an empty field
+// is ignored so an accidental space-press (invisible under the mask) can't
+// corrupt the value.
 func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	// Leading space on an empty masked field: invisible and almost always
 	// accidental — drop it (same guard as the password modal).
@@ -359,7 +360,6 @@ func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		name := m.passphraseTarget
 		_ = m.ctrl.AcceptPassphrase(name, pass)
 		m.passphraseInput.SetValue("")
-		m.passphraseAttempts++
 		m.list = m.ctrl.List()
 		// Re-arm the cursor blink in case the dial rejects it and the modal
 		// stays open for another attempt.
@@ -370,7 +370,6 @@ func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.dismissedPending = pendingKeyForName(m.list, m.passphraseTarget)
 		m.enteringPassphrase = false
 		m.passphraseTarget = ""
-		m.passphraseAttempts = 0
 		m.passphraseInput.SetValue("")
 		return m, nil
 	}
@@ -451,13 +450,11 @@ func (m Model) autoOpenIfPending() (Model, tea.Cmd) {
 }
 
 // openPassphraseModal arms the identity-passphrase modal for the named tuber
-// (resetting the masked input and the attempt counter) and returns the
-// masked-input focus command. Shared by the manual `p` affordance and the tick
-// auto-open. Phase 30.
+// (resetting the masked input) and returns the masked-input focus command.
+// Shared by the manual `p` affordance and the tick auto-open. Phase 30.
 func (m Model) openPassphraseModal(name string) (Model, tea.Cmd) {
 	m.enteringPassphrase = true
 	m.passphraseTarget = name
-	m.passphraseAttempts = 0
 	m.passphraseInput.SetValue("")
 	return m, m.passphraseInput.Focus()
 }

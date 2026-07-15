@@ -43,9 +43,6 @@ func TestPassphraseModal_OpenTypeSubmitCancel(t *testing.T) {
 	if got := f.passphrases["db"]; got != "hunter2" {
 		t.Errorf("AcceptPassphrase not called with the typed value; got %q", got)
 	}
-	if m.passphraseAttempts != 1 {
-		t.Errorf("attempts = %d, want 1 after a submit", m.passphraseAttempts)
-	}
 	if m.passphraseInput.Value() != "" {
 		t.Errorf("input should clear after submit; got %q", m.passphraseInput.Value())
 	}
@@ -98,9 +95,6 @@ func TestPassphraseModal_AutoCloseOnAccept(t *testing.T) {
 	m = next.(Model)
 	if m.enteringPassphrase {
 		t.Error("modal should auto-close once PendingPassphrase clears")
-	}
-	if m.passphraseAttempts != 0 {
-		t.Errorf("attempts should reset on close; got %d", m.passphraseAttempts)
 	}
 }
 

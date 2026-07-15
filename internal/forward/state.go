@@ -83,6 +83,11 @@ type Status struct {
 	// blocks (PassphraseProvider.Wait) until a passphrase arrives, rather than
 	// spinning the reconnect backoff. Empty when not applicable.
 	PendingPassphrase string `json:"pending_passphrase,omitempty"`
+	// PassphraseAttempts (Phase 19, parity with PasswordAttempts) is how many
+	// times a submitted identity passphrase was wrong (the dial re-prompted).
+	// The TUI uses it for an accurate "wrong passphrase" hint only on a real
+	// rejection. 0 when none / on a fresh dial attempt.
+	PassphraseAttempts int `json:"passphrase_attempts,omitempty"`
 
 	// Password (Phase 35): when the tuber has opted into password_auth, no
 	// usable key authenticated, and no password is available yet, this carries

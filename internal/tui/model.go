@@ -47,14 +47,15 @@ type Model struct {
 	acceptTarget  string
 
 	// enteringPassphrase shows the identity-passphrase prompt modal (Phase 19).
-	// Raised by pressing space on a tuber whose dial is blocked on a
-	// passphrase-protected identity (Status.PendingPassphrase). The input is
-	// masked; enter submits via Controller.AcceptPassphrase, esc cancels.
-	// passphraseAttempts counts submits so a wrong passphrase shows a retry hint.
+	// Raised by pressing `p` on (or auto-opening on) a tuber whose dial is
+	// blocked on a passphrase-protected identity (Status.PendingPassphrase).
+	// The input is masked; enter submits via Controller.AcceptPassphrase, esc
+	// cancels. The "wrong passphrase" hint is driven by
+	// Status.PassphraseAttempts (the dial's real rejection count), not a local
+	// counter.
 	enteringPassphrase bool
 	passphraseTarget   string
 	passphraseInput    textinput.Model
-	passphraseAttempts int
 	// enteringPassword shows the SSH-password prompt modal (Phase 35). Raised
 	// by pressing `o` on (or auto-opening on) a tuber whose dial is blocked on
 	// a password-only account (Status.PendingPassword). The input is masked;

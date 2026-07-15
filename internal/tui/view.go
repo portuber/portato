@@ -450,18 +450,31 @@ func (m Model) confirmAcceptView() string {
 
 // passphraseView renders the Phase 19 identity-passphrase modal: the tuber's
 // dial is blocked on a passphrase-protected identity, and the user types the
-// passphrase (masked) and submits it via Controller.AcceptPassphrase. After a
-// rejected attempt a hint line appears.
+// passphrase (masked) and submits it via Controller.AcceptPassphrase. The
+// "wrong passphrase" hint is driven by Status.PassphraseAttempts (the dial's
+// real rejection count), so it only appears when the dial actually rejected a
+// submitted passphrase.
 func (m Model) passphraseView() string {
 	hint := ""
-	if m.passphraseAttempts > 0 {
-		hint = fmt.Sprintf("\nwrong passphrase, try again (attempt %d)", m.passphraseAttempts+1)
+	if n := passphraseAttemptsFor(m.list, m.passphraseTarget); n > 0 {
+		hint = fmt.Sprintf("\nwrong passphrase, try again (rejected %d)", n)
 	}
 	line := fmt.Sprintf(
 		"Passphrase for %s's identity\n%s[enter] submit  ·  [esc] cancel%s",
 		m.passphraseTarget, m.passphraseInput.View(), hint,
 	)
 	return modalStyle.Render(line)
+}
+
+// passphraseAttemptsFor looks up a tuber's PassphraseAttempts (dial rejections)
+// in a status snapshot, for the passphrase modal's retry hint. 0 when absent.
+func passphraseAttemptsFor(list []controller.Status, name string) int {
+	for _, s := range list {
+		if s.Name == name {
+			return s.PassphraseAttempts
+		}
+	}
+	return 0
 }
 
 // passwordView renders the Phase 35 SSH-password modal: the tuber's dial is
