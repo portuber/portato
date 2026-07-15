@@ -36,7 +36,7 @@ The single binary works in several modes:
 
 ## Install
 
-All channels are built from the same release.
+All channels are built from the same release for macOS, Linux, and Windows.
 
 **Homebrew** (macOS / Linuxbrew):
 
@@ -44,17 +44,32 @@ All channels are built from the same release.
 brew install --cask portuber/tap/portato
 ```
 
+**Scoop** (Windows):
+
+```pwsh
+scoop bucket add portuber https://github.com/portuber/scoop-bucket
+scoop install portato/portato
+```
+
 **Binary** — download the archive for your platform from the
 [latest release](https://github.com/portuber/portato/releases/latest), extract
-it, and put `portato` on your `PATH`:
+it, and put the `portato` binary on your `PATH`:
 
 ```sh
-tar -xzf portato_<version>_macOS_arm64.tar.gz
+# macOS / Linux (tar.gz)
+tar -xzf portato_<version>_macOS_arm64.tar.gz   # or linux_amd64, linux_arm64, …
 install -m 0755 portato ~/.local/bin/portato
 portato version
 ```
 
-**deb / rpm** — from the
+```pwsh
+# Windows (zip)
+Expand-Archive portato_<version>_Windows_x86_64.zip
+# move portato.exe into a directory on your PATH
+portato version
+```
+
+**deb / rpm** (Linux) — from the
 [latest release](https://github.com/portuber/portato/releases/latest):
 
 ```sh
@@ -85,9 +100,9 @@ Requires Go 1.26+.
 ## Releases
 
 Releases are built with [goreleaser](https://goreleaser.com) across the
-darwin/linux × amd64/arm64 matrix, producing per-target tarballs, a Homebrew
-cask, deb/rpm packages, and a `checksums.txt`. To build a local snapshot (no
-publish, writes to `dist/`):
+darwin/linux/windows × amd64/arm64 matrix, producing per-target tarballs and a
+Windows zip, a Homebrew cask, a Scoop manifest, deb/rpm packages, and a
+`checksums.txt`. To build a local snapshot (no publish, writes to `dist/`):
 
 ```sh
 make snapshot   # needs goreleaser: go install github.com/goreleaser/goreleaser/v2@latest
@@ -191,6 +206,40 @@ launchctl bootout  "gui/$(id -u)/dev.portato.daemon" # stop (or `portato uninsta
 systemctl --user status portato      # status
 systemctl --user disable --now portato   # stop (or `portato uninstall`)
 ```
+
+### Windows (registry Run key)
+
+`portato install` writes a per-user entry in the HKCU registry Run key so the
+daemon launches at login:
+
+- key: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Portato`
+  → `"<binary>" daemon --config "<config>"` (paths are quoted so a location
+  with spaces survives the shell's command-line parse)
+- unlike launchd's `KeepAlive`, the Run key only **starts** the daemon at login
+  — it is not restarted after a crash (a full Windows Service / SCM is a later
+  refinement)
+- `portato uninstall` removes the value
+
+Inspect it directly:
+
+```pwsh
+reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v Portato
+```
+
+## Windows specifics
+
+Portato runs natively on Windows (built and shipped from the same release):
+
+- **Config:** `%AppData%\portato\config.yaml`.
+- **IPC:** the daemon listens on a named pipe, `\\.\pipe\portato` (no TCP, no
+  socket file). The smart launcher / `attach` find it automatically.
+- **ssh-agent:** a key loaded into the OpenSSH agent (the `ssh-agent` service)
+  is reached over the agent's named pipe `\\.\pipe\openssh-ssh-agent`; there is
+  no `SSH_AUTH_SOCK` on Windows. As elsewhere, a key in the agent is tried
+  before identity and password.
+- **`portato stop`:** on Windows it terminates the daemon (there is no
+  SIGTERM), so it stops immediately rather than draining.
+- **Autostart** is a per-user Run key — see above.
 
 ## Logs, themes & diagnostics
 
