@@ -60,16 +60,17 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–31 (post-MVP backlog) are planned in detail — all are done (`[x]`) except **17 (Windows)**, which is in progress (`[~]`): IPC over a named pipe (`go-winio`), autostart via the HKCU registry Run key. Phase 21 (packaging) is done (`[x]`): v0.1.0 is released (GitHub Release + Homebrew cask + deb/rpm); Scoop is deferred to phase 17.
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–31 (post-MVP backlog) are planned in detail — all are done (`[x]`), including **17 (Windows)** (IPC over a named pipe via `go-winio`, autostart via the HKCU registry Run key, `windows-smoke` CI green). Phase 21 (packaging) is done (`[x]`): **v0.3.0** is released (GitHub Release + Homebrew cask + Scoop bucket + deb/rpm).
 
 ## Current focus
 
 **Phases 0–35 are all `[x]`. Phase 17 (Windows support) and Phase 35 (SSH
 password auth) were closed together after the maintainer verified Phase 35
 end-to-end on a real Windows host (named-pipe IPC, daemon/TUI, password auth,
-TOFU host-key prompt, reconnect loop). Phase 17's `windows-smoke` CI job will
-run on the next push; `portato doctor` and ssh-agent-over-named-pipe are
-maintainer-accepted (see phase-17 "Verification status"). Phase 21 (packaging) is done: v0.1.4 is released (GitHub Release + Homebrew cask + deb/rpm, now bundling `THIRD_PARTY_LICENSES.txt` via Phase 32). The next release is a MINOR, `v0.2.0`: Phase 34 (`portato license` command + `--license` flag) and Phase 35 (SSH password auth, on by default) are new features.** The single binary runs the smart launcher
+TOFU host-key prompt, reconnect loop); the `windows-smoke` CI job then ran
+green on main (install/uninstall + daemon/list round-trip over the named pipe).
+`portato doctor` and ssh-agent-over-named-pipe remain maintainer-accepted (see
+phase-17 "Verification status"). Phase 21 (packaging) is done: **v0.3.0 is released** (GitHub Release + Homebrew cask + Scoop bucket + deb/rpm, bundling `THIRD_PARTY_LICENSES.txt` via Phase 32) — Phase 34 (`portato license` + `--license`) and Phase 35 (SSH password auth, on by default) shipped in it.** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -139,7 +140,7 @@ time-based (not just size-based) log rotation.
 - **Phase 31** — TUI logo wordmark: a combined potato+PORTATO wordmark in the empty-config splash and `--version` (compact-potato fallback on narrow terminals), the compact potato kept in the help overlay, and the inline-PNG image mode removed (iTerm2/WezTerm render braille).
 - **Phase 32** — third-party license notices in releases: bundle each runtime dependency's LICENSE (MIT/Apache-2.0/BSD-3) into the GitHub Release archives and deb/rpm, generated at release time via `go-licenses`, closing the redistribution-notice obligation that phase 21 declared but didn't implement.
 - **Phase 33** — clear codefactor.io's 12 issues (6 builtin-`max` shadowing + 6 complex methods, incl. 2 test funcs) and add a `golangci-lint` config + `make lint` so builtin shadowing and high-complexity production methods can't slip back in.
-- **Phase 34** — `portato license` subcommand + `--license` root flag (parallel to `version`/`--version`): the binary self-reports its MIT license and points to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` prints the embedded MIT text. A MINOR (next release `v0.2.0`).
+- **Phase 34** — `portato license` subcommand + `--license` root flag (parallel to `version`/`--version`): the binary self-reports its MIT license and points to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` prints the embedded MIT text. A MINOR; shipped in v0.2.0/v0.2.1.
 - **Phase 35** — SSH password authentication (planned, `[ ]`): an opt-in `password_auth` tunnel authenticates to a password-only SSH server with a password supplied interactively (TUI/CLI) and, opt-in, the OS keyring — mirroring the Phase 19/30 passphrase flow. Keys stay the default and are tried first; the password is never stored in config (plaintext invariant preserved). depends_on [19, 30]. Surfaced while verifying Phase 17 on a password-only server.
 
 ## Current work
@@ -161,7 +162,7 @@ per AGENTS.md local-only).
 to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` appends the full MIT
 License text embedded via a new module-root `licensetext` package
 (`//go:embed LICENSE`, single source — no drift). `--version` is unchanged. A
-MINOR: the next release is `v0.2.0`.
+MINOR; shipped in v0.2.0/v0.2.1.
 
 **Phase 17** (Windows support) is `[x]` (done): all code, packaging and CI
 config implemented and the Windows runtime verified by dogfooding Phase 35 on a
@@ -175,8 +176,8 @@ hand-off `Setsid`); HKCU registry Run-key autostart (`service_windows.go`) with
 off unix (`fdpass.Supported()`); `windows` in the goreleaser matrix (zip +
 `portuber/scoop-bucket`); build-tagged ssh-agent dial (`agentdial_windows.go`);
 and a `windows-smoke` CI job (daemon+list round-trip over the named pipe +
-install/uninstall). The `windows-smoke` job runs on the next push; `doctor`
-and ssh-agent-over-named-pipe are maintainer-accepted (see phase-17
+install/uninstall), which ran green on main. `portato doctor` and
+ssh-agent-over-named-pipe are maintainer-accepted (see phase-17
 "Verification status").
 
 **Phase 35** (SSH password authentication) is `[x]` (done): an on-by-default

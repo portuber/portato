@@ -60,13 +60,13 @@ supported platform matrix (SPEC §15/§16).
 - [x] `GOOS=windows go build ./...` is clean.
 - [x] On a Windows host/CI runner: `portato daemon` + `portato list`
       round-trip works over the named pipe; the smart launcher attaches.
-      (Verified by Phase 35 dogfooding on a real Windows host: the daemon/TUI
-      run over the named pipe. The `windows-smoke` CI job asserts this
-      automatically and will run on the next push.)
+      (Verified by Phase 35 dogfooding on a real Windows host and by the
+      `windows-smoke` CI job, which ran green on main.)
 - [x] `portato install` adds the HKCU `Run` value; `uninstall` removes it;
       `portato doctor` reports the autostart state.
-      (The `windows-smoke` CI job covers install/uninstall and runs on the next
-      push; `doctor` is implemented and maintainer-accepted.)
+      (The `windows-smoke` CI job covers install/uninstall and ran green on main
+      after the `registry.CreateKey` fix; `doctor` is implemented and
+      maintainer-accepted.)
 - [x] darwin/linux are unaffected (build tags fully isolated).
 - [x] `go vet ./...`, `gofmt -l .` clean on all platforms.
 - [x] On a Windows host with a key loaded into the OpenSSH ssh-agent, a tunnel
@@ -118,14 +118,13 @@ Verified locally (macOS dev host):
 - darwin/linux behaviour unchanged (the named-pipe / registry / process
   code is fully build-tagged out there).
 
-Accepted by the maintainer (pending their automated/manual check on the next
-push/release):
+Accepted by the maintainer (the CI ran green on main; two items remain
+maintainer-accepted pending a focused check):
 
 1. **`windows-smoke` CI job** (`.github/workflows/ci.yml`) asserts the
    `portato daemon` + `portato list` round-trip over `\\.\pipe\portato` and the
-   HKCU Run-key install/uninstall; it runs only on push/PR, so it will execute
-   on the next push (the runtime path it asserts was covered by the manual
-   dogfooding).
+   HKCU Run-key install/uninstall — it **ran green on main** (after the
+   `registry.CreateKey` fix for `portato install` on a fresh profile).
 2. **`portato doctor` autostart reporting on Windows** is implemented
    (`autostart_windows.go` queries the Run value); maintainer-accepted.
 3. **ssh-agent over the Windows named pipe** (`agentdial_windows.go` dials
