@@ -54,20 +54,30 @@ func (m Model) handleTick(_ tickMsg) (Model, tea.Cmd) {
 	// on every tick. Phase 19 UX (also covers the TOFU host-key prompt).
 	var openCmd tea.Cmd
 	m, openCmd = m.autoOpenIfPending()
-	// Auto-close the passphrase modal once the dial accepts it
-	// (Status.PendingPassphrase clears). A wrong passphrase leaves it set,
-	// so the modal stays open for another attempt.
-	if m.enteringPassphrase && !pendingPassphraseFor(m.list, m.passphraseTarget) {
-		m.enteringPassphrase = false
-		m.passphraseTarget = ""
-		m.passphraseInput.SetValue("")
+	// Passphrase modal: success closes it; a rejection (PassphraseAttempts grew
+	// past the submit baseline) drops the "portubbing…" state back to the input.
+	if m.enteringPassphrase {
+		switch {
+		case !pendingPassphraseFor(m.list, m.passphraseTarget):
+			m.enteringPassphrase = false
+			m.passphraseTarget = ""
+			m.passphraseInput.SetValue("")
+			m.passphraseConnecting = false
+		case m.passphraseConnecting && passphraseAttemptsFor(m.list, m.passphraseTarget) > m.passphraseSubmitBase:
+			m.passphraseConnecting = false
+		}
 	}
-	// Auto-close the password modal the same way (Status.PendingPassword
-	// clears on success). A wrong password leaves it set for another attempt.
-	if m.enteringPassword && !pendingPasswordFor(m.list, m.passwordTarget) {
-		m.enteringPassword = false
-		m.passwordTarget = ""
-		m.passwordInput.SetValue("")
+	// Password modal: same — success closes; a rejection drops "portubbing…".
+	if m.enteringPassword {
+		switch {
+		case !pendingPasswordFor(m.list, m.passwordTarget):
+			m.enteringPassword = false
+			m.passwordTarget = ""
+			m.passwordInput.SetValue("")
+			m.passwordConnecting = false
+		case m.passwordConnecting && passwordAttemptsFor(m.list, m.passwordTarget) > m.passwordSubmitBase:
+			m.passwordConnecting = false
+		}
 	}
 	// Forget a stale dismissal once the cursor's tuber has no pending
 	// prompt, so a future block on it auto-opens again.
@@ -349,6 +359,11 @@ func (m Model) handleAcceptConfirm(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 // is ignored so an accidental space-press (invisible under the mask) can't
 // corrupt the value.
 func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// While "portubbing…" (waiting on the dial's verdict), ignore everything
+	// but esc.
+	if m.passphraseConnecting && k.String() != "esc" {
+		return m, nil
+	}
 	// Leading space on an empty masked field: invisible and almost always
 	// accidental — drop it (same guard as the password modal).
 	if m.passphraseInput.Value() == "" && (k.String() == "space" || k.Text == " ") {
@@ -360,9 +375,12 @@ func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		name := m.passphraseTarget
 		_ = m.ctrl.AcceptPassphrase(name, pass)
 		m.passphraseInput.SetValue("")
+		// Enter the "portubbing…" state until the dial accepts (modal closes)
+		// or rejects (PassphraseAttempts passes the submit baseline).
+		m.passphraseConnecting = true
+		m.passphraseSubmitBase = passphraseAttemptsFor(m.list, name)
 		m.list = m.ctrl.List()
-		// Re-arm the cursor blink in case the dial rejects it and the modal
-		// stays open for another attempt.
+		// Re-arm the cursor blink so the input is ready if the modal returns.
 		return m, m.passphraseInput.Focus()
 	case "esc":
 		// Record which prompt was dismissed so the tick auto-open does not
@@ -370,6 +388,7 @@ func (m Model) handlePassphraseKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.dismissedPending = pendingKeyForName(m.list, m.passphraseTarget)
 		m.enteringPassphrase = false
 		m.passphraseTarget = ""
+		m.passphraseConnecting = false
 		m.passphraseInput.SetValue("")
 		return m, nil
 	}
@@ -466,6 +485,11 @@ func (m Model) openPassphraseModal(name string) (Model, tea.Cmd) {
 // password); esc cancels. A leading space on an empty field is ignored so an
 // accidental space-press (invisible under the mask) can't corrupt the value.
 func (m Model) handlePasswordKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	// While "portubbing…" (waiting on the dial's verdict), ignore everything
+	// but esc — no input field is shown.
+	if m.passwordConnecting && k.String() != "esc" {
+		return m, nil
+	}
 	// Leading space on an empty masked field: invisible and almost always
 	// accidental — drop it. Spaces inside a password are kept (field non-empty).
 	if m.passwordInput.Value() == "" && (k.String() == "space" || k.Text == " ") {
@@ -477,9 +501,12 @@ func (m Model) handlePasswordKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		name := m.passwordTarget
 		_ = m.ctrl.AcceptPassword(name, pw)
 		m.passwordInput.SetValue("")
+		// Enter the "portubbing…" state until the dial accepts (modal closes)
+		// or rejects (PasswordAttempts passes the submit baseline).
+		m.passwordConnecting = true
+		m.passwordSubmitBase = passwordAttemptsFor(m.list, name)
 		m.list = m.ctrl.List()
-		// Re-arm the cursor blink in case the server rejects it and the modal
-		// stays open for another attempt.
+		// Re-arm the cursor blink so the input is ready if the modal returns.
 		return m, m.passwordInput.Focus()
 	case "esc":
 		// Record which prompt was dismissed so the tick auto-open does not
@@ -487,6 +514,7 @@ func (m Model) handlePasswordKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.dismissedPending = pendingKeyForName(m.list, m.passwordTarget)
 		m.enteringPassword = false
 		m.passwordTarget = ""
+		m.passwordConnecting = false
 		m.passwordInput.SetValue("")
 		return m, nil
 	}

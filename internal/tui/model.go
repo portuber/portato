@@ -56,6 +56,12 @@ type Model struct {
 	enteringPassphrase bool
 	passphraseTarget   string
 	passphraseInput    textinput.Model
+	// passphraseConnecting is the brief "portubbing…" state between submit and
+	// the dial's verdict (passphrase accepted → modal closes; rejected → back to
+	// the input). passphraseSubmitBase is the PasswordAttempts value at submit
+	// time, so a tick can detect a rejection (it increments).
+	passphraseConnecting bool
+	passphraseSubmitBase int
 	// enteringPassword shows the SSH-password prompt modal (Phase 35). Raised
 	// by pressing `o` on (or auto-opening on) a tuber whose dial is blocked on
 	// a password-only account (Status.PendingPassword). The input is masked;
@@ -65,6 +71,12 @@ type Model struct {
 	enteringPassword bool
 	passwordTarget   string
 	passwordInput    textinput.Model
+	// passwordConnecting is the brief "portubbing…" state between submit and the
+	// dial's verdict (password accepted → modal closes; rejected → back to the
+	// input). passwordSubmitBase is the PasswordAttempts value at submit time,
+	// so a tick can detect a rejection (it increments).
+	passwordConnecting bool
+	passwordSubmitBase int
 	// dismissedPending is the pending-prompt key (a passphrase path, a password
 	// account, or a host line) the user cancelled with esc, so the auto-open on
 	// tick does not re-pop the same prompt endlessly. Cleared once the cursor's

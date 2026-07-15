@@ -147,6 +147,50 @@ func TestPasswordModal_LeadingSpaceIgnored(t *testing.T) {
 	}
 }
 
+// TestPasswordModal_PortubbingState asserts the "portubbing…" connecting
+// state: enter submits and enters it; a dial rejection (PasswordAttempts grows)
+// drops back to the input; success (PendingPassword clears) closes the modal.
+func TestPasswordModal_PortubbingState(t *testing.T) {
+	f := newFake(controller.Status{
+		Name: "db", Type: "local", Local: "1", Remote: "r",
+		State: controller.Connecting, PendingPassword: "password:u@h:22",
+	})
+	m := New(f, Options{Mode: "standalone"})
+	next, _ := m.handleKey(keyPress("o"))
+	m = next.(Model)
+	next, _ = m.handlePasswordKey(keyPress("a"))
+	m = next.(Model)
+	next, _ = m.handlePasswordKey(keyPress("enter"))
+	m = next.(Model)
+	if !m.passwordConnecting {
+		t.Fatal("enter should enter the portubbing state")
+	}
+
+	// The dial rejects the password → PasswordAttempts grows past the submit
+	// baseline → drop back to the input (modal stays open).
+	f.mu.Lock()
+	f.statuses[0].PasswordAttempts = 1
+	f.mu.Unlock()
+	next, _ = m.Update(tickMsg{})
+	m = next.(Model)
+	if m.passwordConnecting {
+		t.Error("a rejection should drop the portubbing state back to the input")
+	}
+	if !m.enteringPassword {
+		t.Error("the modal should stay open after a rejection")
+	}
+
+	// The dial accepts → PendingPassword clears → modal closes.
+	f.mu.Lock()
+	f.statuses[0].PendingPassword = ""
+	f.mu.Unlock()
+	next, _ = m.Update(tickMsg{})
+	m = next.(Model)
+	if m.enteringPassword {
+		t.Error("the modal should close on success")
+	}
+}
+
 // TestPasswordModal_OKeyOpensAfterDismissal covers the case autoOpen cannot:
 // once the user dismisses the prompt (esc records dismissedPending, which the
 // tick auto-open honours so it won't re-pop), o is the way back into the modal.
