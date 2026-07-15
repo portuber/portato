@@ -3,6 +3,7 @@
 # Portato
 
 [![CI](https://github.com/portuber/portato/actions/workflows/ci.yml/badge.svg)](https://github.com/portuber/portato/actions/workflows/ci.yml)
+[![security](https://github.com/portuber/portato/actions/workflows/security.yml/badge.svg)](https://github.com/portuber/portato/actions/workflows/security.yml)
 [![Release](https://img.shields.io/github/v/release/portuber/portato)](https://github.com/portuber/portato/releases)
 [![License: MIT](https://img.shields.io/github/license/portuber/portato)](LICENSE)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/portuber/portato)](go.mod)
