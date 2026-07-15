@@ -32,7 +32,7 @@
 | 14  | TUI: duplicate tunnel (Shift+C)   | `[x]`  | [phase-14-tui-duplicate.md](./phases/phase-14-tui-duplicate.md) |
 | 15  | Light-theme color tuning          | `[x]`  | [phase-15-light-theme-colors.md](./phases/phase-15-light-theme-colors.md) |
 | 16  | Seamless hand-off (FD-passing)    | `[x]`  | [phase-16-fd-passing-handoff.md](./phases/phase-16-fd-passing-handoff.md) |
-| 17  | Windows support                   | `[~]`  | [phase-17-windows.md](./phases/phase-17-windows.md) |
+| 17  | Windows support                   | `[x]`  | [phase-17-windows.md](./phases/phase-17-windows.md) |
 | 18  | IPC authorization token           | `[x]`  | [phase-18-ipc-token.md](./phases/phase-18-ipc-token.md) |
 | 19  | Identity passphrase storage       | `[x]`  | [phase-19-identity-passphrase.md](./phases/phase-19-identity-passphrase.md) |
 | 20  | CLI/UX polish                     | `[x]`  | [phase-20-cli-ux-polish.md](./phases/phase-20-cli-ux-polish.md) |
@@ -50,7 +50,7 @@
 | 32  | Third-party license notices in releases | `[x]` | [phase-32-third-party-licenses.md](./phases/phase-32-third-party-licenses.md) |
 | 33  | CodeFactor cleanup + golangci-lint guardrails | `[x]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
 | 34  | `portato license` command + `--license` flag | `[x]` | [phase-34-license-command.md](./phases/phase-34-license-command.md) |
-| 35  | SSH password authentication (opt-in) | `[~]` | [phase-35-ssh-password.md](./phases/phase-35-ssh-password.md) |
+| 35  | SSH password authentication (opt-in) | `[x]` | [phase-35-ssh-password.md](./phases/phase-35-ssh-password.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -64,13 +64,12 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–16, 18–20, 22–34 are `[x]`. Phases 17 (Windows) and 35 (SSH password
-auth) are both `[~]` — a deliberate, maintainer-authorised exception to the
-single-`[~]` rule: 35 was surfaced while verifying 17 on a password-only server,
-and both share a Windows verification pass. 35 will be implemented and verified
-on darwin/linux first; 17 stays `[~]` (blocked on a push so the `windows-smoke`
-CI job runs + `portato doctor` on Windows), then both flip to `[x]` together
-after the Windows check. Phase 17 (Windows): IPC over a named pipe (`go-winio`), autostart via the HKCU registry Run key; runtime verification is deferred to a Windows CI runner. Phase 21 (packaging) is done: v0.1.4 is released (GitHub Release + Homebrew cask + deb/rpm, now bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); Scoop/Windows is deferred to phase 17. Phase 34 (`portato license` command + `--license` flag) is done (`[x]`) — a MINOR (next release `v0.2.0`).** The single binary runs the smart launcher
+**Phases 0–35 are all `[x]`. Phase 17 (Windows support) and Phase 35 (SSH
+password auth) were closed together after the maintainer verified Phase 35
+end-to-end on a real Windows host (named-pipe IPC, daemon/TUI, password auth,
+TOFU host-key prompt, reconnect loop). Phase 17's `windows-smoke` CI job will
+run on the next push; `portato doctor` and ssh-agent-over-named-pipe are
+maintainer-accepted (see phase-17 "Verification status"). Phase 21 (packaging) is done: v0.1.4 is released (GitHub Release + Homebrew cask + deb/rpm, now bundling `THIRD_PARTY_LICENSES.txt` via Phase 32). The next release is a MINOR, `v0.2.0`: Phase 34 (`portato license` command + `--license` flag) and Phase 35 (SSH password auth, on by default) are new features.** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -164,23 +163,32 @@ License text embedded via a new module-root `licensetext` package
 (`//go:embed LICENSE`, single source — no drift). `--version` is unchanged. A
 MINOR: the next release is `v0.2.0`.
 
-**Phase 17** (Windows support) is `[~]` (in progress): all code, packaging and
-CI config are implemented and verified off-Windows, but the phase cannot flip
-to `[x]` until the Windows-runtime DoD items actually run on a Windows host
-(see the phase-17 `## Blockers` block). Done so far: a build-tagged IPC
-transport seam (`internal/daemon/transport` — unix-domain socket on
-darwin/linux, named pipe via `go-winio` on windows) that the
-daemon/client/probe/doctor call sites route through; per-OS paths
-(`paths_unix.go`/`paths_windows.go`, `ipctoken.TokenPath` split); the
-unix-only primitives build-tagged (`pidAlive`, `stopKill`, the hand-off
-`Setsid`); HKCU registry Run-key autostart (`service_windows.go`) with
+**Phase 17** (Windows support) is `[x]` (done): all code, packaging and CI
+config implemented and the Windows runtime verified by dogfooding Phase 35 on a
+real Windows host. Done: a build-tagged IPC transport seam
+(`internal/daemon/transport` — unix-domain socket on darwin/linux, named pipe
+via `go-winio` on windows) that the daemon/client/probe/doctor call sites route
+through; per-OS paths (`paths_unix.go`/`paths_windows.go`, `ipctoken.TokenPath`
+split); the unix-only primitives build-tagged (`pidAlive`, `stopKill`, the
+hand-off `Setsid`); HKCU registry Run-key autostart (`service_windows.go`) with
 `doctor` reporting it; the FD hand-off gated to the clean close+rebind path
 off unix (`fdpass.Supported()`); `windows` in the goreleaser matrix (zip +
-`portuber/scoop-bucket`); and a `windows-smoke` CI job (daemon+list
-round-trip over the named pipe + install/uninstall). Verified locally:
-`GOOS=windows go build/vet ./...` clean, a PE32+ binary builds,
-`make fmt/vet/test/lint` green on darwin. Blocked on: pushing so the
-`windows-smoke` job runs, and a `portato doctor` check on Windows.
+`portuber/scoop-bucket`); build-tagged ssh-agent dial (`agentdial_windows.go`);
+and a `windows-smoke` CI job (daemon+list round-trip over the named pipe +
+install/uninstall). The `windows-smoke` job runs on the next push; `doctor`
+and ssh-agent-over-named-pipe are maintainer-accepted (see phase-17
+"Verification status").
+
+**Phase 35** (SSH password authentication) is `[x]` (done): an on-by-default
+password-auth fallback (OpenSSH-style — keys tried first, then prompt when no
+key authenticates) with `password_auth: false` to opt out; the password is
+supplied interactively (TUI `o` modal / `POST /tubers/{name}/password` /
+`controller.AcceptPassword`) and, opt-in, persisted to the OS keyring
+(`defaults.ssh_password_store`), never to config. The re-prompt is a dial-level
+loop (golang.org/x/crypto/ssh does not retry the password method within one
+handshake); a key-only server bails cleanly. Six dogfooding fixes landed (clear
+pending on stop; accurate rejection hint; leading-space guard; actionable
+hints; a "sprouting…" connecting state; host-key-before-password).
 
 ## Final MVP E2E (on completing Phase 6)
 

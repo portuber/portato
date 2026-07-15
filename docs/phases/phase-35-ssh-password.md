@@ -1,7 +1,7 @@
 ---
 phase: 35
 title: SSH password authentication
-status: in-progress
+status: done
 depends_on: [19, 30]
 ---
 
@@ -113,11 +113,11 @@ never triggers a password prompt.
       consulted).
 - [x] A wrong password is re-prompted; disabling/restarting a tunnel cancels a
       blocked prompt (ctx cancellation).
-- [ ] With `defaults.ssh_password_store: true` the password persists across
+- [x] With `defaults.ssh_password_store: true` the password persists across
       daemon restarts via the OS keyring; off (default) keeps it in-memory only.
-      (Wiring + the in-memory path are covered by unit tests; the cross-restart
-      keyring path is identical to the Phase 19 passphrase store and awaits a
-      runtime/keyring verification — see the dual-[~] note below.)
+      (Wiring + the in-memory path are covered by unit tests and verified by
+      dogfooding on darwin/windows; the cross-restart keyring path reuses the
+      Phase 19 passphrase store, maintainer-accepted.)
 - [x] `make fmt && make vet && make test && make lint` green; the new flows are
       covered by unit tests.
 - [x] SPEC §9/§16 updated.

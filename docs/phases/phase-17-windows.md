@@ -1,7 +1,7 @@
 ---
 phase: 17
 title: Windows support
-status: in-progress
+status: done
 depends_on: [4, 6]
 ---
 
@@ -58,19 +58,21 @@ supported platform matrix (SPEC §15/§16).
 ## Definition of Done
 
 - [x] `GOOS=windows go build ./...` is clean.
-- [ ] On a Windows host/CI runner: `portato daemon` + `portato list`
+- [x] On a Windows host/CI runner: `portato daemon` + `portato list`
       round-trip works over the named pipe; the smart launcher attaches.
-      (The `windows-smoke` CI job covers the round-trip; it has not run yet —
-      see Blockers.)
-- [ ] `portato install` adds the HKCU `Run` value; `uninstall` removes it;
+      (Verified by Phase 35 dogfooding on a real Windows host: the daemon/TUI
+      run over the named pipe. The `windows-smoke` CI job asserts this
+      automatically and will run on the next push.)
+- [x] `portato install` adds the HKCU `Run` value; `uninstall` removes it;
       `portato doctor` reports the autostart state.
-      (The `windows-smoke` CI job covers install/uninstall; `doctor` and the
-      runtime itself are unverified — see Blockers.)
+      (The `windows-smoke` CI job covers install/uninstall and runs on the next
+      push; `doctor` is implemented and maintainer-accepted.)
 - [x] darwin/linux are unaffected (build tags fully isolated).
 - [x] `go vet ./...`, `gofmt -l .` clean on all platforms.
-- [ ] On a Windows host with a key loaded into the OpenSSH ssh-agent, a tunnel
+- [x] On a Windows host with a key loaded into the OpenSSH ssh-agent, a tunnel
       authenticates via the agent (`agentdial_windows.go`, named pipe).
-      (Manual check; not covered by the `windows-smoke` CI job — see Blockers.)
+      (Maintainer-accepted: the code cross-compiles/vets clean; not exercised by
+      the Phase 35 dogfooding, which used password auth with no agent loaded.)
 
 ## Verification
 
@@ -98,11 +100,12 @@ portato uninstall
 - Out of scope here: Windows service (Service Control Manager) autostart; the
   Run key is the MVP-equivalent. SCM can be a later refinement.
 
-## Blockers
+## Verification status
 
-All code, packaging and CI config for the phase is implemented and verified
-**off-Windows** (the status stays `[~]` — it cannot move to `[x]` until the
-Windows-runtime DoD items are actually exercised on a Windows host).
+All code, packaging and CI config for the phase is implemented. The status is
+now `[x]` (done): the Windows runtime was verified by dogfooding Phase 35 on a
+real Windows host (the daemon and TUI run over the named pipe, password auth
+works end to end, the TOFU host-key prompt and the reconnect loop behave).
 
 Verified locally (macOS dev host):
 
@@ -115,27 +118,23 @@ Verified locally (macOS dev host):
 - darwin/linux behaviour unchanged (the named-pipe / registry / process
   code is fully build-tagged out there).
 
-Remaining (need a Windows environment):
+Accepted by the maintainer (pending their automated/manual check on the next
+push/release):
 
-1. **`windows-smoke` CI job must run.** It is written
-   (`.github/workflows/ci.yml`) and asserts the `portato daemon` + `portato
-   list` round-trip over `\\.\pipe\portato` and the HKCU Run-key
-   install/uninstall. It runs only on push/PR — which is blocked until the
-   maintainer authorises a push (AGENTS.md: local commits only unless asked).
+1. **`windows-smoke` CI job** (`.github/workflows/ci.yml`) asserts the
+   `portato daemon` + `portato list` round-trip over `\\.\pipe\portato` and the
+   HKCU Run-key install/uninstall; it runs only on push/PR, so it will execute
+   on the next push (the runtime path it asserts was covered by the manual
+   dogfooding).
 2. **`portato doctor` autostart reporting on Windows** is implemented
-   (`autostart_windows.go` queries the Run value) but not asserted by the CI
-   job and not run by hand yet.
-3. **ssh-agent over the Windows named pipe** is implemented
-   (`agentdial_windows.go` dials `\\.\pipe\openssh-ssh-agent`) and
-   cross-compiles/vets clean, but a tunnel authenticating via a key loaded in
-   the Windows OpenSSH agent has not been exercised on a real host.
+   (`autostart_windows.go` queries the Run value); maintainer-accepted.
+3. **ssh-agent over the Windows named pipe** (`agentdial_windows.go` dials
+   `\\.\pipe\openssh-ssh-agent`) cross-compiles/vets clean; not exercised by the
+   Phase 35 dogfooding (which used password auth with no agent loaded) —
+   maintainer-accepted.
 4. **Known limitations already accepted** (documented in commit bodies and
    SPEC caveats): `portato stop` terminates rather than SIGTERMs (no
    `portato stop` graceful path); a detached daemon gets no ctrl-C at logout;
    named-pipe ACL relies on the Phase 18 bearer token (no per-user SDDL
    hardening yet); the seamless FD hand-off is intentionally skipped (clean
    close+rebind instead).
-
-Unblock: push to a branch/PR so the `windows-smoke` job runs; on green, verify
-`portato doctor` on a Windows host, then flip the status to `[x]`
-(`docs(phase-17): complete`).
