@@ -1,0 +1,41 @@
+name: security
+
+# Scans Go dependencies for reachable known vulnerabilities with govulncheck.
+# The weekly cron is the key piece: it catches a CVE disclosed *after* a
+# dependency was merged — a signal a PR/push-only check can never give.
+# See docs/phases/phase-36-ci-security.md.
+
+on:
+  pull_request:
+    branches: [master, main]
+  push:
+    branches: [master, main]
+  schedule:
+    - cron: "23 4 * * 1" # Mon 04:23 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  govulncheck:
+    name: govulncheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Download modules
+        run: go mod download
+      - name: Verify modules
+        run: go mod verify
+      - name: Install govulncheck
+        # @latest: govulncheck pulls the live vuln DB from vuln.go.dev at run
+        # time anyway, so staying on the latest tool matches that intent.
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run govulncheck
+        # Source mode (the default) reports reachability: a finding is
+        # "Vulnerable" only if our code reaches the affected symbol, else it is
+        # listed as "Informational". The job fails only on reachable vulns.
+        run: govulncheck ./...
