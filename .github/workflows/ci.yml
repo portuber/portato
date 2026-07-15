@@ -28,6 +28,26 @@ jobs:
       - name: go test
         run: go test ./... -race
 
+  lint:
+    # Enforces the same .golangci.yml that `make lint` runs locally (phase 33):
+    # predeclared (no builtin shadowing) + gocyclo (min 15). CI never ran lint
+    # before, so these could slip in if an author skipped the local ritual.
+    name: golangci-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          # The golangci-lint-action brings its own cache; let setup-go provide
+          # only the toolchain (honors the go.mod toolchain directive).
+          cache: false
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          # .golangci.yml is a v1-schema config (phase 33); golangci-lint v2
+          # uses an incompatible format, so pin to v1.x.
+          version: v1.64.8
+
   build-all:
     name: cross-compile (${{ matrix.goos }}/${{ matrix.goarch }})
     runs-on: ubuntu-latest
