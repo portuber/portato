@@ -31,19 +31,19 @@ verification of the entire MVP.
 
 ### Common interface
 
-- [x] `glm-complex/internal/service/service.go`:
+- [x] `portato/internal/service/service.go`:
   - [x] `type Options struct { BinaryPath string; ConfigPath string; Label string }`.
   - [x] `type Installer interface` with `Install/Uninstall/Status` (see Implementation notes for the signature).
   - [x] `func New() Installer` — backed by a build-tagged implementation under the hood.
   - [x] `const DefaultLabel = "dev.portato.daemon"`.
-- [x] `glm-complex/internal/cmd/install.go`, `uninstall.go` (replace the stubs):
+- [x] `portato/internal/cmd/install.go`, `uninstall.go` (replace the stubs):
   - [x] Populate `Options`: `BinaryPath = os.Executable()` (warn if this is `go run` — unstable path), `ConfigPath` from flag/default, `Label` — `DefaultLabel` (optionally overridden by a flag).
   - [x] `service.New().Install(opts)` → clear message: `«Installed. Daemon will start at login. See: <plist/unit path>»`.
   - [x] `uninstall` → `Uninstall()` + message.
 
 ### macOS (launchd)
 
-- [x] `glm-complex/internal/service/service_darwin.go` (`//go:build darwin`):
+- [x] `portato/internal/service/service_darwin.go` (`//go:build darwin`):
   - [x] `plistPath := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents", "dev.portato.daemon.plist")`.
   - [x] Generate the plist (template in a Go string):
     ```xml
@@ -73,7 +73,7 @@ verification of the entire MVP.
 
 ### Linux (systemd --user)
 
-- [x] `glm-complex/internal/service/service_linux.go` (`//go:build linux`):
+- [x] `portato/internal/service/service_linux.go` (`//go:build linux`):
   - [x] `unitPath := filepath.Join(xdg.ConfigHome, "systemd", "user", "portato.service")` (usually `~/.config/systemd/user/portato.service`).
   - [x] Generate the unit:
     ```ini
@@ -96,7 +96,7 @@ verification of the entire MVP.
 
 ### Documentation
 
-- [x] Update `glm-complex/README.md` — the «Autostart» section:
+- [x] Update `portato/README.md` — the «Autostart» section:
   - macOS: what `portato install` does, the plist path, how to edit it, `launchctl print/load/unload`.
   - Linux: the unit path, `systemctl --user` commands, `enable-linger`.
   - General: tunnels are **disabled** at system startup; they need to be enabled via TUI/CLI.
@@ -142,7 +142,7 @@ verification of the entire MVP.
 ## Verification (including the final E2E MVP)
 
 ```sh
-cd glm-complex
+cd portato
 make build
 make test                       # all unit tests green
 

@@ -36,18 +36,18 @@ After this phase the utility fully matches the "three modes of operation" concep
 
 ### CLI commands
 
-- [x] `glm-complex/internal/cmd/list.go` (replacing the stub):
+- [x] `portato/internal/cmd/list.go` (replacing the stub):
   - [x] Create `client.New(socketPath)`.
   - [x] `Healthz()` — on error, a clear message: `«portato daemon is not running. Start it with 'portato daemon' or set up autostart with 'portato install'.»` + exit code 1.
   - [x] `List()` → print a table to stdout (name, type, local→remote, status, uptime). Format is simple aligned text; `--json` is a post-MVP option.
-- [x] `glm-complex/internal/cmd/enable.go`, `disable.go`, `restart.go` (replacing the stubs):
+- [x] `portato/internal/cmd/enable.go`, `disable.go`, `restart.go` (replacing the stubs):
   - [x] Common pattern: `client.New` → `Healthz` → call the corresponding method → on success, a short confirmation (`enabled: <name>`).
   - [x] The `<name>` argument via cobra `Args: ExactArgs(1)`.
   - [x] When there is no tunnel with that name — the daemon's error is surfaced readably.
 
 ### Smart-launcher
 
-- [x] `glm-complex/internal/cmd/root.go` (extend Phase 3):
+- [x] `portato/internal/cmd/root.go` (extend Phase 3):
   - [x] Before loading the config: probe the socket via `client.New(socketPath).Healthz()` with a short timeout (200ms).
   - [x] If the daemon is alive → **attach** mode:
     - create `controller.Remote(client, ...)`, call `tui.Run(ctrl)`.
@@ -59,7 +59,7 @@ After this phase the utility fully matches the "three modes of operation" concep
 
 ### Hand-off "leave in background?"
 
-- [x] `glm-complex/internal/tui/model.go` (extend Phase 3):
+- [x] `portato/internal/tui/model.go` (extend Phase 3):
   - [x] New field `mode string` (`"standalone"` | `"attach"`). If `attach` — normal exit without a modal.
   - [x] Field `confirmQuit bool` — a flag for showing the modal.
   - [x] In `Update` for `q` / `ctrl+c`:
@@ -71,7 +71,7 @@ After this phase the utility fully matches the "three modes of operation" concep
 - [x] Modal in `view.go`:
   - [x] Window centered: `«N tunnels active. Leave them running in the background? [y/N]»`.
   - [x] Keys: `y` — yes, `n` / `enter` — no (default, stop + exit), `Esc` — cancel (close the modal, return to the list).
-- [x] `glm-complex/internal/tui/handoff.go`:
+- [x] `portato/internal/tui/handoff.go`:
   - [x] `func handoff(ctx) error`:
     - Before spawning, make sure the `cfg` on disk matches the current Engine state (if the user toggled in standalone, `localController` should already have persisted via `Enable/Disable` → `config.Save`). Verify and save if necessary.
     - `exec.Command(os.Executable(), "daemon", "--config", cfgPath)` + `cmd.Stdin/Stdout/Stderr = nil` + `cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}` (detached). `cmd.Start()`.
@@ -83,7 +83,7 @@ After this phase the utility fully matches the "three modes of operation" concep
 
 ### Related minor items
 
-- [x] `glm-complex/internal/cmd/paths.go` (or in `daemon/paths.go`): a shared function `SocketPath() string` and `PIDPath() string`, used by all commands. Avoid duplication.
+- [x] `portato/internal/cmd/paths.go` (or in `daemon/paths.go`): a shared function `SocketPath() string` and `PIDPath() string`, used by all commands. Avoid duplication.
 - [x] In `daemon.New` accept a `spawned bool` flag (or simply ignore it) — it does not matter whether smart-launcher or the user manually spawns it.
 
 ## Definition of Done
@@ -107,7 +107,7 @@ After this phase the utility fully matches the "three modes of operation" concep
 ## Verification
 
 ```sh
-cd glm-complex
+cd portato
 make build
 
 # 1. CLI commands (with the daemon):

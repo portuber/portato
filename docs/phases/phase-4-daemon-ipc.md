@@ -32,7 +32,7 @@ this socket. The TUI can be closed — the tunnels keep running. This is the mod
 
 ## Tasks
 
-- [x] `glm-complex/internal/daemon/server.go`:
+- [x] `portato/internal/daemon/server.go`:
   - [x] `type Server struct { engine *forward.Engine; cfg *config.Config; cfgPath, socketPath, pidPath string; log *slog.Logger; srv *http.Server; }`.
   - [x] `func New(cfg, cfgPath, log) (*Server, error)` — compute the socket/PID paths (see SPEC §6), check that no daemon is running (PID file + live process).
   - [x] HTTP routes (via `http.ServeMux` or a chi equivalent — stdlib is fine):
@@ -51,7 +51,7 @@ this socket. The TUI can be closed — the tunnels keep running. This is the mod
     - wait for `ctx.Done()` or a signal.
   - [x] `func (s *Server) Shutdown()` — `srv.Shutdown(ctx)`, `engine.StopAll()`, remove the socket and PID file.
   - [x] Signal handling: `signal.NotifyContext(ctx, syscall.SIGTERM, syscall.SIGINT)` → triggers `Shutdown()`.
-- [x] `glm-complex/internal/client/client.go`:
+- [x] `portato/internal/client/client.go`:
   - [x] `type Client struct { http *http.Client; socketPath string }`.
   - [x] `http.Client.Transport = &http.Transport{ DialContext: func(...) { net.Dial("unix", socketPath) } }`.
   - [x] `func New(socketPath string) *Client`.
@@ -59,15 +59,15 @@ this socket. The TUI can be closed — the tunnels keep running. This is the mod
   - [x] `func (c *Client) Enable(name) error`, `Disable(name)`, `Restart(name)`.
   - [x] `func (c *Client) Reload() error`.
   - [x] `func (c *Client) Healthz() error` — `GET /healthz`.
-- [x] `glm-complex/internal/controller/remote.go`:
+- [x] `portato/internal/controller/remote.go`:
   - [x] `type Remote struct { client *client.Client; changes chan struct{}; }`.
   - [x] Implementation of all `Controller` methods via `client.*`.
   - [x] `Changes()` — a goroutine with `tea.Tick` 1s, sends into the channel (polling).
   - [x] `Close()` — close the channel (do NOT close client, it is stateless).
-- [x] `glm-complex/internal/cmd/daemon.go` (replaces the stub):
+- [x] `portato/internal/cmd/daemon.go` (replaces the stub):
   - [x] `RunE`: load the config (`config.Load`), create a logger (file + stderr only), create `daemon.New(...)`, start it.
   - [x] Logs go to `xdg.StateHome/portato/daemon.log`.
-- [x] `glm-complex/internal/cmd/attach.go` (replaces the stub):
+- [x] `portato/internal/cmd/attach.go` (replaces the stub):
   - [x] `RunE`: resolve the socket path (same as in the daemon), create `client.New(socketPath)`, `Healthz()` — on error, a clear message: `«daemon not running, try 'portato daemon' or 'portato install'»`.
   - [x] Create `controller.Remote(client, ...)`, call `tui.Run(ctrl)`.
   - [x] The TUI header shows `mode: attach @ <socket>` — this string needs to be threaded into the Model (via a `Run` option or a field).
@@ -90,7 +90,7 @@ this socket. The TUI can be closed — the tunnels keep running. This is the mod
 ## Verification
 
 ```sh
-cd glm-complex
+cd portato
 make build
 
 # Terminal A:

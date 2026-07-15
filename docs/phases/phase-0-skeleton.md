@@ -29,11 +29,11 @@ files are already in place — here we tie them together with a working skeleton
 
 ## Tasks
 
-- [x] `glm-complex/go.mod` via `go mod init github.com/portuber/portato`.
+- [x] `portato/go.mod` via `go mod init github.com/portuber/portato`.
 - [x] Add dependencies (`go get …`).
 - [x] Create the directory tree:
-  - `glm-complex/cmd/portato/main.go`
-  - `glm-complex/internal/{config,forward,controller,daemon,client,tui,service,cmd,log}/`
+  - `portato/cmd/portato/main.go`
+  - `portato/internal/{config,forward,controller,daemon,client,tui,service,cmd,log}/`
 - [x] `cmd/portato/main.go`: calls `internal/cmd.Execute()`.
 - [x] `internal/cmd/root.go`: cobra root command `portato` with a `--config` flag and a `RunE` handler that for now prints "TUI not implemented yet" (this will become the smart-launcher in Phase 5).
 - [x] `internal/cmd/daemon.go`, `attach.go`, `list.go`, `enable.go`, `disable.go`, `restart.go`, `install.go`, `uninstall.go` — each subcommand as a stub: `RunE: func(...) { return fmt.Errorf("not implemented yet") }`.
@@ -52,7 +52,7 @@ files are already in place — here we tie them together with a working skeleton
   vet:
   	go vet ./...
   ```
-- [x] `glm-complex/README.md`: a brief project description, a link to `docs/SPEC.md`, the `make build` / `make run` commands.
+- [x] `portato/README.md`: a brief project description, a link to `docs/SPEC.md`, the `make build` / `make run` commands.
 
 ## Definition of Done
 
@@ -67,7 +67,7 @@ files are already in place — here we tie them together with a working skeleton
 ## Verification
 
 ```sh
-cd glm-complex
+cd portato
 go build ./...
 ./bin/portato --help
 ./bin/portato daemon            # expected: not implemented yet

@@ -5,7 +5,7 @@ This document describes how planning and implementation are organized in the `po
 ## Planning structure
 
 ```
-glm-complex/docs/
+portato/docs/
 ├── SPEC.md              # the project's single technical spec (source of truth)
 ├── ROADMAP.md           # the summary table of all phases with statuses
 ├── CONVENTIONS.md       # this file — the rules of work

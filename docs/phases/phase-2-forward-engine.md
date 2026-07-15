@@ -29,13 +29,13 @@ A thread-safe `Engine` as a tunnel manager — `localController` in Phase 3 will
 
 ## Tasks
 
-- [x] `glm-complex/internal/forward/ssh.go`:
+- [x] `portato/internal/forward/ssh.go`:
   - [x] `func dialSSH(ctx, t config.Tunnel, defaults config.Defaults, log *slog.Logger) (*ssh.Client, error)` (`ctx` added for responsive Stop via `net.Dialer.DialContext` + `ssh.NewClientConn`):
     - build `ssh.ClientConfig` (User, AuthMethod, HostKeyCallback, Timeout: 5s).
     - auth chain: `ssh.PublicKeysCallback` from the agent → on failure `ssh.ParsePrivateKey` + `ssh.PublicKeys` from the identity.
     - `HostKeyCallback`: `knownhosts.New(defaults.KnownHosts)`; if `defaults.AcceptNewHosts` — a wrapper that appends the key.
     - human-readable errors: `unknown host: <fingerprint>. Add to known_hosts or set accept_new_hosts: true` / `auth failed: ...` / `connect refused: ...`.
-- [x] `glm-complex/internal/forward/tunnel.go` (`State`/`Status` moved to `state.go`):
+- [x] `portato/internal/forward/tunnel.go` (`State`/`Status` moved to `state.go`):
   - [x] `type State int` with constants `Off, Connecting, Connected, Reconnecting, Error`.
   - [x] `type Tunnel struct` (fields per plan + `baseCtx`, `done`).
   - [x] `func NewTunnel(baseCtx, cfg, defaults, log) *Tunnel` (renamed from `New` to avoid clashing with `NewEngine`).
@@ -46,7 +46,7 @@ A thread-safe `Engine` as a tunnel manager — `localController` in Phase 3 will
   - [x] accept-loop: for each incoming conn — `client.Dial("tcp", remote)` + two `io.Copy` in both directions (goroutines). On `client.Dial` error — log a warning, close the incoming conn.
   - [x] reconnect-loop: on SSH drop → state `Reconnecting` → backoff (1s→2s→4s→8s→16s→30s cap) → reconnect. Reset backoff after 30s of stable `Connected`.
   - [x] keepalive-loop: every 30s `client.SendRequest("keepalive@openssh.com", true, nil)` with a 5s timeout; on error — close client, which triggers the reconnect-loop.
-- [x] `glm-complex/internal/forward/engine.go`:
+- [x] `portato/internal/forward/engine.go`:
   - [x] `type Engine struct` + internal `tunneler` interface (for mocks in tests).
   - [x] `func NewEngine(ctx, cfg *config.Config, log *slog.Logger) *Engine` — creates tunnels from the config (but does not start them).
   - [x] `func (e *Engine) Enable(name string) error` — check existence + `Start`.
@@ -77,7 +77,7 @@ A thread-safe `Engine` as a tunnel manager — `localController` in Phase 3 will
 ## Verification
 
 ```sh
-cd glm-complex
+cd portato
 go test ./internal/forward/... -v
 
 # Manual verification (needs a test SSH server, e.g. a local sshd or a container):

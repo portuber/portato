@@ -29,7 +29,7 @@ coverage.
 
 ## Tasks
 
-- [x] `glm-complex/internal/config/config.go`:
+- [x] `portato/internal/config/config.go`:
   - [x] `type Tunnel struct` with fields: `Name, Type, Local, Remote, SSH, Identity, Enabled`, plus parsed `User, Host, Port` (not serialized, populated from `SSH`).
   - [x] `type Defaults struct { Identity, KnownHosts string; AcceptNewHosts bool }`.
   - [x] `type Config struct { Defaults Defaults; Tunnels []Tunnel }`.
@@ -51,7 +51,7 @@ coverage.
   - [x] Do not fail on an empty config.
 - [x] `func EnsureExample(path string) (created bool, err error)`:
   - [x] If the file is missing — create it with one example tunnel (`enabled: false`), return `created=true`.
-- [x] `glm-complex/config.example.yaml` — reference example.
+- [x] `portato/config.example.yaml` — reference example.
 - [x] Unit tests (`config_test.go`):
   - [x] Parsing of valid YAML.
   - [x] Applying defaults (local host, known_hosts, ssh port/user).
@@ -72,7 +72,7 @@ coverage.
 ## Verification
 
 ```sh
-cd glm-complex
+cd portato
 go test ./internal/config/... -v
 go run ./cmd/portato list    # not implemented yet, but the config must load/be created in the background
 ls -la "$(go run ./cmd/portato config-path 2>/dev/null || true)"  # optional: add a temporary subcommand for debugging

@@ -104,7 +104,7 @@ from `local` is the per-connection handler (a SOCKS5 server instead of a fixed
 ## Verification
 
 ```sh
-cd glm-complex
+cd portato
 make fmt && make vet && make test
 go test ./internal/forward/... -run 'Dynamic' -v
 go test ./internal/config/... -v

@@ -30,23 +30,23 @@ In this phase we do NOT build the daemon and IPC — that is Phase 4. We also do
 
 ## Tasks
 
-- [x] `glm-complex/internal/controller/controller.go`:
+- [x] `portato/internal/controller/controller.go`:
   - [x] `type State int` (re-export from forward, or define here and convert — choose). **Decided:** re-export (`type State = forward.State`, `type Status = forward.Status`) + state constants.
   - [x] `type Status struct { ... }` — re-exported from forward; the interface uses `controller.Status`.
   - [x] `type Controller interface { List() []Status; Enable(name) error; Disable(name) error; Restart(name) error; Reload() error; Changes() <-chan struct{}; Close() error }`.
-- [x] `glm-complex/internal/controller/local.go`:
+- [x] `portato/internal/controller/local.go`:
   - [x] `type Local struct { engine *forward.Engine; cfgPath string; ... changes chan struct{} }` (+ ctx/cancel, interval, Once-guards).
   - [x] `func NewLocal(cfg, cfgPath, log) *Local` — creates the Engine, does not start it.
   - [x] `Enable/Disable/Restart` → `engine.*` (the signal to `changes` comes from a separate ticker, see below).
   - [x] `Reload()` → `config.Load` + `engine.Reload`.
   - [x] `Changes()` → return the channel; lazily starts a goroutine with `time.NewTicker(1s)` that non-blockingly sends to the channel. The controller package does NOT depend on bubbletea.
   - [x] `Close()` → idempotent (sync.Once): cancel ctx + stop ticker + wait for the goroutine + close the channel + `engine.StopAll()`.
-- [x] `glm-complex/internal/tui/styles.go`:
+- [x] `portato/internal/tui/styles.go`:
   - [x] Lipgloss styles: header, table rows, footer with hotkeys, colored status indicators (green connected, gray off, yellow connecting/reconnecting, red error).
-- [x] `glm-complex/internal/tui/model.go`:
+- [x] `portato/internal/tui/model.go`:
   - [x] `type Model struct { ctrl controller.Controller; list []controller.Status; cursor int; width, height int; mode string; help bool; quit bool }` (`pendingQuit` is not needed — in Phase 3 `q` exits immediately).
   - [x] `mode` = `"standalone"` (later it will be `"attach @ <socket>"`).
-- [x] `glm-complex/internal/tui/update.go`:
+- [x] `portato/internal/tui/update.go`:
   - [x] `Init()` — initial `List()` + subscription to `Changes()` (via channel-listening `tea.Cmd`).
   - [x] `Update(msg)`:
     - `tea.KeyPressMsg` (v2):
@@ -59,15 +59,15 @@ In this phase we do NOT build the daemon and IPC — that is Phase 4. We also do
       - `q` / `ctrl+c` — `tea.Quit` (`ctrl.Close()` is called via defer in root.go).
     - `tea.WindowSizeMsg` — update `width/height`.
     - signal from `Changes()` → `ctrl.List()` + redraw.
-- [x] `glm-complex/internal/tui/view.go`:
+- [x] `portato/internal/tui/view.go`:
   - [x] Header: `portato — Port Forwarding` + `mode: standalone`.
   - [x] Table: `●/○` | `name` | `type` | `local → remote` | `status` | `uptime`.
   - [x] Footer: hotkeys `↑↓ move · space toggle · r restart · a/x all · R reload · ? help · q quit`.
   - [x] Highlighting of the selected row (a blue bar).
   - [x] When `help=true` — an additional panel with a description of all hotkeys.
-- [x] `glm-complex/internal/tui/run.go`:
+- [x] `portato/internal/tui/run.go`:
   - [x] `func Run(ctrl controller.Controller, mode string) error` — `tea.NewProgram(model)`, `Run()`, handle the error. AltScreen and `tea.KeyPressMsg`/`tea.NewView` — per the v2 API (`view.AltScreen = true` in `View()`, not the `tea.WithAltScreen()` option).
-- [x] `glm-complex/internal/cmd/root.go` (replacing the stub):
+- [x] `portato/internal/cmd/root.go` (replacing the stub):
   - [x] `rootCmd.RunE`: load the config (`config.Load`, if absent a sample is created), create a logger (a file under the XDG state home — stderr is removed because it breaks the alt-screen), create `controller.NewLocal(...)`, call `tui.Run(ctrl, "standalone")`.
   - [x] Graceful shutdown: on TUI exit — `ctrl.Close()` (which does `StopAll()`).
   - [x] The `--config` flag is honored.
@@ -90,7 +90,7 @@ In this phase we do NOT build the daemon and IPC — that is Phase 4. We also do
 ## Verification
 
 ```sh
-cd glm-complex
+cd portato
 make build
 
 # Prepare a test sshd and add a tunnel to the config:

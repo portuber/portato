@@ -97,7 +97,7 @@ while the data path dials a local address.
 ## Verification
 
 ```sh
-cd glm-complex
+cd portato
 make fmt && make vet && make test
 go test ./internal/forward/... -run 'Remote' -v
 go test ./internal/config/... -v

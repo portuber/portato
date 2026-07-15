@@ -83,7 +83,7 @@ For `portato` (smart): the daemon's presence is detected by reading the discover
 ## 4. Project layout
 
 ```
-glm-complex/
+portato/
 ├── go.mod
 ├── cmd/
 │   └── portato/
