@@ -107,9 +107,12 @@ scoops:
       owner: portuber
       name: scoop-bucket
       branch: main
-      # A PAT with push rights to the bucket repo (cross-repo publish); the
-      # default GITHUB_TOKEN cannot push to portuber/scoop-bucket.
-      token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
+      # Reuse the same cross-repo PAT as Homebrew (a repo-scoped token pushes to
+      # any portuber/* repo the owner can access); the default GITHUB_TOKEN
+      # cannot push to portuber/scoop-bucket. (Was .Env.SCOOP_BUCKET_GITHUB_TOKEN,
+      # which the release workflow never injected — that broke the v0.3.0 release
+      # at the Scoop step.)
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     commit_author:
       name: Valerii Kipkaev
       email: kipkaev@kipkaev.name
