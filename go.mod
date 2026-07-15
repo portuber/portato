@@ -2,7 +2,7 @@ module github.com/portuber/portato
 
 go 1.26.0
 
-toolchain go1.26.2
+toolchain go1.26.5
 
 require (
 	charm.land/bubbles/v2 v2.1.0
