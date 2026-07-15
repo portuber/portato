@@ -147,10 +147,10 @@ func TestPasswordModal_LeadingSpaceIgnored(t *testing.T) {
 	}
 }
 
-// TestPasswordModal_PortubbingState asserts the "portubbing…" connecting
-// state: enter submits and enters it; a dial rejection (PasswordAttempts grows)
-// drops back to the input; success (PendingPassword clears) closes the modal.
-func TestPasswordModal_PortubbingState(t *testing.T) {
+// TestPasswordModal_SproutingState asserts the "sprouting…" connecting state:
+// enter submits and enters it; a dial rejection (PasswordAttempts grows) drops
+// back to the input; success (PendingPassword clears) closes the modal.
+func TestPasswordModal_SproutingState(t *testing.T) {
 	f := newFake(controller.Status{
 		Name: "db", Type: "local", Local: "1", Remote: "r",
 		State: controller.Connecting, PendingPassword: "password:u@h:22",

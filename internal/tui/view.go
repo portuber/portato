@@ -117,13 +117,13 @@ func (m Model) render() string {
 	}
 	if m.enteringPassphrase {
 		if m.passphraseConnecting {
-			return m.centered(m.portubbingView(m.passphraseTarget))
+			return m.centered(m.sproutingView())
 		}
 		return m.centered(m.passphraseView())
 	}
 	if m.enteringPassword {
 		if m.passwordConnecting {
-			return m.centered(m.portubbingView(m.passwordTarget))
+			return m.centered(m.sproutingView())
 		}
 		return m.centered(m.passwordView())
 	}
@@ -484,12 +484,13 @@ func passphraseAttemptsFor(list []controller.Status, name string) int {
 	return 0
 }
 
-// portubbingView is the brief "connecting" state shown after a password /
+// sproutingView is the brief "connecting" state shown after a password /
 // passphrase submit, while the dial races to its verdict (accept → modal
-// closes; reject → back to the input). An on-brand stand-in (cf. Phase 25) for
-// what would otherwise be an empty input modal looking like "enter again".
-func (m Model) portubbingView(name string) string {
-	return modalStyle.Render(fmt.Sprintf("portubbing to %s…", name))
+// closes; reject → back to the input). An on-brand stand-in (portato = potato,
+// tubers sprout) for what would otherwise be an empty input modal looking like
+// "enter again".
+func (m Model) sproutingView() string {
+	return modalStyle.Render("sprouting…")
 }
 
 // passwordView renders the Phase 35 SSH-password modal: the tuber's dial is

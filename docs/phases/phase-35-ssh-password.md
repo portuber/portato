@@ -149,10 +149,10 @@ connected from the cache without prompting.
 - [x] **Fix 4:** the help overlay documents `o` (and that the modal auto-opens);
       `space` is toggle-only. The row hints are actionable: `password? (o)` /
       `passphrase? (p)`.
-- [x] **Fix 5:** after a submit, the modal shows a brief "portubbing to <name>…"
-      state (on-brand, cf. Phase 25) instead of an empty input that looked like
-      "enter again"; it closes on success or returns to the input on a rejection.
-      Applied to both the password and passphrase modals.
+- [x] **Fix 5:** after a submit, the modal shows a brief "sprouting…" state
+      (on-brand: portato = potato, tubers sprout) instead of an empty input that
+      looked like "enter again"; it closes on success or returns to the input on
+      a rejection. Applied to both the password and passphrase modals.
 
 ## Verification
 
