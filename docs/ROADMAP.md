@@ -51,7 +51,7 @@
 | 33  | CodeFactor cleanup + golangci-lint guardrails | `[x]` | [phase-33-codefactor-cleanup.md](./phases/phase-33-codefactor-cleanup.md) |
 | 34  | `portato license` command + `--license` flag | `[x]` | [phase-34-license-command.md](./phases/phase-34-license-command.md) |
 | 35  | SSH password authentication (opt-in) | `[x]` | [phase-35-ssh-password.md](./phases/phase-35-ssh-password.md) |
-| 36  | CI security hardening (govulncheck + lint in CI) | `[ ]` | [phase-36-ci-security.md](./phases/phase-36-ci-security.md) |
+| 36  | CI security hardening (govulncheck + lint in CI) | `[~]` | [phase-36-ci-security.md](./phases/phase-36-ci-security.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -143,7 +143,7 @@ time-based (not just size-based) log rotation.
 - **Phase 33** — clear codefactor.io's 12 issues (6 builtin-`max` shadowing + 6 complex methods, incl. 2 test funcs) and add a `golangci-lint` config + `make lint` so builtin shadowing and high-complexity production methods can't slip back in.
 - **Phase 34** — `portato license` subcommand + `--license` root flag (parallel to `version`/`--version`): the binary self-reports its MIT license and points to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` prints the embedded MIT text. A MINOR; shipped in v0.2.0/v0.2.1.
 - **Phase 35** — SSH password authentication (planned, `[ ]`): an opt-in `password_auth` tunnel authenticates to a password-only SSH server with a password supplied interactively (TUI/CLI) and, opt-in, the OS keyring — mirroring the Phase 19/30 passphrase flow. Keys stay the default and are tried first; the password is never stored in config (plaintext invariant preserved). depends_on [19, 30]. Surfaced while verifying Phase 17 on a password-only server.
-- **Phase 36** — CI security hardening (todo, `[ ]`): close two CI gaps — a `govulncheck` workflow (PR/push + weekly cron) scanning Go dependencies for reachable CVEs, and a `lint` job in `ci.yml` enforcing the existing `.golangci.yml` (which `make lint` runs locally but CI never did). depends_on [33]. Out of scope: Dependabot, CodeQL, Go Reference badge.
+- **Phase 36** — CI security hardening (in-progress, `[~]`): close two CI gaps — a `govulncheck` workflow (PR/push + weekly cron) scanning Go dependencies for reachable CVEs, and a `lint` job in `ci.yml` enforcing the existing `.golangci.yml` (which `make lint` runs locally but CI never did). depends_on [33]. Out of scope: Dependabot, CodeQL, Go Reference badge.
 
 ## Current work
 

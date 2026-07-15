@@ -1,7 +1,7 @@
 ---
 phase: 36
 title: CI security hardening (govulncheck + lint in CI)
-status: todo
+status: in-progress
 depends_on: [33]
 ---
 
@@ -126,6 +126,7 @@ and the README badge renders.
 
 ## Start guard
 
-This phase is `status: todo`. It starts only on an explicit "start phase 36"
-command (per docs/CONVENTIONS.md). The first action then is commit 2 (the
-`[~]` flip) and the implementation commits.
+This phase is `status: in-progress`. It was started on an explicit
+"start phase 36" command (per docs/CONVENTIONS.md). The `[~]` flip and the
+implementation commits are landing now; it returns to `status: done` on
+"complete phase 36" once the DoD is met.
