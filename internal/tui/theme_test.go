@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"math"
 	"testing"
 
 	"charm.land/lipgloss/v2"
@@ -189,5 +190,99 @@ func TestResolveKind(t *testing.T) {
 				t.Errorf("resolveKind(%v,%v) = %v, want %v", c.bgDark, c.hasRuntime, got, c.want)
 			}
 		})
+	}
+}
+
+// styleRGB extracts the 8-bit foreground RGB of a lipgloss style through the
+// same color model lipgloss renders with (its ANSI/truecolor table). A style
+// with no explicit foreground returns black.
+func styleRGB(st lipgloss.Style) (r, g, b int) {
+	c := st.GetForeground()
+	if c == nil {
+		return 0, 0, 0
+	}
+	cr, cg, cb, _ := c.RGBA()
+	return int(cr >> 8), int(cg >> 8), int(cb >> 8)
+}
+
+// wcagLuminance computes the WCAG 2.x relative luminance of an 8-bit RGB triple.
+func wcagLuminance(r, g, b int) float64 {
+	ch := func(c int) float64 {
+		v := float64(c) / 255
+		if v <= 0.03928 {
+			return v / 12.92
+		}
+		return math.Pow((v+0.055)/1.055, 2.4)
+	}
+	return 0.2126*ch(r) + 0.7152*ch(g) + 0.0722*ch(b)
+}
+
+// wcagContrast is the WCAG 2.x contrast ratio between two 8-bit RGB triples.
+func wcagContrast(r1, g1, b1, r2, g2, b2 int) float64 {
+	l1 := wcagLuminance(r1, g1, b1)
+	l2 := wcagLuminance(r2, g2, b2)
+	if l1 < l2 {
+		l1, l2 = l2, l1
+	}
+	return (l1 + 0.05) / (l2 + 0.05)
+}
+
+// TestDarkPaletteContrastOnDarkHome locks the Phase 37 Task D color fix: every
+// dark state color plus the title/cursor/editorTitle, err and warn roles clear
+// WCAG AA (>= 4.5:1) on the dark home background #1E1E1E. The state colors are
+// truecolor hex values (not ANSI-16 indices): the indices that preceded them
+// (2/3) computed below 4.5:1 under lipgloss's own color model and rendered
+// unpredictably across terminal palettes.
+func TestDarkPaletteContrastOnDarkHome(t *testing.T) {
+	const minContrast = 4.5
+	const gR, gG, gB = 0x1E, 0x1E, 0x1E
+	p := darkPalette()
+	styles := []struct {
+		name string
+		st   lipgloss.Style
+	}{
+		{"title", p.title}, {"cursor", p.cursor}, {"editorTitle", p.editorTitle},
+		{"err", p.err}, {"warn", p.warn},
+		{"state[Off]", p.state[controller.Off]},
+		{"state[Connecting]", p.state[controller.Connecting]},
+		{"state[Connected]", p.state[controller.Connected]},
+		{"state[Reconnecting]", p.state[controller.Reconnecting]},
+		{"state[Error]", p.state[controller.Error]},
+	}
+	for _, s := range styles {
+		r, g, b := styleRGB(s.st)
+		if c := wcagContrast(r, g, b, gR, gG, gB); c < minContrast {
+			t.Errorf("dark %s = #%02X%02X%02X contrast on #1E1E1E = %.2f:1, want >= %.1f:1",
+				s.name, r, g, b, c, minContrast)
+		}
+	}
+}
+
+// TestLightPaletteContrastOnLightSurface locks the light palette against its
+// #FAFAFA surface (painted by fillBg + View.BackgroundColor). The 166 -> #B45309
+// swap is the one that crossed the 4.5:1 threshold for connecting/reconnecting/
+// warn; the rest already passed.
+func TestLightPaletteContrastOnLightSurface(t *testing.T) {
+	const minContrast = 4.5
+	const gR, gG, gB = 0xFA, 0xFA, 0xFA
+	p := lightPalette()
+	styles := []struct {
+		name string
+		st   lipgloss.Style
+	}{
+		{"title", p.title}, {"cursor", p.cursor}, {"editorTitle", p.editorTitle},
+		{"err", p.err}, {"warn", p.warn},
+		{"state[Off]", p.state[controller.Off]},
+		{"state[Connecting]", p.state[controller.Connecting]},
+		{"state[Connected]", p.state[controller.Connected]},
+		{"state[Reconnecting]", p.state[controller.Reconnecting]},
+		{"state[Error]", p.state[controller.Error]},
+	}
+	for _, s := range styles {
+		r, g, b := styleRGB(s.st)
+		if c := wcagContrast(r, g, b, gR, gG, gB); c < minContrast {
+			t.Errorf("light %s = #%02X%02X%02X contrast on #FAFAFA = %.2f:1, want >= %.1f:1",
+				s.name, r, g, b, c, minContrast)
+		}
 	}
 }

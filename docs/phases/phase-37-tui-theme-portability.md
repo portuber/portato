@@ -162,8 +162,11 @@ many fonts.
 > every branch.
 
 ### D — color correctness
-- [ ] `theme.go` `darkPalette()` — replace error `1` → `203` (#FF5F5F, 2.85 →
-      5.60:1); replace title/cursor `63` → `105` (#8787FF, 3.63 → 5.51:1).
+- [x] `theme.go` `darkPalette()`/`lightPalette()` — dark state colors + accent/
+      error/warn retuned to truecolor hex so every state clears WCAG AA
+      deterministically; light `166` → `#B45309` (its only failing color). See
+      the note. Locked by `TestDarkPaletteContrastOnDarkHome` /
+      `TestLightPaletteContrastOnLightSurface`.
 - [ ] (Optional, larger) Adopt adaptive light/dark pairs per semantic role
       (replacing the hand-written two-palette split), and drop `Faint(true)`
       usage in dark/mono (`theme.go:96-104`) in favor of a dim color — `Faint`
@@ -171,6 +174,30 @@ many fonts.
       `#FAFAFA` (light) / `#1E1E1E` (dark), all ≥ 4.4:1: accent `#4646D6`/`#8F8FFF`,
       connected `#15803D`/`#22C55E`, error `#CC0000`/`#F87171`, warn `#B45309`/`#FBBF24`,
       dim `#626262`/`#9CA3AF`, body `#262626`/`#E5E7EB`.
+
+> **Implementation note (Task D resolution — empirically revised).** The planned
+> minimal swaps (error `1`→`203`, title/cursor `63`→`105`, ANSI-256 indices) were
+> widened to **truecolor hex** and extended to the connecting/connected states.
+> Reason: while writing the WCAG test it surfaced that lipgloss's color model maps
+> ANSI-16 indices (0-15) to dim VGA values (index 3 = olive `#808000`, index 2 =
+> dark green `#008000`), under which connecting computed **3.97:1** and connected
+> **3.25:1** on `#1E1E1E` — failing AA — and whose real rendering further depends
+> on the terminal's palette index 2/3 (bright on iTerm2/Terminal.app, dim
+> elsewhere). The audit's "passing" verdict for 2/3 assumed a bright palette. To
+> make the DoD ("every state ≥ 4.5:1, recomputed via WCAG") hold
+> **terminal-independently**, the dark state colors moved off ANSI-16 onto hex
+> from the audit §5 dark column: error `#F87171` (6.03),
+> connecting/reconnecting `#FBBF24` (9.99), connected `#22C55E` (7.32); accent
+> (title/cursor/editorTitle) `#8F8FFF` (5.99); off stays `245` (4.83,
+> deterministic ramp). The dark `warn` field followed connecting (`#FBBF24`) for
+> role coherence. Light: `166` → `#B45309` (4.81) for connecting/reconnecting/warn
+> — its only failing color. Hex values quantize predictably on 256-colour
+> terminals (nearest cube ≈ the 203/105-class indices originally proposed). The
+> optional D-large (adaptive `LightDark` pairs + drop `Faint`) remains deferred
+> by explicit owner decision; the chosen hex values are verbatim the §5 dark
+> column, so D-large is now a mechanical refactor onto `lipgloss.LightDark`, not
+> a re-tune. Exclusions honored: no adaptive-pairs refactor, no `Faint` removal,
+> no `LightDark`.
 
 ### E — mono glyph split
 - [ ] `theme.go` `monoPalette()` / `view.go` `indicator()` — differentiate
