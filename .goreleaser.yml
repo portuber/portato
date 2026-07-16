@@ -18,6 +18,12 @@ builds:
     binary: portato
     env:
       - CGO_ENABLED=0
+    # -trimpath strips the build machine's absolute source paths (e.g.
+    # /Users/.../glm-complex) from the binary, so release artifacts only expose
+    # the module path (github.com/portuber/portato/...), not the maintainer's
+    # local working directory. It is a build flag, not an ldflag.
+    flags:
+      - -trimpath
     goos:
       - linux
       - darwin
