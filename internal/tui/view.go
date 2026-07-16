@@ -392,7 +392,54 @@ func formatUptime(d time.Duration) string {
 }
 
 func (m Model) footer() string {
-	return m.pal.footer.Render("↑↓/jk move · space toggle · p passphrase · o password · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · / filter · R reload · ? help · q quit")
+	const sep = " · "
+	b := tuberBindings()
+	full := joinFeet(b, sep)
+	avail := m.width - 2*sideMargin
+	// Before the first WindowSizeMsg (and in unit tests) m.width is 0: render
+	// the full natural-order footer so the un-sized output is stable. Also
+	// short-circuit when the whole footer already fits — a wide terminal keeps
+	// the exact pre-Phase-38 string.
+	if avail <= 0 || lipgloss.Width(full) <= avail {
+		return m.pal.footer.Render(full)
+	}
+	// Tail reservation: the last two entries (? help, q quit) — the keys that
+	// unlock the rest of the UI — always stay visible at the end. Walk the
+	// middle in natural order and keep a contiguous prefix that fits alongside
+	// the reserved tail; drop whole entries on overflow (never mid-word). The
+	// first entries to go are the lowest-priority ones (later in natural order:
+	// reload, filter, logs, …), matching the footer's everyday-use ranking.
+	tailStr := b[len(b)-2].foot + sep + b[len(b)-1].foot
+	middle := b[:len(b)-2]
+	budget := avail - lipgloss.Width(sep) - lipgloss.Width(tailStr)
+	shown := make([]string, 0, len(middle))
+	used := 0
+	for _, e := range middle {
+		extra := 0
+		if len(shown) > 0 {
+			extra = lipgloss.Width(sep)
+		}
+		if used+extra+lipgloss.Width(e.foot) > budget {
+			break
+		}
+		shown = append(shown, e.foot)
+		used += extra + lipgloss.Width(e.foot)
+	}
+	if len(shown) == 0 {
+		return m.pal.footer.Render(tailStr)
+	}
+	return m.pal.footer.Render(strings.Join(shown, sep) + sep + tailStr)
+}
+
+// joinFeet renders the bindings' footer tokens in order, joined by sep. It is
+// the canonical full-footer string, used both for the wide-terminal/fast-path
+// render and as the width-fit baseline.
+func joinFeet(b []binding, sep string) string {
+	feet := make([]string, len(b))
+	for i, e := range b {
+		feet[i] = e.foot
+	}
+	return strings.Join(feet, sep)
 }
 
 func (m Model) helpBlock() string {
