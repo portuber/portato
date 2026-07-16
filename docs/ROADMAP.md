@@ -53,7 +53,7 @@
 | 35  | SSH password authentication (on by default) | `[x]` | [phase-35-ssh-password.md](./phases/phase-35-ssh-password.md) |
 | 36  | CI security hardening (govulncheck + lint in CI) | `[x]` | [phase-36-ci-security.md](./phases/phase-36-ci-security.md) |
 | 37  | TUI theme portability & color     | `[x]` | [phase-37-tui-theme-portability.md](./phases/phase-37-tui-theme-portability.md) |
-| 38  | TUI responsive layout              | `[ ]` | [phase-38-tui-responsive-layout.md](./phases/phase-38-tui-responsive-layout.md) |
+| 38  | TUI responsive layout              | `[~]` | [phase-38-tui-responsive-layout.md](./phases/phase-38-tui-responsive-layout.md) |
 | 39  | TUI polish (modals, microcopy)     | `[ ]` | [phase-39-tui-polish.md](./phases/phase-39-tui-polish.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
@@ -68,8 +68,8 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–37 are all `[x]`; phases 38–39 are `[ ]` (planned — a TUI
-responsive/polish pass: responsive layout + behavioral polish). Phase 36
+**Phases 0–37 are all `[x]`; phase 38 is `[~]` (in progress — TUI responsive
+layout); phase 39 is `[ ]` (planned — TUI polish). Phase 36
 (CI security hardening) is `[x]`: a
 `govulncheck` workflow (PR/push + weekly cron) scanning dependencies for
 reachable CVEs, plus a `lint` job in CI enforcing the existing

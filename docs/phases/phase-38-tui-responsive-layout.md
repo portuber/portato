@@ -1,7 +1,7 @@
 ---
 phase: 38
 title: TUI responsive layout (footer, help, columns)
-status: todo
+status: in-progress
 depends_on: [23]
 ---
 
