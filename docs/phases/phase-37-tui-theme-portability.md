@@ -134,9 +134,32 @@ many fonts.
 > the first `WindowSizeMsg` is kept as a first-frame repaint aid.
 
 ### C — dark surface policy
-- [ ] With A+B in place, confirm dark is transparent by default; paint a dark
-      surface (`#16161D`-class) **only** in the unknown-background fallback
-      branch. Do not override the user's terminal theme when detection worked.
+- [x] Dark stays transparent in every resolution branch — env override, OSC-11
+      answer, `COLORFGBG`, and the unknown-background default-dark fallback
+      alike. No `#16161D` fallback paint. (Supersedes the original "paint in the
+      unknown-fallback branch" clause; see the note.)
+
+> **Implementation note (Task C resolution).** Decision: the dark surface stays
+> **transparent everywhere**; the `#16161D`-class fallback paint is **not**
+> implemented. Rationale: (a) the DoD requires only "transparent when detection
+> succeeded" — already true, since `darkPalette`/`monoPalette` carry `surfaceBg
+> == nil`; (b) a paint via `tea.View.BackgroundColor` (OSC 11 set) is ignored by
+> the iTerm2 class of terminals, so it would not produce a reliable surface
+> anyway; (c) the `fillBg` cell-fill alone reproduces the same blank-separator /
+> footer gaps documented under Task B, i.e. it does not yield a clean dark
+> surface either; (d) on the rare no-signal **light** terminal (no OSC answer,
+> no `COLORFGBG`) a forced dark paint would override the user's own light theme
+> — reintroducing the F1 failure mode (a forced theme override) in exchange for
+> a readability gain that only matters in that same rare case; (e) the
+> unknown-fallback is empirically rare: both tested terminals emit a signal
+> (iTerm2 → `COLORFGBG="7;0"` → dark; Terminal.app → OSC 11 answer → light).
+> Net: a forced dark surface buys readability in a rare corner while paying with
+> a theme override there, and it cannot be made reliable on non-honoring
+> terminals regardless — so the transparent default is kept unconditionally.
+> `darkPalette`/`monoPalette` are unchanged (`surfaceBg` nil;
+> `TestResolvePaletteAllKinds` already locks that). The DoD item "Dark theme
+> stays transparent by default" is met — strictly stronger: transparent in
+> every branch.
 
 ### D — color correctness
 - [ ] `theme.go` `darkPalette()` — replace error `1` → `203` (#FF5F5F, 2.85 →
