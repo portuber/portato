@@ -97,22 +97,24 @@ func resolveKind(bgDark, hasRuntime bool) themeKind {
 // style variables in styles.go are aliases into one palette so the call sites
 // (view.go / editor.go / logs.go) never change.
 type palette struct {
-	title       lipgloss.Style
-	mode        lipgloss.Style
-	header      lipgloss.Style
-	selected    lipgloss.Style
-	cursor      lipgloss.Style
-	dim         lipgloss.Style
-	body        lipgloss.Style
-	err         lipgloss.Style
-	warn        lipgloss.Style
-	footer      lipgloss.Style
-	helpTitle   lipgloss.Style
-	helpPanel   lipgloss.Style
-	modal       lipgloss.Style
-	editorTitle lipgloss.Style
-	editorLabel lipgloss.Style
-	state       map[controller.State]lipgloss.Style
+	title           lipgloss.Style
+	mode            lipgloss.Style
+	header          lipgloss.Style
+	selected        lipgloss.Style
+	cursor          lipgloss.Style
+	dim             lipgloss.Style
+	body            lipgloss.Style
+	err             lipgloss.Style
+	warn            lipgloss.Style
+	footer          lipgloss.Style
+	helpTitle       lipgloss.Style
+	helpPanel       lipgloss.Style
+	modal           lipgloss.Style
+	editorTitle     lipgloss.Style
+	editorLabel     lipgloss.Style
+	state           map[controller.State]lipgloss.Style
+	connectingGlyph string
+	connectedGlyph  string
 	// surfaceBg, when non-nil, is painted across the whole TUI surface (a
 	// real "light mode" background). Nil = transparent (use the terminal's
 	// own background). Only the light theme sets it.
@@ -155,6 +157,8 @@ func darkPalette() palette {
 			controller.Reconnecting: lipgloss.NewStyle().Foreground(lipgloss.Color("#FBBF24")),
 			controller.Error:        lipgloss.NewStyle().Foreground(lipgloss.Color("#F87171")),
 		},
+		connectingGlyph: "●",
+		connectedGlyph:  "●",
 	}
 }
 
@@ -192,7 +196,9 @@ func lightPalette() palette {
 			controller.Reconnecting: lipgloss.NewStyle().Foreground(lipgloss.Color("#B45309")),
 			controller.Error:        lipgloss.NewStyle().Foreground(lipgloss.Color("124")),
 		},
-		surfaceBg: bg,
+		connectingGlyph: "●",
+		connectedGlyph:  "●",
+		surfaceBg:       bg,
 	}
 }
 
@@ -223,5 +229,7 @@ func monoPalette() palette {
 			controller.Reconnecting: lipgloss.NewStyle(),
 			controller.Error:        lipgloss.NewStyle().Bold(true),
 		},
+		connectingGlyph: "◐",
+		connectedGlyph:  "●",
 	}
 }

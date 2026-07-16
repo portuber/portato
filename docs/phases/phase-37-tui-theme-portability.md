@@ -200,9 +200,20 @@ many fonts.
 > no `LightDark`.
 
 ### E — mono glyph split
-- [ ] `theme.go` `monoPalette()` / `view.go` `indicator()` — differentiate
-      `connecting`/`reconnecting` as `◐` vs `●` connected (keep `○` off, `✗`
-      error). (Mono is a daily-driver theme for some users, not an edge case.)
+- [x] `theme.go` `palette` (new `connectingGlyph`/`connectedGlyph` fields) +
+      `monoPalette()` (`◐`/`●`) + `view.go` `indicator()` (Connecting/
+      Reconnecting → `connectingGlyph`, Connected → `connectedGlyph`). Dark/
+      light keep `●` for connecting (colour already distinguishes the live
+      states) — the `◐` split is mono-only. Locked by
+      `TestMonoIndicatorGlyphs`.
+
+> **Implementation note (Task E resolution).** Added `connectingGlyph`/
+> `connectedGlyph` to the `palette` struct so `indicator()` is glyph-driven
+> rather than hardcoded: mono sets `◐` (connecting/reconnecting) vs `●`
+> (connected) — the old `●`-for-both-differing-only-by-Bold was invisible in
+> many fonts (F11). The colour themes set both to `●` (the live states are
+> already separated by green/amber); making the split universal is a one-line
+> change per palette if ever wanted. `○` off and `✗` error are unchanged.
 
 ### F — bookkeeping
 - [ ] `docs/ROADMAP.md` — phase-37 row already added at plan time; flip status

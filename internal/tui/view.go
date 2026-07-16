@@ -342,8 +342,10 @@ func indicator(pal palette, s controller.Status) string {
 		return pal.state[controller.Off].Render("○")
 	case controller.Error:
 		return pal.state[controller.Error].Render("✗")
+	case controller.Connecting, controller.Reconnecting:
+		return pal.state[s.State].Render(pal.connectingGlyph)
 	default:
-		return pal.state[s.State].Render("●")
+		return pal.state[s.State].Render(pal.connectedGlyph)
 	}
 }
 

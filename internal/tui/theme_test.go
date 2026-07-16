@@ -2,6 +2,7 @@ package tui
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"charm.land/lipgloss/v2"
@@ -284,5 +285,40 @@ func TestLightPaletteContrastOnLightSurface(t *testing.T) {
 			t.Errorf("light %s = #%02X%02X%02X contrast on #FAFAFA = %.2f:1, want >= %.1f:1",
 				s.name, r, g, b, c, minContrast)
 		}
+	}
+}
+
+// TestMonoIndicatorGlyphs locks the Phase 37 Task E mono glyph split: in the
+// monochrome theme connecting/reconnecting render ◐ and connected renders ●
+// (previously both were ●, differing only by Bold, invisible in many fonts).
+// The colour themes keep ● for connecting (colour already distinguishes the
+// live states); the ◐ split is mono-only.
+func TestMonoIndicatorGlyphs(t *testing.T) {
+	pal := monoPalette()
+	cases := []struct {
+		state    controller.State
+		contains string
+	}{
+		{controller.Off, "○"},
+		{controller.Error, "✗"},
+		{controller.Connecting, "◐"},
+		{controller.Reconnecting, "◐"},
+		{controller.Connected, "●"},
+	}
+	for _, c := range cases {
+		got := indicator(pal, controller.Status{State: c.state})
+		if !strings.Contains(got, c.contains) {
+			t.Errorf("mono indicator(%v) = %q, want glyph %q", c.state, got, c.contains)
+		}
+	}
+	dark := darkPalette()
+	got := indicator(dark, controller.Status{State: controller.Connecting})
+	if !strings.Contains(got, "●") || strings.Contains(got, "◐") {
+		t.Errorf("dark indicator(Connecting) = %q, want ● and not ◐ (mono-only split)", got)
+	}
+	light := lightPalette()
+	got = indicator(light, controller.Status{State: controller.Reconnecting})
+	if !strings.Contains(got, "●") || strings.Contains(got, "◐") {
+		t.Errorf("light indicator(Reconnecting) = %q, want ● and not ◐ (mono-only split)", got)
 	}
 }
