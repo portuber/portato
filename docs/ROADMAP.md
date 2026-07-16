@@ -52,7 +52,7 @@
 | 34  | `portato license` command + `--license` flag | `[x]` | [phase-34-license-command.md](./phases/phase-34-license-command.md) |
 | 35  | SSH password authentication (on by default) | `[x]` | [phase-35-ssh-password.md](./phases/phase-35-ssh-password.md) |
 | 36  | CI security hardening (govulncheck + lint in CI) | `[x]` | [phase-36-ci-security.md](./phases/phase-36-ci-security.md) |
-| 37  | TUI theme portability & color     | `[~]` | [phase-37-tui-theme-portability.md](./phases/phase-37-tui-theme-portability.md) |
+| 37  | TUI theme portability & color     | `[x]` | [phase-37-tui-theme-portability.md](./phases/phase-37-tui-theme-portability.md) |
 | 38  | TUI responsive layout              | `[ ]` | [phase-38-tui-responsive-layout.md](./phases/phase-38-tui-responsive-layout.md) |
 | 39  | TUI polish (modals, microcopy)     | `[ ]` | [phase-39-tui-polish.md](./phases/phase-39-tui-polish.md) |
 
@@ -68,9 +68,9 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–36 are all `[x]`; phases 37–39 are `[ ]` (planned — a TUI
-accessibility/responsive/polish pass: theme portability & color, responsive
-layout, and behavioral polish). Phase 36 (CI security hardening) is `[x]`: a
+**Phases 0–37 are all `[x]`; phases 38–39 are `[ ]` (planned — a TUI
+responsive/polish pass: responsive layout + behavioral polish). Phase 36
+(CI security hardening) is `[x]`: a
 `govulncheck` workflow (PR/push + weekly cron) scanning dependencies for
 reachable CVEs, plus a `lint` job in CI enforcing the existing
 `.golangci.yml` — it immediately surfaced 5 reachable stdlib CVEs
@@ -154,7 +154,7 @@ time-based (not just size-based) log rotation.
 - **Phase 34** — `portato license` subcommand + `--license` root flag (parallel to `version`/`--version`): the binary self-reports its MIT license and points to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` prints the embedded MIT text. A MINOR; shipped in v0.2.0/v0.2.1.
 - **Phase 35** — SSH password authentication (done, `[x]`): an on-by-default password-auth fallback (OpenSSH-style — keys tried first, then prompt when no key authenticates) with `password_auth: false` to opt out; the password is supplied interactively (TUI `o` modal / `POST /tubers/{name}/password` / `controller.AcceptPassword`) and, opt-in, persisted to the OS keyring (`defaults.ssh_password_store`), never to config. Keys stay the default; the re-prompt is a dial-level loop (golang.org/x/crypto/ssh does not retry the password method within one handshake). depends_on [19, 30]. Surfaced while verifying Phase 17 on a password-only server.
 - **Phase 36** — CI security hardening (done, `[x]`): close two CI gaps — a `govulncheck` workflow (PR/push + weekly cron) scanning Go dependencies for reachable CVEs, and a `lint` job in `ci.yml` enforcing the existing `.golangci.yml` (which `make lint` runs locally but CI never did). Adding the workflow immediately surfaced 5 reachable stdlib CVEs in the pinned toolchain (crypto/tls, crypto/x509, net, net/http), fixed by bumping the toolchain 1.26.2 → 1.26.5; `govulncheck ./...` now exits 0. depends_on [33]. Out of scope: Dependabot, CodeQL, Go Reference badge.
-- **Phase 37** — TUI theme portability & color correctness (planned, `[ ]`): pick the palette against the real terminal background (`tea.RequestBackgroundColor` → `BackgroundColorMsg`, with an explicit `PORTATO_THEME` → OSC 11 → `COLORFGBG` → dark degradation chain), move palette resolution off package init onto `Model`, fix the light surface fill under tmux, and correct the contrast-failing dark colors + the mono `connecting`/`connected` glyph split. depends_on [15].
+- **Phase 37** — TUI theme portability & color correctness (done, `[x]`): pick the palette against the real terminal background (`tea.RequestBackgroundColor` → `BackgroundColorMsg`, with an explicit `PORTATO_THEME` → OSC 11 → `COLORFGBG` → dark degradation chain), move palette resolution off package init onto `Model`, fix the light surface fill under tmux, and correct the contrast-failing dark colors + the mono `connecting`/`connected` glyph split. depends_on [15].
 - **Phase 38** — TUI responsive layout (planned, `[ ]`): make the footer fit at 80/60 cols (`? help`/`q quit` visible), the `?` help overlay reachable at 80×24, and the table columns shrink by priority (STATUS untouchable, ENDPOINT shrinks first, NAME flex, UPTIME right-aligned). depends_on [23].
 - **Phase 39** — TUI polish (planned, `[ ]`): modals overlay the dimmed list instead of erasing it, footer pinned to the bottom edge, empty-state CTA → `n`, the `hasLiveTubers` quit gate counts the Error state and the footer/help/modal microcopy agree, the attach header drops its socket path, and error text keeps the actionable tail. depends_on [].
 

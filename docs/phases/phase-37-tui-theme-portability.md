@@ -1,7 +1,7 @@
 ---
 phase: 37
 title: TUI theme portability & color correctness
-status: in-progress
+status: done
 depends_on: [15]
 ---
 
@@ -71,18 +71,18 @@ many fonts.
 ## Tasks
 
 ### A — runtime theme resolution (the core change)
-- [ ] `theme.go` — keep `detectKind()` as the fallback resolver; add a path that
+- [x] `theme.go` — keep `detectKind()` as the fallback resolver; add a path that
       accepts a runtime-resolved background luminance and returns the theme kind.
-- [ ] `styles.go` — stop resolving the palette at package init (`var pal = …`).
+- [x] `styles.go` — stop resolving the palette at package init (`var pal = …`).
       Introduce a `styles`/theme struct on `Model` (fields replacing the current
       package-level style vars `titleStyle … editorLabelStyle`, `stateStyle`,
       `surfaceBg`); update every call site in `view.go`/`editor.go`/`logs.go`.
-- [ ] `model.go` — hold the resolved styles on `Model`; resolve a sensible
+- [x] `model.go` — hold the resolved styles on `Model`; resolve a sensible
       default at construction (for the pre-message first frame and unit tests).
-- [ ] `update.go`/`model.go` — return `tea.RequestBackgroundColor()` from
+- [x] `update.go`/`model.go` — return `tea.RequestBackgroundColor()` from
       `Init()`; on `tea.BackgroundColorMsg` resolve the palette by luminance
       (`IsDark()`), store it on the model, and request a repaint.
-- [ ] Degradation: `PORTATO_THEME` short-circuits the query; `NO_COLOR` → mono;
+- [x] Degradation: `PORTATO_THEME` short-circuits the query; `NO_COLOR` → mono;
       a missing OSC 11 answer falls through to `COLORFGBG` then default dark —
       verify none of these misrender or hang.
 
@@ -216,28 +216,28 @@ many fonts.
 > change per palette if ever wanted. `○` off and `✗` error are unchanged.
 
 ### F — bookkeeping
-- [ ] `docs/ROADMAP.md` — phase-37 row already added at plan time; flip status
+- [x] `docs/ROADMAP.md` — phase-37 row already added at plan time; flip status
       on start/complete.
-- [ ] This file — flip status on start/complete.
+- [x] This file — flip status on start/complete.
 
 ## Definition of Done
 
-- [ ] With `PORTATO_THEME` unset, a dark-background terminal gets the dark
+- [x] With `PORTATO_THEME` unset, a dark-background terminal gets the dark
       palette and a white-background terminal gets the light palette.
-- [ ] On a terminal that does not answer OSC 11 (e.g. tmux without passthrough)
+- [x] On a terminal that does not answer OSC 11 (e.g. tmux without passthrough)
       the app does not hang or misrender: it falls back to `COLORFGBG`, then
       default dark.
-- [ ] `PORTATO_THEME=light` inside a dark-background tmux: `tmux capture-pane -e`
+- [x] `PORTATO_THEME=light` inside a dark-background tmux: `tmux capture-pane -e`
       shows the surface background SGR on **every** grid line across the full
       width (spot-check first / middle / last rows and padding lines).
-- [ ] Every state color (off / connecting / connected / reconnecting / error) ≥
+- [x] Every state color (off / connecting / connected / reconnecting / error) ≥
       4.5:1 on its ground background (recomputed via WCAG relative-luminance).
-- [ ] In the monochrome theme, `connecting` and `connected` are visually distinct
+- [x] In the monochrome theme, `connecting` and `connected` are visually distinct
       (`◐` vs `●`), not just bold.
-- [ ] Dark theme stays transparent by default (no painted dark surface when
+- [x] Dark theme stays transparent by default (no painted dark surface when
       detection succeeded); the user's terminal background shows through.
-- [ ] `PORTATO_THEME=dark|light|mono` still override; `NO_COLOR` still → mono.
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean;
+- [x] `PORTATO_THEME=dark|light|mono` still override; `NO_COLOR` still → mono.
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean;
       `make lint` is clean.
 
 ## Verification
