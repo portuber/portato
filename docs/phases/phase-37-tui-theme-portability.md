@@ -87,14 +87,51 @@ many fonts.
       verify none of these misrender or hang.
 
 ### B — light surface fill
-- [ ] `view.go` — issue `tea.ClearScreen` on the first `WindowSizeMsg` so the
-      whole frame repaints once dimensions are known (the first frames render
-      with `m.width == 0`, where `fillBg` is a documented no-op,
-      `view.go:59-61`).
-- [ ] `view.go` — replace `fillBg`/`paintLine` string-level SGR injection with
-      structural full-width backgrounds (full-width row styles or the view
-      background) so every grid cell carries the surface color regardless of the
-      cell-diff renderer.
+- [x] `view.go` — issue `tea.ClearScreen` on the first `WindowSizeMsg` so the
+      whole frame repaints once dimensions are known.
+- [x] `view.go` — light surface via two complementary mechanisms (see note), and
+      delete the per-style baked background (`withBackground`) that caused
+      visible #FAFAFA boxes whenever the terminal bg ≠ #FAFAFA.
+
+> **Implementation note (Task B resolution — empirically revised).** Two
+> terminal facts drove this (verified on the maintainer's machine): **iTerm2
+> ignores OSC 11 set** but exports `COLORFGBG="7;0"` (→ dark auto-detect);
+> **Terminal.app honours OSC 11 set** but has no `COLORFGBG`. So neither a pure
+> cell-fill nor a pure view-background works everywhere, and the earlier
+> `withBackground` baking (Phase 15) painted a #FAFAFA box per glyph that showed
+> on any terminal whose bg ≠ #FAFAFA (bugs #1/#2). The final mechanism:
+>
+> - **Delete `withBackground`** — styles carry foregrounds only; no per-glyph
+>   boxes. (Supersedes the Phase 15 approach; the surface comes from below.)
+> - **`fillBg` cell-paints every content line** with #FAFAFA — covers OSC-ignoring
+>   terminals (iTerm2). Reset-aware (re-asserts bg after every ANSI reset).
+> - **`tea.View.BackgroundColor`** asks the renderer to set the terminal's own
+>   background (OSC 11) to #FAFAFA — covers the whole pane (incl. footer and the
+>   below-content area) on OSC-honoring terminals (Terminal.app). Restored on
+>   normal exit (`ResetBackgroundColor` on close; SIGKILL can't — accepted).
+> - **Theme-conditional section separators** in `render()`: light keeps sections
+>   adjacent (single `\n`, `table()` no trailing `\n`) — a blank separator would
+>   render as the terminal's own background, a dark seam through the card on
+>   non-honoring terminals. Dark/mono keep a blank line (`\n\n`) for breathing
+>   room: it is invisible there (transparent surface). One conditional on
+>   `surfaceBg`, not scattered per-view. (If OSC-11-set success ever becomes
+>   detectable, light can regain the gaps; a painted separator row for light is a
+>   phase-39 polish candidate, rejected here — rule lines change the design
+>   language and NBSP tricks bet on ultraviolet's whitespace classification.)
+>
+> **Detection status (#3):** auto-detect works on both terminals. iTTerm2 → dark
+> via `COLORFGBG="7;0"`; **Terminal.app (white) → light**, i.e. bubbletea's OSC 11
+> query reader gets an answer where the naive shell test did not — so #3 is a
+> *working*-detection case, not accept-and-document. The DoD item "white-bg
+> terminal → light palette" is met.
+>
+> **Accepted residuals (non-honoring terminal with a FORCED light theme — not the
+> auto-detect path):** (a) the area below the content block to full screen height
+> is whitespace-only by nature and stays terminal-bg; (b) the footer line — a
+> single long foreground-only run — loses its bg to a v2 cell-diff renderer quirk
+> (the diff skips bg-only attribute changes on unchanged visible glyphs). Both
+> are covered by `View.BackgroundColor` on honoring terminals. `ClearScreen` on
+> the first `WindowSizeMsg` is kept as a first-frame repaint aid.
 
 ### C — dark surface policy
 - [ ] With A+B in place, confirm dark is transparent by default; paint a dark
@@ -167,6 +204,31 @@ PORTATO_THEME=mono ./bin/portato   # connecting ◐ vs connected ●
 Safety: when capturing against the real binary, never enable tubers from the
 user's real `config.yaml` (it dials real hosts). Use a copy with `ssh:` hosts
 replaced by `127.0.0.1:9` (instant local failure) or a local test sshd.
+
+### Task B gate results (recorded)
+
+Outputs captured during Task B verification (maintainer's machine):
+
+1. **tmux capture gate** — `PORTATO_THEME=light`, dark-bg 256-colour tmux
+   (`capture-pane -e`, x=100 y=30). The content-block lines carry the surface
+   bg (#FAFAFA = 256-colour index 231) across the full width:
+   - L1 header — bg YES (`48;5;231` SGR, re-asserted after every ANSI reset,
+     padded to width; e.g. starts `<ESC>[48;5;231m 🥔 …`).
+   - L2 column-header — bg YES.
+   - L3 row — bg YES.
+   - L4 footer — bg NO: the documented residual (a single long fg-only run the
+     v2 cell-diff renderer leaves un-bg'd on non-honoring terminals; covered by
+     `View.BackgroundColor` on honoring ones).
+2. **bg restore on clean `q`-quit** — pty capture shows **OSC 111 (reset
+   background)** emitted on close, so the terminal's prior background is
+   restored. Confirmed visually on Terminal.app (Ocean/blue profile):
+   `PORTATO_THEME=light` paints the full pane #FAFAFA over blue; `q` restores
+   the exact blue.
+3. **Unit tests** — `go test ./internal/tui/` → ok. Passing: `TestViewBackgroundColor`
+   (light sets bg; dark/mono nil), `TestFillBg`, `TestFillBgReassertsAfterReset`,
+   `TestDetectKind` (10 cases), `TestResolvePaletteAllKinds`,
+   `TestLightPaletteReadableForegrounds`, `TestResolveKind` (11 cases). Full
+   `make fmt/vet/test/lint` + `gofmt -l .` (empty) + `go build ./...` clean.
 
 ## Technical details / risks
 

@@ -34,6 +34,20 @@ const (
 	splashWordmarkW = 70
 )
 
+// View renders a frame. For the light theme the surface is established two ways
+// (belt for non-honoring terminals, suspenders for honoring ones):
+//   - fillBg cell-paints every content line with #FAFAFA (covers terminals that
+//     ignore OSC 11 set, e.g. iTerm2). The v2 cell renderer strips whitespace-only
+//     lines, so render() emits no internal blank separators — the content block is
+//     one solid surface; the area below it to full height stays terminal-bg.
+//   - View.BackgroundColor asks the renderer to set the terminal's own background
+//     (OSC 11) to #FAFAFA, which covers the content block AND the below-content
+//     area on terminals that honor it (e.g. Terminal.app). The bg is baked out of
+//     the styles themselves, so there are no per-glyph #FAFAFA boxes when the
+//     terminal's bg is not #FAFAFA.
+//
+// Dark/mono leave BackgroundColor nil so the user's terminal theme shows through
+// (transparent). The terminal's prior background is restored on normal exit.
 func (m Model) View() tea.View {
 	content := m.render()
 	if m.pal.surfaceBg != nil && m.width > 0 && m.height > 0 {
@@ -41,20 +55,20 @@ func (m Model) View() tea.View {
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
+	if m.pal.surfaceBg != nil {
+		v.BackgroundColor = m.pal.surfaceBg
+	}
 	return v
 }
 
-// fillBg paints bg across the whole TUI surface: each line is padded to width
-// and the content is padded to height, all with bg-coloured cells. This turns
-// the light theme into a real "light mode" (a light page) instead of just
-// recoloured glyphs on the terminal's own background. A no-op when bg is nil
-// or the dimensions are unknown (before the first WindowSizeMsg).
-//
-// The implementation is reset-aware: a styled run ends with an ANSI reset, and
-// the raw cells after it (spaces glued between segments, plain log text, the
-// viewport's own padding) would otherwise fall back to the terminal's default
-// background. fillBg re-asserts the background after every reset and paints the
-// width/height padding, so no default-bg cells leak through.
+// fillBg paints bg across the content lines: every line is padded to width with
+// bg-coloured cells. It is reset-aware — re-asserting the background after every
+// ANSI reset — so the raw cells between styled runs keep the surface colour. It
+// does NOT pad to full screen height: those appended lines are whitespace-only
+// and the v2 cell renderer strips them anyway (render() emits no internal blank
+// separators for the same reason). The area below the content block is covered
+// by View.BackgroundColor on terminals that honour OSC 11 set, and stays the
+// terminal's own background elsewhere (accepted).
 func fillBg(content string, bg color.Color, width, height int) string {
 	if bg == nil || width <= 0 || height <= 0 {
 		return content
@@ -71,16 +85,9 @@ func fillBg(content string, bg color.Color, width, height int) string {
 		}
 		lines[i] = painted
 	}
-	for len(lines) < height {
-		lines = append(lines, bgSeq+strings.Repeat(" ", width))
-	}
 	return strings.Join(lines, "\n")
 }
 
-// bgSequence returns the profiled SGR string that sets bg as the background,
-// with no trailing reset. It is obtained by rendering a single marker through a
-// bg-only lipgloss style and taking the prefix in front of the marker, so the
-// emitted sequence matches the active colour profile (truecolor/256/ansi).
 func bgSequence(bg color.Color) string {
 	const marker = "Z"
 	out := lipgloss.NewStyle().Background(bg).Render(marker)
@@ -91,8 +98,6 @@ func bgSequence(bg color.Color) string {
 	return strings.TrimPrefix(out[:i], "\x1b[0m")
 }
 
-// paintLine prepends the background SGR and re-asserts it after every reset in
-// the line, so cells that follow a styled run keep the surface background.
 func paintLine(line, bgSeq string) string {
 	if bgSeq == "" {
 		return line
@@ -133,18 +138,28 @@ func (m Model) render() string {
 	if m.handoffing {
 		return m.centered(m.pal.mode.Render("Starting daemon…"))
 	}
+	// Section separator: dark/mono (transparent surface) get a blank line for
+	// breathing room — it is invisible there (the terminal's own background shows
+	// through, same as the content). Light keeps sections adjacent: a blank
+	// separator would render as the terminal's own background, a dark seam through
+	// the card on terminals that ignore OSC 11 set, and OSC-11-set success is not
+	// detectable, so light assumes the worst case.
+	sep := "\n"
+	if m.pal.surfaceBg == nil {
+		sep = "\n\n"
+	}
 	var b strings.Builder
 	b.WriteString(m.header())
-	b.WriteString("\n\n")
+	b.WriteString(sep)
 	b.WriteString(m.table())
-	b.WriteString("\n\n")
+	b.WriteString(sep)
 	if m.filtering || m.filter.Value() != "" {
 		b.WriteString(m.filterLine())
-		b.WriteString("\n\n")
+		b.WriteString(sep)
 	}
 	b.WriteString(m.footer())
 	if m.help {
-		b.WriteString("\n\n")
+		b.WriteString(sep)
 		b.WriteString(m.helpBlock())
 	}
 	return insetLines(b.String(), sideMargin)
@@ -188,14 +203,15 @@ func (m Model) table() string {
 		return m.pal.dim.Render(fmt.Sprintf("no tubers match %q — esc clears", m.filter.Value()))
 	}
 	nameW := m.nameWidth()
-	var b strings.Builder
-	b.WriteString(columnHeader(m.pal, nameW))
-	b.WriteString("\n")
+	lines := make([]string, 0, len(rows)+1)
+	lines = append(lines, columnHeader(m.pal, nameW))
 	for _, i := range rows {
-		b.WriteString(m.row(i, m.list[i], nameW))
-		b.WriteString("\n")
+		lines = append(lines, m.row(i, m.list[i], nameW))
 	}
-	return b.String()
+	// No trailing newline: render() joins sections with "\n", and a trailing
+	// "\n" here would create a whitespace-only separator line (which the v2
+	// renderer strips, leaving a terminal-bg gap in the surface).
+	return strings.Join(lines, "\n")
 }
 
 // splash renders the empty-list state: the centered logo with the hint line

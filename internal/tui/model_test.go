@@ -723,8 +723,45 @@ func TestRenderCursorGlyph(t *testing.T) {
 	}
 }
 
-// TestFillBg verifies the light-theme surface fill: a no-op without a colour
-// or unknown dimensions, and a height-padded fill with them.
+// TestViewBackgroundColor guards one prong of the Phase 37 surface fill: the
+// light theme sets View.BackgroundColor so the renderer sets the terminal's own
+// background (OSC 11) to #FAFAFA — covering the whole pane (incl. the area below
+// the content block) on terminals that honour OSC 11 set (e.g. Terminal.app).
+// Dark/mono leave it nil so the user's terminal background shows through. (The
+// other prong, fillBg, cell-paints every content line for terminals that ignore
+// OSC 11 set, e.g. iTerm2 — covered by TestFillBg below.)
+func TestViewBackgroundColor(t *testing.T) {
+	cases := []struct {
+		name string
+		kind themeKind
+	}{
+		{"light sets surface bg", themeLight},
+		{"dark stays transparent", themeDark},
+		{"mono stays transparent", themeMono},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := Model{pal: resolvePalette(c.kind)}
+			v := m.View()
+			switch c.kind {
+			case themeLight:
+				if v.BackgroundColor == nil {
+					t.Errorf("light theme should set View.BackgroundColor")
+				}
+			default:
+				if v.BackgroundColor != nil {
+					t.Errorf("%s theme should leave View.BackgroundColor nil (transparent)", c.name)
+				}
+			}
+		})
+	}
+}
+
+// TestFillBg verifies fillBg (the light-theme content-line coverage used on
+// terminals that ignore OSC 11 set): a no-op without a colour or unknown
+// dimensions; content preserved; each line padded to width with the bg SGR.
+// (It no longer pads to full height — those appended whitespace-only lines are
+// stripped by the v2 cell renderer, so the height padding was removed.)
 func TestFillBg(t *testing.T) {
 	if got := fillBg("hi", nil, 10, 10); got != "hi" {
 		t.Errorf("fillBg with nil bg should be a no-op, got %q", got)
@@ -736,22 +773,21 @@ func TestFillBg(t *testing.T) {
 	if !strings.Contains(got, "hi") {
 		t.Errorf("fillBg lost the content: %q", got)
 	}
-	if lines := strings.Count(got, "\n") + 1; lines < 5 {
-		t.Errorf("fillBg should pad to height 5, got %d lines", lines)
+	// The line is padded to the width with bg-coloured cells.
+	if w := lipgloss.Width(got); w != 12 {
+		t.Errorf("fillBg should pad the line to width 12, got display width %d (%q)", w, got)
 	}
 }
 
-// TestFillBgReassertsAfterReset checks the core fix for the light-theme bg
-// artifacts: a styled run ends with an ANSI reset, and the raw cells after it
-// (glued spaces, plain text) must still carry the surface background. fillBg
-// must re-insert the bg SGR right after every reset rather than leaving the
-// trailing cells on the terminal's default background.
+// TestFillBgReassertsAfterReset checks the core coverage guarantee: a styled run
+// ends with an ANSI reset, and the raw cells after it (glued spaces, plain text)
+// must still carry the surface background — fillBg re-inserts the bg SGR right
+// after every reset rather than leaving the trailing cells on the default bg.
 func TestFillBgReassertsAfterReset(t *testing.T) {
 	styled := lipgloss.NewStyle().Foreground(lipgloss.Color("26")).Render("AB")
 	content := styled + " CD"
 	got := fillBg(content, lipgloss.Color("#FAFAFA"), 20, 1)
 
-	// lipgloss emits the reset as "\x1b[m"; accept the full "\x1b[0m" form too.
 	reset := "\x1b[m"
 	i := strings.Index(got, reset)
 	if i < 0 {
@@ -762,12 +798,9 @@ func TestFillBgReassertsAfterReset(t *testing.T) {
 		t.Fatalf("no reset in fillBg output: %q", got)
 	}
 	after := got[i+len(reset):]
-	// Right after the reset the bg must be re-asserted: the next bytes must be
-	// an SGR sequence (ESC), not raw text/space falling back to default bg.
 	if !strings.HasPrefix(after, "\x1b[") {
 		t.Errorf("fillBg did not re-assert bg after reset: %q", after)
 	}
-	// The raw " CD" tail must still be present under the fill.
 	if !strings.Contains(got, "CD") {
 		t.Errorf("fillBg dropped raw content after a styled run: %q", got)
 	}

@@ -16,8 +16,13 @@ type Model struct {
 	cursor int
 	width  int
 	height int
-	mode   string
-	attach bool
+	// cleared tracks whether tea.ClearScreen has been issued on the first
+	// WindowSizeMsg, forcing a full repaint once dimensions are known (Phase 37
+	// task B: the first frames render at width 0, where the surface fill is a
+	// no-op, and the v2 cell-diff renderer would otherwise never repaint them).
+	cleared bool
+	mode    string
+	attach  bool
 
 	// pal is the resolved palette (Phase 37). Palette resolution moved off
 	// package init onto the model because tea.BackgroundColorMsg (the OSC-11

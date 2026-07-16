@@ -33,20 +33,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 	m.width, m.height = msg.Width, msg.Height
+	var cmds []tea.Cmd
+	if !m.cleared {
+		m.cleared = true
+		cmds = append(cmds, tea.ClearScreen)
+	}
 	if m.editor != nil {
-		return m, m.editor.update(msg)
+		cmds = append(cmds, m.editor.update(msg))
+		return m, tea.Batch(cmds...)
 	}
 	if m.logs != nil {
-		return m, m.logs.update(msg)
+		cmds = append(cmds, m.logs.update(msg))
+		return m, tea.Batch(cmds...)
 	}
-	return m, nil
+	return m, tea.Batch(cmds...)
 }
 
 // handleBackgroundColor re-resolves the palette from the terminal's answered
-// background color (OSC 11). PORTATO_THEME/NO_COLOR short-circuit inside
-// resolveKind, so a forced theme is untouched. Open sub-models inherit the new
-// palette so the editor/logs repaint in the right theme too.
+// background colour (OSC 11 query). Degradation chain (delegated to resolveKind):
+// PORTATO_THEME -> OSC 11 answer -> COLORFGBG -> default dark. Only a strictly
+// valid answered colour overrides the static chain: bubbletea delivers
+// BackgroundColorMsg solely on a parsed colour reply, so a non-answering or
+// garbage terminal never reaches here and the env/COLORFGBG/default seed set in
+// New() stays put. Open sub-models inherit the new palette.
 func (m Model) handleBackgroundColor(msg tea.BackgroundColorMsg) (Model, tea.Cmd) {
+	if msg.Color == nil {
+		return m, nil
+	}
 	m.kind = resolveKind(msg.IsDark(), true)
 	m.pal = resolvePalette(m.kind)
 	m.propagateTheme()

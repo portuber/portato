@@ -96,11 +96,13 @@ func TestResolvePaletteAllKinds(t *testing.T) {
 	}
 }
 
-// TestLightPaletteBakesBackground verifies the light theme's two readability
-// guarantees: every visible style carries the surface background (so styled
-// glyphs are self-covering and no default-bg leaks between runs), and no style
-// is faint (faint collapses to an unreadable pale grey on a light surface).
-func TestLightPaletteBakesBackground(t *testing.T) {
+// TestLightPaletteReadableForegrounds verifies the light theme's readability on
+// a light surface: every visible style carries an explicit (non-faint) foreground
+// tuned for #FAFAFA. The surface itself is NOT baked into the styles (Phase 37:
+// baking a per-glyph #FAFAFA background left visible boxes whenever the
+// terminal's own background was not #FAFAFA); the surface is provided by View()
+// (View.BackgroundColor / fillBg) instead.
+func TestLightPaletteReadableForegrounds(t *testing.T) {
 	p := lightPalette()
 	styles := []struct {
 		name string
@@ -113,16 +115,16 @@ func TestLightPaletteBakesBackground(t *testing.T) {
 		{"editorTitle", p.editorTitle}, {"editorLabel", p.editorLabel},
 	}
 	for _, s := range styles {
-		if s.st.GetBackground() == nil {
-			t.Errorf("light style %q should carry the surface background", s.name)
-		}
 		if s.st.GetFaint() {
 			t.Errorf("light style %q must not be faint (unreadable on light bg)", s.name)
 		}
+		if s.st.GetForeground() == nil {
+			t.Errorf("light style %q should carry an explicit foreground tuned for the light surface", s.name)
+		}
 	}
 	for state, st := range p.state {
-		if st.GetBackground() == nil {
-			t.Errorf("light state %v style should carry the surface background", state)
+		if st.GetForeground() == nil {
+			t.Errorf("light state %v style should carry an explicit foreground", state)
 		}
 	}
 	if p.dim.GetForeground() == nil {

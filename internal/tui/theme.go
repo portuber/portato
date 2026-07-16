@@ -161,12 +161,15 @@ func darkPalette() palette {
 // lightPalette uses darker foregrounds that stay readable on a light surface
 // (deeper green/red/orange, a blue title/cursor, a dark grey for dim text).
 // Faint is avoided: on a light background it collapses to an unreadable pale
-// grey. withBackground bakes the surface colour into every style so each
-// styled glyph carries its own background regardless of any outer wrapper —
-// the raw cells between styled runs are then covered by fillBg.
+// grey. The light surface itself is NOT baked into the styles (Phase 37): doing
+// so painted a #FAFAFA box per glyph that showed whenever the terminal's own
+// background was not #FAFAFA. The surface is provided instead by View()
+// (View.BackgroundColor -> OSC 11 set, honored by e.g. Terminal.app) plus fillBg
+// (cell-paints every content line, for terminals that ignore OSC 11 set such as
+// iTerm2). styles therefore carry foregrounds only.
 func lightPalette() palette {
 	bg := lipgloss.Color("#FAFAFA")
-	p := palette{
+	return palette{
 		title:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("26")),
 		mode:        lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 		header:      lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("240")),
@@ -191,38 +194,6 @@ func lightPalette() palette {
 		},
 		surfaceBg: bg,
 	}
-	p = p.withBackground(bg)
-	return p
-}
-
-// withBackground returns a copy of the palette with bg set as the background of
-// every style (including the per-state styles). Only the light theme uses it;
-// dark/mono stay transparent and rely on the terminal's own background.
-func (p palette) withBackground(bg color.Color) palette {
-	if bg == nil {
-		return p
-	}
-	p.title = p.title.Background(bg)
-	p.mode = p.mode.Background(bg)
-	p.header = p.header.Background(bg)
-	p.selected = p.selected.Background(bg)
-	p.cursor = p.cursor.Background(bg)
-	p.dim = p.dim.Background(bg)
-	p.body = p.body.Background(bg)
-	p.err = p.err.Background(bg)
-	p.warn = p.warn.Background(bg)
-	p.footer = p.footer.Background(bg)
-	p.helpTitle = p.helpTitle.Background(bg)
-	p.helpPanel = p.helpPanel.Background(bg)
-	p.modal = p.modal.Background(bg)
-	p.editorTitle = p.editorTitle.Background(bg)
-	p.editorLabel = p.editorLabel.Background(bg)
-	states := make(map[controller.State]lipgloss.Style, len(p.state))
-	for k, v := range p.state {
-		states[k] = v.Background(bg)
-	}
-	p.state = states
-	return p
 }
 
 // monoPalette keeps the layout but drops all foreground colours (NO_COLOR).
