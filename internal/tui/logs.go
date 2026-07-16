@@ -25,6 +25,7 @@ type logsView struct {
 	vp      viewport.Model
 	debug   bool // show debug-level entries
 	entries []routelog.Entry
+	pal     palette // resolved styles (Phase 37); Model overrides at open time
 
 	width, height int
 	autoScroll    bool
@@ -40,6 +41,7 @@ func newLogsView(ctrl controller.Controller, name string, width, height int) *lo
 		width:      width,
 		height:     height,
 		autoScroll: true,
+		pal:        resolvePalette(detectKind()),
 	}
 	lv.refresh()
 	return lv
@@ -66,7 +68,7 @@ func logsHeight(h int) int {
 func (l *logsView) refresh() {
 	entries, _ := l.ctrl.Logs(l.name)
 	l.entries = filterLevel(entries, l.debug)
-	l.vp.SetContent(renderLogs(l.entries))
+	l.vp.SetContent(renderLogs(l.pal, l.entries))
 	if l.autoScroll || l.vp.AtBottom() {
 		l.vp.GotoBottom()
 		l.autoScroll = true
@@ -86,9 +88,9 @@ func filterLevel(in []routelog.Entry, debug bool) []routelog.Entry {
 	return out
 }
 
-func renderLogs(entries []routelog.Entry) string {
+func renderLogs(pal palette, entries []routelog.Entry) string {
 	if len(entries) == 0 {
-		return dimStyle.Render("(no log entries)")
+		return pal.dim.Render("(no log entries)")
 	}
 	var b strings.Builder
 	for _, e := range entries {
@@ -96,21 +98,21 @@ func renderLogs(entries []routelog.Entry) string {
 		if e.Attrs != "" {
 			msg += " " + e.Attrs
 		}
-		fmt.Fprintf(&b, "%s %s %s\n", dimStyle.Render(e.Time.Format(time.TimeOnly)), levelTag(e.Level), bodyStyle.Render(msg))
+		fmt.Fprintf(&b, "%s %s %s\n", pal.dim.Render(e.Time.Format(time.TimeOnly)), levelTag(pal, e.Level), pal.body.Render(msg))
 	}
 	return b.String()
 }
 
-func levelTag(l slog.Level) string {
+func levelTag(pal palette, l slog.Level) string {
 	switch {
 	case l >= slog.LevelError:
-		return errorStyle.Render("ERR")
+		return pal.err.Render("ERR")
 	case l >= slog.LevelWarn:
-		return warnStyle.Render("WRN")
+		return pal.warn.Render("WRN")
 	case l >= slog.LevelInfo:
-		return dimStyle.Render("INF")
+		return pal.dim.Render("INF")
 	default:
-		return dimStyle.Render("DBG")
+		return pal.dim.Render("DBG")
 	}
 }
 
@@ -166,15 +168,15 @@ func (l *logsView) handleKey(k tea.KeyPressMsg) tea.Cmd {
 
 func (l *logsView) view() string {
 	var b strings.Builder
-	level := dimStyle.Render("info")
+	level := l.pal.dim.Render("info")
 	if l.debug {
-		level = warnStyle.Render("debug")
+		level = l.pal.warn.Render("debug")
 	}
-	b.WriteString(titleStyle.Render("Portato") + " " + dimStyle.Render("— Logs — "+l.name+"  level: "+level))
+	b.WriteString(l.pal.title.Render("Portato") + " " + l.pal.dim.Render("— Logs — "+l.name+"  level: "+level))
 	b.WriteString("\n")
 	b.WriteString(l.vp.View())
 	b.WriteString("\n")
-	b.WriteString(footerStyle.Render("↑↓/jk scroll · pgup/pgdn · g/G top/bottom · L level · l/esc close"))
+	b.WriteString(l.pal.footer.Render("↑↓/jk scroll · pgup/pgdn · g/G top/bottom · L level · l/esc close"))
 	return insetLines(b.String(), sideMargin)
 }
 

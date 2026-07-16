@@ -20,34 +20,75 @@ const (
 	themeMono
 )
 
-// detectKind picks a theme from the environment, in priority order:
-//   - PORTATO_THEME (light|dark|mono) forces that theme; "auto"/empty falls
-//     through to detection.
-//   - NO_COLOR set (any value) → monochrome (no ANSI foregrounds).
-//   - COLORFGBG "fg;bg" with bg ≤ 6 → dark; otherwise light.
-//   - default → dark (the historical palette).
-func detectKind() themeKind {
+// envKindOverride returns the theme forced by PORTATO_THEME or NO_COLOR, or
+// ok=false when neither pins a specific theme ("auto"/empty fall through to
+// detection).
+func envKindOverride() (themeKind, bool) {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("PORTATO_THEME"))) {
 	case "light":
-		return themeLight
+		return themeLight, true
 	case "dark":
-		return themeDark
+		return themeDark, true
 	case "mono", "nocolor":
-		return themeMono
+		return themeMono, true
 	}
 	if os.Getenv("NO_COLOR") != "" {
-		return themeMono
+		return themeMono, true
 	}
-	if fg := os.Getenv("COLORFGBG"); fg != "" {
-		parts := strings.Split(fg, ";")
-		if len(parts) >= 2 {
-			if bg, err := strconv.Atoi(strings.TrimSpace(parts[1])); err == nil {
-				if bg <= 6 {
-					return themeDark
-				}
-				return themeLight
-			}
+	return 0, false
+}
+
+// colorfgbgKind applies the COLORFGBG "fg;bg" heuristic (bg <= 6 -> dark),
+// returning ok=false when the var is unset or malformed.
+func colorfgbgKind() (themeKind, bool) {
+	fg := os.Getenv("COLORFGBG")
+	if fg == "" {
+		return 0, false
+	}
+	parts := strings.Split(fg, ";")
+	if len(parts) < 2 {
+		return 0, false
+	}
+	bg, err := strconv.Atoi(strings.TrimSpace(parts[1]))
+	if err != nil {
+		return 0, false
+	}
+	if bg <= 6 {
+		return themeDark, true
+	}
+	return themeLight, true
+}
+
+// detectKind picks a theme from the environment (the pre-Phase-37 resolver,
+// kept as the pre-message default and the static fallback). It is deliberately
+// environment-only: PORTATO_THEME -> NO_COLOR -> COLORFGBG -> default dark.
+func detectKind() themeKind {
+	if k, ok := envKindOverride(); ok {
+		return k
+	}
+	if k, ok := colorfgbgKind(); ok {
+		return k
+	}
+	return themeDark
+}
+
+// resolveKind layers a runtime OSC-11 background answer (tea.BackgroundColorMsg)
+// ahead of the COLORFGBG/default fallbacks. PORTATO_THEME/NO_COLOR still force a
+// theme and short-circuit the query; with no override a runtime answer wins over
+// COLORFGBG, and with no runtime answer the static chain (COLORFGBG -> dark)
+// applies. Mono is never chosen by detection — only by an explicit override.
+func resolveKind(bgDark, hasRuntime bool) themeKind {
+	if k, ok := envKindOverride(); ok {
+		return k
+	}
+	if hasRuntime {
+		if bgDark {
+			return themeDark
 		}
+		return themeLight
+	}
+	if k, ok := colorfgbgKind(); ok {
+		return k
 	}
 	return themeDark
 }

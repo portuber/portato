@@ -19,6 +19,14 @@ type Model struct {
 	mode   string
 	attach bool
 
+	// pal is the resolved palette (Phase 37). Palette resolution moved off
+	// package init onto the model because tea.BackgroundColorMsg (the OSC-11
+	// answer) arrives after Init: a sensible default is seeded in New and
+	// re-resolved in handleBackgroundColor. kind is the resolved theme kind
+	// (kept for the logo's mono branch and tests).
+	pal  palette
+	kind themeKind
+
 	// filter is the Phase 13 `/` substring filter over the list. filtering is
 	// true while the input is focused (typing/editing); the query stays
 	// applied after `enter` until cleared. Pure view-state: the list is
@@ -101,6 +109,11 @@ func New(ctrl controller.Controller, opt Options) Model {
 		attach:  strings.HasPrefix(opt.Mode, "attach"),
 		cfgPath: opt.CfgPath,
 	}
+	// Seed the palette with the environment-only resolver as the pre-message
+	// default (covers the first frame and unit tests). The runtime OSC-11
+	// answer, when it arrives, re-resolves via handleBackgroundColor.
+	m.kind = detectKind()
+	m.pal = resolvePalette(m.kind)
 	m.filter = newFilterInput()
 	m.passphraseInput = newPassphraseInput()
 	m.passwordInput = newPasswordInput()
@@ -166,5 +179,9 @@ func redrawTick() tea.Cmd {
 }
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(waitForChange(m.ctrl.Changes()), redrawTick())
+	// RequestBackgroundColor asks the terminal for its background (OSC 11);
+	// the answer arrives as tea.BackgroundColorMsg, handled in Update, which
+	// re-resolves the palette by luminance. bubbletea v2 brackets the query
+	// with a Device Attributes request so a non-answering terminal never hangs.
+	return tea.Batch(waitForChange(m.ctrl.Changes()), redrawTick(), tea.RequestBackgroundColor)
 }

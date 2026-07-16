@@ -15,6 +15,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.handleWindowSize(msg)
+	case tea.BackgroundColorMsg:
+		return m.handleBackgroundColor(msg)
 	case tickMsg:
 		return m.handleTick(msg)
 	case redrawTickMsg:
@@ -38,6 +40,31 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 		return m, m.logs.update(msg)
 	}
 	return m, nil
+}
+
+// handleBackgroundColor re-resolves the palette from the terminal's answered
+// background color (OSC 11). PORTATO_THEME/NO_COLOR short-circuit inside
+// resolveKind, so a forced theme is untouched. Open sub-models inherit the new
+// palette so the editor/logs repaint in the right theme too.
+func (m Model) handleBackgroundColor(msg tea.BackgroundColorMsg) (Model, tea.Cmd) {
+	m.kind = resolveKind(msg.IsDark(), true)
+	m.pal = resolvePalette(m.kind)
+	m.propagateTheme()
+	return m, nil
+}
+
+// propagateTheme pushes the model's resolved palette into any open sub-model.
+// The editor/logs seed their own palette (the env default) at construction so
+// they render correctly in isolation and tests; this makes a sub-model opened
+// after the OSC-11 answer use the runtime-detected theme. m.editor/m.logs are
+// pointers, so the write reaches the pointed-to object on this value receiver.
+func (m Model) propagateTheme() {
+	if m.editor != nil {
+		m.editor.pal = m.pal
+	}
+	if m.logs != nil {
+		m.logs.pal = m.pal
+	}
 }
 
 func (m Model) handleTick(_ tickMsg) (Model, tea.Cmd) {
@@ -287,16 +314,19 @@ func (m Model) handleEditorKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.hasCurrent() {
 			ed, cmd := openEditor(m.ctrl, true, m.list[m.cursor].Name, m.width, m.height)
 			m.editor = ed
+			m.propagateTheme()
 			return m, cmd
 		}
 	case "n":
 		ed, cmd := openEditor(m.ctrl, false, "", m.width, m.height)
 		m.editor = ed
+		m.propagateTheme()
 		return m, cmd
 	case "C":
 		if m.hasCurrent() {
 			ed, cmd := openDuplicateEditor(m.ctrl, m.list[m.cursor].Name, m.width, m.height)
 			m.editor = ed
+			m.propagateTheme()
 			return m, cmd
 		}
 	case "d":
@@ -307,6 +337,7 @@ func (m Model) handleEditorKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "l":
 		if m.hasCurrent() {
 			m.logs = newLogsView(m.ctrl, m.list[m.cursor].Name, m.width, m.height)
+			m.propagateTheme()
 		}
 	}
 	return m, nil

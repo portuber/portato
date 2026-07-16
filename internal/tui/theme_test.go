@@ -129,3 +129,63 @@ func TestLightPaletteBakesBackground(t *testing.T) {
 		t.Errorf("light dim should have an explicit foreground, not faint")
 	}
 }
+
+func TestResolveKind(t *testing.T) {
+	clearEnv := func(t *testing.T) {
+		t.Setenv("PORTATO_THEME", "")
+		t.Setenv("NO_COLOR", "")
+		t.Setenv("COLORFGBG", "")
+	}
+	cases := []struct {
+		name       string
+		set        func(t *testing.T)
+		bgDark     bool
+		hasRuntime bool
+		want       themeKind
+	}{
+		{"runtime dark -> dark", clearEnv, true, true, themeDark},
+		{"runtime light -> light", clearEnv, false, true, themeLight},
+		{"no runtime, COLORFGBG dark -> dark", func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("COLORFGBG", "15;0")
+		}, false, false, themeDark},
+		{"no runtime, COLORFGBG light -> light", func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("COLORFGBG", "0;15")
+		}, false, false, themeLight},
+		{"no runtime, nothing -> default dark", clearEnv, false, false, themeDark},
+		{"runtime answer wins over COLORFGBG", func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("COLORFGBG", "0;15") // light bg, but runtime says dark
+		}, true, true, themeDark},
+		{"PORTATO_THEME light forces regardless of runtime", func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("PORTATO_THEME", "light")
+		}, true, true, themeLight},
+		{"PORTATO_THEME dark forces regardless of runtime", func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("PORTATO_THEME", "dark")
+		}, false, true, themeDark},
+		{"PORTATO_THEME mono forces regardless of runtime", func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("PORTATO_THEME", "mono")
+		}, false, true, themeMono},
+		{"NO_COLOR -> mono regardless of runtime", func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("NO_COLOR", "1")
+		}, false, true, themeMono},
+		{"PORTATO_THEME wins over NO_COLOR", func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("NO_COLOR", "1")
+			t.Setenv("PORTATO_THEME", "light")
+		}, true, true, themeLight},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			c.set(t)
+			if got := resolveKind(c.bgDark, c.hasRuntime); got != c.want {
+				t.Errorf("resolveKind(%v,%v) = %v, want %v", c.bgDark, c.hasRuntime, got, c.want)
+			}
+		})
+	}
+}

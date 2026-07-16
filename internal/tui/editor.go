@@ -6,6 +6,7 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/portuber/portato/internal/config"
 	"github.com/portuber/portato/internal/controller"
 )
@@ -20,8 +21,9 @@ import (
 // Passwords are never in the form: authentication is agent/identity only.
 type tuberEditor struct {
 	mode     editorMode
-	original string // name being edited ("" for new); used for rename + uniqueness
-	enabled  bool   // preserved from the edited tuber
+	original string  // name being edited ("" for new); used for rename + uniqueness
+	enabled  bool    // preserved from the edited tuber
+	pal      palette // resolved styles (Phase 37); Model overrides at open time
 
 	name     textinput.Model
 	ssh      textinput.Model
@@ -75,12 +77,13 @@ func newTuberEditor(mode editorMode, t config.Tuber, existing []string, ctrl con
 		ctrl:     ctrl,
 		focus:    fName,
 		errs:     map[string]string{},
+		pal:      resolvePalette(detectKind()),
 	}
-	e.name = newInput(t.Name, "my-tuber")
-	e.ssh = newInput(t.SSH, "user@host:22")
-	e.local = newInput(t.Local, "5432 or 127.0.0.1:5432")
-	e.remote = newInput(t.Remote, "db:5432")
-	e.identity = newInput(t.Identity, "~/.ssh/id_ed25519 (optional)")
+	e.name = newInput(t.Name, "my-tuber", e.pal.body)
+	e.ssh = newInput(t.SSH, "user@host:22", e.pal.body)
+	e.local = newInput(t.Local, "5432 or 127.0.0.1:5432", e.pal.body)
+	e.remote = newInput(t.Remote, "db:5432", e.pal.body)
+	e.identity = newInput(t.Identity, "~/.ssh/id_ed25519 (optional)", e.pal.body)
 
 	e.typeIdx = 0
 	for i, ty := range tuberTypes {
@@ -123,7 +126,7 @@ func (e *tuberEditor) typeNote() string {
 	return ""
 }
 
-func newInput(value, placeholder string) textinput.Model {
+func newInput(value, placeholder string, body lipgloss.Style) textinput.Model {
 	ti := textinput.New()
 	ti.Prompt = ""
 	ti.Placeholder = placeholder
@@ -131,8 +134,8 @@ func newInput(value, placeholder string) textinput.Model {
 	ti.SetWidth(40)
 	ti.SetValue(value)
 	s := ti.Styles()
-	s.Focused.Text = bodyStyle
-	s.Blurred.Text = bodyStyle
+	s.Focused.Text = body
+	s.Blurred.Text = body
 	ti.SetStyles(s)
 	return ti
 }
@@ -304,12 +307,12 @@ func (e *tuberEditor) view() string {
 	if e.mode == modeEdit {
 		title = "Edit tuber: " + e.original
 	}
-	b.WriteString(editorTitleStyle.Render(title))
+	b.WriteString(e.pal.editorTitle.Render(title))
 	b.WriteString("\n\n")
 
 	b.WriteString(e.renderText("Name", &e.name, fName, "name"))
 	b.WriteString(e.renderType())
-	b.WriteString("          " + dimStyle.Render(e.typeNote()) + "\n")
+	b.WriteString("          " + e.pal.dim.Render(e.typeNote()) + "\n")
 	b.WriteString(e.renderText("SSH", &e.ssh, fSSH, "ssh"))
 	b.WriteString(e.renderText("Local", &e.local, fLocal, "local"))
 	b.WriteString(e.renderText("Remote", &e.remote, fRemote, "remote"))
@@ -317,24 +320,24 @@ func (e *tuberEditor) view() string {
 	b.WriteString("\n")
 
 	if e.status != "" {
-		b.WriteString(errorStyle.Render(e.status))
+		b.WriteString(e.pal.err.Render(e.status))
 		b.WriteString("\n")
 	}
-	b.WriteString(dimStyle.Render("tab/enter next · shift+tab prev · ←/→ change type · ctrl+s save · esc cancel"))
-	return modalStyle.Render(b.String())
+	b.WriteString(e.pal.dim.Render("tab/enter next · shift+tab prev · ←/→ change type · ctrl+s save · esc cancel"))
+	return e.pal.modal.Render(b.String())
 }
 
 func (e *tuberEditor) renderText(label string, ti *textinput.Model, idx int, key string) string {
 	focused := e.focus == idx
 	lab := fmt.Sprintf("%-9s", label+":")
 	if focused {
-		lab = editorLabelStyle.Render(lab)
+		lab = e.pal.editorLabel.Render(lab)
 	} else {
-		lab = dimStyle.Render(lab)
+		lab = e.pal.dim.Render(lab)
 	}
 	line := lab + " " + ti.View()
 	if msg, ok := e.errs[key]; ok {
-		line += "  " + errorStyle.Render("← "+msg)
+		line += "  " + e.pal.err.Render("← "+msg)
 	}
 	return line + "\n"
 }
@@ -343,15 +346,15 @@ func (e *tuberEditor) renderType() string {
 	focused := e.focus == fType
 	lab := fmt.Sprintf("%-9s", "Type:")
 	if focused {
-		lab = editorLabelStyle.Render(lab)
+		lab = e.pal.editorLabel.Render(lab)
 	} else {
-		lab = dimStyle.Render(lab)
+		lab = e.pal.dim.Render(lab)
 	}
 	val := tuberTypes[e.typeIdx]
 	if focused {
-		val = cursorStyle.Render(val) + "  " + dimStyle.Render("←/→")
+		val = e.pal.cursor.Render(val) + "  " + e.pal.dim.Render("←/→")
 	} else {
-		val = dimStyle.Render(val)
+		val = e.pal.dim.Render(val)
 	}
 	return lab + " " + val + "\n"
 }

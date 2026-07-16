@@ -694,7 +694,7 @@ func TestIndicatorShapePerState(t *testing.T) {
 		{controller.Reconnecting, "●"},
 	}
 	for _, c := range cases {
-		got := indicator(controller.Status{State: c.state})
+		got := indicator(darkPalette(), controller.Status{State: c.state})
 		if !strings.Contains(got, c.glyph) {
 			t.Errorf("state %v: indicator %q does not contain %q", c.state, got, c.glyph)
 		}
@@ -1098,7 +1098,7 @@ func TestRenderLogsFormatsEntries(t *testing.T) {
 		{Msg: "first", Level: 0},
 		{Msg: "second", Level: 8, Attrs: "dest=ipinfo.po:443 err=no such host"},
 	}
-	out := renderLogs(entries)
+	out := renderLogs(darkPalette(), entries)
 	if !strings.Contains(out, "first") || !strings.Contains(out, "second") {
 		t.Errorf("renderLogs missing entries: %s", out)
 	}

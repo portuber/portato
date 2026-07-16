@@ -36,8 +36,8 @@ const (
 
 func (m Model) View() tea.View {
 	content := m.render()
-	if surfaceBg != nil && m.width > 0 && m.height > 0 {
-		content = fillBg(content, surfaceBg, m.width, m.height)
+	if m.pal.surfaceBg != nil && m.width > 0 && m.height > 0 {
+		content = fillBg(content, m.pal.surfaceBg, m.width, m.height)
 	}
 	v := tea.NewView(content)
 	v.AltScreen = true
@@ -131,7 +131,7 @@ func (m Model) render() string {
 		return m.centered(m.confirmQuitView())
 	}
 	if m.handoffing {
-		return m.centered(modeStyle.Render("Starting daemon…"))
+		return m.centered(m.pal.mode.Render("Starting daemon…"))
 	}
 	var b strings.Builder
 	b.WriteString(m.header())
@@ -161,18 +161,18 @@ func (m Model) centered(block string) string {
 }
 
 func (m Model) header() string {
-	left := titleStyle.Render("Portato")
+	left := m.pal.title.Render("Portato")
 	if logo.EmojiEnabled() {
 		left = "🥔 " + left
 	}
-	left += " " + dimStyle.Render("— Port Forwarding")
-	right := modeStyle.Render("mode: " + m.mode)
+	left += " " + m.pal.dim.Render("— Port Forwarding")
+	right := m.pal.mode.Render("mode: " + m.mode)
 	return joinRight(left, right, m.width-2*sideMargin)
 }
 
 func (m Model) table() string {
 	if len(m.list) == 0 {
-		hint := dimStyle.Render("no tubers — add one to config and press R to reload")
+		hint := m.pal.dim.Render("no tubers — add one to config and press R to reload")
 		if m.height >= splashMinH {
 			return m.splash(hint)
 		}
@@ -185,11 +185,11 @@ func (m Model) table() string {
 		}
 	}
 	if len(rows) == 0 {
-		return dimStyle.Render(fmt.Sprintf("no tubers match %q — esc clears", m.filter.Value()))
+		return m.pal.dim.Render(fmt.Sprintf("no tubers match %q — esc clears", m.filter.Value()))
 	}
 	nameW := m.nameWidth()
 	var b strings.Builder
-	b.WriteString(columnHeader(nameW))
+	b.WriteString(columnHeader(m.pal, nameW))
 	b.WriteString("\n")
 	for _, i := range rows {
 		b.WriteString(m.row(i, m.list[i], nameW))
@@ -205,13 +205,13 @@ func (m Model) table() string {
 // the compact potato. The logo is tinted with the title accent unless the
 // theme is monochrome.
 func (m Model) splash(hint string) string {
-	mono := detectKind() == themeMono
+	mono := m.kind == themeMono
 	avail := m.width - 2*sideMargin
 	var art string
 	if avail >= splashWordmarkW {
-		art = logo.Wordmark(titleStyle, mono)
+		art = logo.Wordmark(m.pal.title, mono)
 	} else {
-		art = logo.Banner(titleStyle, mono)
+		art = logo.Banner(m.pal.title, mono)
 	}
 	if avail < splashLogoW {
 		avail = splashLogoW
@@ -223,11 +223,11 @@ func (m Model) splash(hint string) string {
 // while typing), and a matched/total count. Shown whenever the filter is open
 // or has a query applied.
 func (m Model) filterLine() string {
-	count := dimStyle.Render(fmt.Sprintf("(%d/%d)", m.visibleCount(), len(m.list)))
+	count := m.pal.dim.Render(fmt.Sprintf("(%d/%d)", m.visibleCount(), len(m.list)))
 	if m.filtering {
-		return bodyStyle.Render("/ ") + m.filter.View() + "  " + count
+		return m.pal.body.Render("/ ") + m.filter.View() + "  " + count
 	}
-	return dimStyle.Render(fmt.Sprintf("/ %s  %s  — esc clears", m.filter.Value(), count))
+	return m.pal.dim.Render(fmt.Sprintf("/ %s  %s  — esc clears", m.filter.Value(), count))
 }
 
 func (m Model) nameWidth() int {
@@ -249,8 +249,8 @@ func (m Model) nameWidth() int {
 	return min(nameW, avail)
 }
 
-func columnHeader(nameW int) string {
-	return headerStyle.Render(
+func columnHeader(pal palette, nameW int) string {
+	return pal.header.Render(
 		"    " +
 			pad("NAME", nameW) + gutter +
 			pad("TYPE", colType) + gutter +
@@ -263,22 +263,22 @@ func columnHeader(nameW int) string {
 func (m Model) row(i int, s controller.Status, nameW int) string {
 	selected := i == m.cursor
 	endpoint := fitEndpoint(s.Endpoint(), colEndpoint)
-	status := stateLabel(s.State)
+	status := stateLabel(m.pal, s.State)
 	if s.Error != "" {
-		status += " " + dimStyle.Render(truncate(s.Error, 18))
+		status += " " + m.pal.dim.Render(truncate(s.Error, 18))
 	}
 	// Phase 19: a dial blocked on a passphrase-protected identity is in
 	// Connecting with PendingPassphrase set; flag it with the key that opens
 	// the prompt (the modal also auto-opens when this tuber is under the
 	// cursor).
 	if s.PendingPassphrase != "" {
-		status += " " + dimStyle.Render("passphrase? (p)")
+		status += " " + m.pal.dim.Render("passphrase? (p)")
 	}
 	// Phase 35: a dial blocked on a password-only account is in Connecting
 	// with PendingPassword set; flag it with the key that opens the prompt
 	// (the modal also auto-opens when this tuber is under the cursor).
 	if s.PendingPassword != "" {
-		status += " " + dimStyle.Render("password? (o)")
+		status += " " + m.pal.dim.Render("password? (o)")
 	}
 
 	name, typ, ep, up := fitName(s.Name, nameW), s.Type, endpoint, uptime(s)
@@ -288,22 +288,22 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 		// in one outer style) because the indicator is already colour-rendered
 		// and a nested ANSI reset would otherwise drop the outer styling after
 		// it. Each plain cell has no inner sequences, so bolding is reliable.
-		name = selectedStyle.Render(name)
-		typ = selectedStyle.Render(typ)
-		ep = selectedStyle.Render(ep)
+		name = m.pal.selected.Render(name)
+		typ = m.pal.selected.Render(typ)
+		ep = m.pal.selected.Render(ep)
 		if up != "" {
-			up = selectedStyle.Render(up)
+			up = m.pal.selected.Render(up)
 		}
 	} else {
-		name = bodyStyle.Render(name)
-		typ = bodyStyle.Render(typ)
-		ep = bodyStyle.Render(ep)
+		name = m.pal.body.Render(name)
+		typ = m.pal.body.Render(typ)
+		ep = m.pal.body.Render(ep)
 		if up != "" {
-			up = bodyStyle.Render(up)
+			up = m.pal.body.Render(up)
 		}
 	}
 
-	cells := indicator(s) + " " +
+	cells := indicator(m.pal, s) + " " +
 		pad(name, nameW) + gutter +
 		pad(typ, colType) + gutter +
 		pad(ep, colEndpoint) + gutter +
@@ -312,7 +312,7 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 
 	cursor := " "
 	if selected {
-		cursor = cursorStyle.Render("❯")
+		cursor = m.pal.cursor.Render("❯")
 	}
 	return cursor + " " + cells
 }
@@ -320,19 +320,19 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 // indicator returns the leading status glyph, coloured by state. Error uses a
 // distinct ✗ so a failed tuber cannot be mistaken for a connected one — the
 // old "● for everything not Off" made an errored tuber look live.
-func indicator(s controller.Status) string {
+func indicator(pal palette, s controller.Status) string {
 	switch s.State {
 	case controller.Off:
-		return stateStyle[controller.Off].Render("○")
+		return pal.state[controller.Off].Render("○")
 	case controller.Error:
-		return stateStyle[controller.Error].Render("✗")
+		return pal.state[controller.Error].Render("✗")
 	default:
-		return stateStyle[s.State].Render("●")
+		return pal.state[s.State].Render("●")
 	}
 }
 
-func stateLabel(s controller.State) string {
-	style := stateStyle[s]
+func stateLabel(pal palette, s controller.State) string {
+	style := pal.state[s]
 	switch s {
 	case controller.Off:
 		return style.Render("off")
@@ -374,7 +374,7 @@ func formatUptime(d time.Duration) string {
 }
 
 func (m Model) footer() string {
-	return footerStyle.Render("↑↓/jk move · space toggle · p passphrase · o password · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · / filter · R reload · ? help · q quit")
+	return m.pal.footer.Render("↑↓/jk move · space toggle · p passphrase · o password · r restart · a/x all · e edit · n new · C duplicate · d delete · l logs · / filter · R reload · ? help · q quit")
 }
 
 func (m Model) helpBlock() string {
@@ -397,7 +397,7 @@ func (m Model) helpBlock() string {
 		"? / esc      toggle this help",
 		"q / ctrl+c   quit (stops all tubers)",
 	}
-	title := helpTitle.Render("Help")
+	title := m.pal.helpTitle.Render("Help")
 	contentW := lipgloss.Width(title)
 	for _, l := range hotkeys {
 		if w := lipgloss.Width(l); w > contentW {
@@ -408,11 +408,11 @@ func (m Model) helpBlock() string {
 	// Prepend the logo above the title when there is vertical room, centered
 	// within the hotkey block width. Same height gate as the empty-state splash.
 	if m.height >= splashMinH {
-		lines = append(lines, centerBlock(logo.Banner(titleStyle, detectKind() == themeMono), contentW), "")
+		lines = append(lines, centerBlock(logo.Banner(m.pal.title, m.kind == themeMono), contentW), "")
 	}
 	lines = append(lines, title, "")
 	lines = append(lines, hotkeys...)
-	return helpPanel.Render(strings.Join(lines, "\n"))
+	return m.pal.helpPanel.Render(strings.Join(lines, "\n"))
 }
 
 // confirmQuitView renders the "leave running in background?" modal shown when
@@ -426,14 +426,14 @@ func (m Model) confirmQuitView() string {
 		}
 	}
 	line := fmt.Sprintf("%d tuber(s) active.\nLeave them running in the background? [y/N]", n)
-	return modalStyle.Render(line)
+	return m.pal.modal.Render(line)
 }
 
 // confirmDeleteView renders the "delete tuber?" modal. Deleting stops an
 // active tuber (via the engine reload) and removes it from the config.
 func (m Model) confirmDeleteView() string {
 	line := fmt.Sprintf("Delete tuber %q?\nThis stops it if active and removes it from the config. [y/N]", m.deleteTarget)
-	return modalStyle.Render(line)
+	return m.pal.modal.Render(line)
 }
 
 // confirmAcceptView renders the Phase 11 TOFU modal: the tuber is blocked by
@@ -452,7 +452,7 @@ func (m Model) confirmAcceptView() string {
 		"Unknown host key for %s\nhost: %s\nfingerprint: %s\n[y] accept & restart  ·  [n/esc] cancel",
 		m.acceptTarget, host, fp,
 	)
-	return modalStyle.Render(line)
+	return m.pal.modal.Render(line)
 }
 
 // passphraseView renders the Phase 19 identity-passphrase modal: the tuber's
@@ -470,7 +470,7 @@ func (m Model) passphraseView() string {
 		"Passphrase for %s's identity\n%s[enter] submit  ·  [esc] cancel%s",
 		m.passphraseTarget, m.passphraseInput.View(), hint,
 	)
-	return modalStyle.Render(line)
+	return m.pal.modal.Render(line)
 }
 
 // passphraseAttemptsFor looks up a tuber's PassphraseAttempts (dial rejections)
@@ -490,7 +490,7 @@ func passphraseAttemptsFor(list []controller.Status, name string) int {
 // tubers sprout) for what would otherwise be an empty input modal looking like
 // "enter again".
 func (m Model) sproutingView() string {
-	return modalStyle.Render("sprouting…")
+	return m.pal.modal.Render("sprouting…")
 }
 
 // passwordView renders the Phase 35 SSH-password modal: the tuber's dial is
@@ -507,7 +507,7 @@ func (m Model) passwordView() string {
 		"Password for %s\n%s[enter] submit  ·  [esc] cancel%s",
 		m.passwordTarget, m.passwordInput.View(), hint,
 	)
-	return modalStyle.Render(line)
+	return m.pal.modal.Render(line)
 }
 
 // passwordAttemptsFor looks up a tuber's PasswordAttempts (server rejections)
