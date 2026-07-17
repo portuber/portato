@@ -1,7 +1,7 @@
 ---
 phase: 39
 title: TUI polish (modals, footer pin, microcopy, error display)
-status: todo
+status: in-progress
 depends_on: []
 ---
 

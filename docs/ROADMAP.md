@@ -54,7 +54,7 @@
 | 36  | CI security hardening (govulncheck + lint in CI) | `[x]` | [phase-36-ci-security.md](./phases/phase-36-ci-security.md) |
 | 37  | TUI theme portability & color     | `[x]` | [phase-37-tui-theme-portability.md](./phases/phase-37-tui-theme-portability.md) |
 | 38  | TUI responsive layout              | `[x]` | [phase-38-tui-responsive-layout.md](./phases/phase-38-tui-responsive-layout.md) |
-| 39  | TUI polish (modals, microcopy)     | `[ ]` | [phase-39-tui-polish.md](./phases/phase-39-tui-polish.md) |
+| 39  | TUI polish (modals, microcopy)     | `[~]` | [phase-39-tui-polish.md](./phases/phase-39-tui-polish.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -68,7 +68,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–38 are all `[x]`; phase 39 is `[ ]` (planned — TUI polish). Phase 36
+**Phases 0–38 are all `[x]`; phase 39 is `[~]` (in progress — TUI polish:
+modals keep the list in view, footer pinned to the bottom edge, empty-state
+CTA → `n`, the `hasLiveTubers` quit gate counts the Error state with unified
+microcopy, the attach header drops its socket path, and error text keeps the
+actionable tail). Phase 36
 (CI security hardening) is `[x]`: a
 `govulncheck` workflow (PR/push + weekly cron) scanning dependencies for
 reachable CVEs, plus a `lint` job in CI enforcing the existing
