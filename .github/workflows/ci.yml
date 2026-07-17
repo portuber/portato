@@ -47,6 +47,12 @@ jobs:
           # .golangci.yml is a v1-schema config (phase 33); golangci-lint v2
           # uses an incompatible format, so pin to v1.x.
           version: v1.64.8
+          # Build golangci-lint from source under the workflow's Go (1.26.5,
+          # from go.mod via setup-go). The default `binary` mode downloads a
+          # prebuilt v1.64.8 built with Go 1.24, which can't parse the 1.26
+          # toolchain (the v1.x release line ships no Go-1.26 binary). Mirrors
+          # the `go install` the govulncheck job uses in security.yml.
+          install-mode: goinstall
 
   build-all:
     name: cross-compile (${{ matrix.goos }}/${{ matrix.goarch }})
