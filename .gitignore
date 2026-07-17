@@ -9,3 +9,4 @@ cover.out
 .idea/
 config.yaml
 e2e/systemd-docker/portato
+*.exe
