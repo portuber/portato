@@ -162,17 +162,39 @@ func (m Model) mainView() string {
 	sep, sepBlank := sectionSep(m.pal)
 	showFilter := m.filtering || m.filter.Value() != ""
 	bottom := m.footerZone()
-	var b strings.Builder
-	b.WriteString(m.header())
-	b.WriteString(sep)
-	b.WriteString(m.table(m.tableRowBudget(sepBlank, showFilter, bottom)))
-	b.WriteString(sep)
+	budget := m.tableRowBudget(sepBlank, showFilter, bottom)
+
+	topSections := []string{m.header(), m.table(budget)}
 	if showFilter {
-		b.WriteString(m.filterLine())
-		b.WriteString(sep)
+		topSections = append(topSections, m.filterLine())
 	}
-	b.WriteString(bottom)
-	return insetLines(b.String(), sideMargin)
+	top := strings.Join(topSections, sep)
+
+	// Pin the bottom block (footer or prompt) to the last row: insert blank pad
+	// lines between the top content and the bottom block so the whole view is
+	// exactly m.height rows tall. tableRowBudget caps the table so the pad is
+	// never negative; multi-line prompts shrink the table further. Before sizing
+	// (height 0) no pad is inserted, matching the un-sized output.
+	//
+	// Pad colour (measured, Phase 39): the pad rows are whitespace-only, and
+	// whitespace-only rows lose their bg SGR on non-honoring terminals
+	// regardless of how they are generated — hand-rolled spaces through fillBg
+	// and lipgloss-baked Background both render as the terminal's own background
+	// under tmux-256color (the #FAFAFA surface survives only mid-line, between
+	// text segments). The gap therefore renders as terminal-bg on non-honoring
+	// light terminals (tmux/iTerm2) — the same accepted tradeoff as the
+	// below-content area (see View); honoring terminals (Terminal.app) get the
+	// surface via OSC 11, and dark/mono are transparent by design. The pin
+	// itself is positional and works in every theme.
+	parts := []string{top}
+	if m.height > 0 {
+		padLines := m.height - lipgloss.Height(top) - lipgloss.Height(bottom)
+		for i := 0; i < padLines; i++ {
+			parts = append(parts, "")
+		}
+	}
+	parts = append(parts, bottom)
+	return insetLines(strings.Join(parts, "\n"), sideMargin)
 }
 
 // sectionSep is the inter-section separator and the number of extra blank
@@ -198,13 +220,16 @@ func (m Model) tableRowBudget(sepBlank int, showFilter bool, bottom string) int 
 	if m.height <= 0 {
 		return 0
 	}
-	seps := 2 // header-table, table-(filter|bottom)
-	used := 2 // header line + column-header line
+	// seps is the inter-section separators within the top block (header-table,
+	// and table-filter when filtering); the bottom block is separated by the
+	// pin pad, not a section sep.
+	seps := 1
+	filterH := 0
 	if showFilter {
-		used += lipgloss.Height(m.filterLine())
-		seps++ // filter-bottom
+		seps = 2
+		filterH = lipgloss.Height(m.filterLine())
 	}
-	used += seps*sepBlank + lipgloss.Height(bottom)
+	used := 2 + seps*sepBlank + filterH + lipgloss.Height(bottom)
 	if rows := m.height - used; rows >= 1 {
 		return rows
 	}
