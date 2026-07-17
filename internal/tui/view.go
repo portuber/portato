@@ -258,7 +258,7 @@ func (m Model) header() string {
 
 func (m Model) table(maxRows int) string {
 	if len(m.list) == 0 {
-		hint := m.pal.dim.Render("no tubers — add one to config and press R to reload")
+		hint := m.pal.dim.Render("no tubers — press n to create one (or edit the config and press R)")
 		if m.height >= splashMinH {
 			return m.splash(hint)
 		}
@@ -593,6 +593,18 @@ func formatUptime(d time.Duration) string {
 func (m Model) footer() string {
 	const sep = " · "
 	b := tuberBindings()
+	// Empty list: drop bindings that act on the selected tuber (they are
+	// meaningless with nothing to act on), keeping only the always-applicable
+	// ones (n new, R reload, ? help, q quit). Phase 39, Task C / F9.
+	if len(m.list) == 0 {
+		applicable := make([]binding, 0, len(b))
+		for _, e := range b {
+			if !e.needsList {
+				applicable = append(applicable, e)
+			}
+		}
+		b = applicable
+	}
 	full := joinFeet(b, sep)
 	avail := m.width - 2*sideMargin
 	// Before the first WindowSizeMsg (and in unit tests) m.width is 0: render

@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+
+	"github.com/portuber/portato/internal/controller"
 )
 
 // footSet returns the set of valid footer tokens, so a test can assert the fit
@@ -58,7 +60,7 @@ func stripAnsi(s string) string {
 func TestFooter_FitsWidth(t *testing.T) {
 	set := footSet()
 	for _, w := range []int{0, 200, 120, 80, 60, 40, 30} {
-		m := New(newFake(), Options{Mode: "standalone"})
+		m := New(newFake(controller.Status{Name: "x"}), Options{Mode: "standalone"})
 		m.width = w
 		rendered := m.footer()
 		tokens := parseFooterTokens(rendered)
@@ -134,5 +136,31 @@ func TestFooter_SharedSource(t *testing.T) {
 	// "q quit (stops all tubers)" — now both live on one binding).
 	if !strings.Contains(helpLines()[len(lines)-1], "quit (stops all tubers)") {
 		t.Errorf("last help line lost the (stops all tubers) tail: %q", helpLines()[len(lines)-1])
+	}
+}
+
+// TestFooter_EmptyListFiltersApplicable asserts the Phase 39 empty-state footer:
+// with no tubers, bindings that act on the selected tuber are hidden, leaving
+// only the always-applicable set (n new, R reload, ? help, q quit) — so the
+// footer never advertises keys that do nothing (F9).
+func TestFooter_EmptyListFiltersApplicable(t *testing.T) {
+	set := footSet()
+	m := New(newFake(), Options{Mode: "standalone"}) // empty list
+	if len(m.list) != 0 {
+		t.Fatalf("precondition: list must be empty, got %d", len(m.list))
+	}
+	m.width = 120
+	tokens := parseFooterTokens(m.footer())
+	want := []string{"n new", "R reload", "? help", "q quit"}
+	if len(tokens) != len(want) {
+		t.Fatalf("empty footer tokens = %v, want %v", tokens, want)
+	}
+	for i, tok := range tokens {
+		if tok != want[i] {
+			t.Errorf("empty footer token[%d] = %q, want %q (full=%v)", i, tok, want[i], tokens)
+		}
+		if !set[tok] {
+			t.Errorf("unknown token %q", tok)
+		}
 	}
 }

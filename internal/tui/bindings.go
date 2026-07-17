@@ -13,6 +13,10 @@ type binding struct {
 	// One footer token may expand to several help lines (navigation up/down,
 	// enable/disable all); the slice keeps that 1-to-many mapping explicit.
 	help []string
+	// needsList marks bindings that act on the selected tuber and are therefore
+	// meaningless with an empty list; the footer hides them in the empty state
+	// (Phase 39, Task C). The help view always shows every binding.
+	needsList bool
 }
 
 // tuberBindings returns the ordered list of list-view bindings. The order is
@@ -21,42 +25,42 @@ type binding struct {
 // view simply renders every binding's help lines in the same order.
 func tuberBindings() []binding {
 	return []binding{
-		{foot: "↑↓/jk move", help: []string{
+		{foot: "↑↓/jk move", needsList: true, help: []string{
 			"↑ / k        move cursor up",
 			"↓ / j        move cursor down",
 		}},
-		{foot: "space toggle", help: []string{
+		{foot: "space toggle", needsList: true, help: []string{
 			"space        toggle selected tuber (on/off)",
 		}},
-		{foot: "p passphrase", help: []string{
+		{foot: "p passphrase", needsList: true, help: []string{
 			"p            enter passphrase for the selected tuber",
 		}},
-		{foot: "o password", help: []string{
+		{foot: "o password", needsList: true, help: []string{
 			"o            enter SSH password for the selected tuber (also auto-opens)",
 		}},
-		{foot: "r restart", help: []string{
+		{foot: "r restart", needsList: true, help: []string{
 			"r            restart selected tuber",
 		}},
-		{foot: "a/x all", help: []string{
+		{foot: "a/x all", needsList: true, help: []string{
 			"a            enable all tubers",
 			"x            disable all tubers",
 		}},
-		{foot: "e edit", help: []string{
+		{foot: "e edit", needsList: true, help: []string{
 			"e            edit the selected tuber",
 		}},
 		{foot: "n new", help: []string{
 			"n            create a new tuber",
 		}},
-		{foot: "C duplicate", help: []string{
+		{foot: "C duplicate", needsList: true, help: []string{
 			"C            duplicate the selected tuber",
 		}},
-		{foot: "d delete", help: []string{
+		{foot: "d delete", needsList: true, help: []string{
 			"d            delete the selected tuber",
 		}},
-		{foot: "l logs", help: []string{
+		{foot: "l logs", needsList: true, help: []string{
 			"l            view the selected tuber's logs",
 		}},
-		{foot: "/ filter", help: []string{
+		{foot: "/ filter", needsList: true, help: []string{
 			"/            filter the list (name/type/endpoint; esc clears)",
 		}},
 		{foot: "R reload", help: []string{
