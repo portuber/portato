@@ -22,6 +22,7 @@ const (
 	sideMargin   = 1
 	minName      = 12
 	maxName      = 40
+	minEndpoint  = 12
 	uptimeBudget = 7
 	// splashMinH is the terminal-height gate for the big logo: below it the
 	// empty-list splash and the help overlay omit the logo and show text only,
@@ -201,11 +202,11 @@ func (m Model) table() string {
 	if len(rows) == 0 {
 		return m.pal.dim.Render(fmt.Sprintf("no tubers match %q — esc clears", m.filter.Value()))
 	}
-	nameW := m.nameWidth()
+	c := m.columnBudget()
 	lines := make([]string, 0, len(rows)+1)
-	lines = append(lines, columnHeader(m.pal, nameW))
+	lines = append(lines, columnHeader(m.pal, c))
 	for _, i := range rows {
-		lines = append(lines, m.row(i, m.list[i], nameW))
+		lines = append(lines, m.row(i, m.list[i], c))
 	}
 	// No trailing newline: render() joins sections with "\n", and a trailing
 	// "\n" here would create a whitespace-only separator line (which the v2
@@ -245,39 +246,111 @@ func (m Model) filterLine() string {
 	return m.pal.dim.Render(fmt.Sprintf("/ %s  %s  — esc clears", m.filter.Value(), count))
 }
 
-func (m Model) nameWidth() int {
+// columns is the per-frame width budget for the five table columns, computed
+// by columnBudget from the terminal width (Phase 38, task C; audit F5). The
+// indicator block and STATUS are untouchable; ENDPOINT shrinks first; NAME is
+// the flex column that absorbs slack; UPTIME is right-aligned numeric.
+type columns struct {
+	nameW, typeW, epW, statusW, upW int
+}
+
+// columnBudget derives the column widths from m.width. STATUS, UPTIME, the
+// indicator lead-in and the gutters/margins are reserved first (untouchable);
+// TYPE stays at full words and only collapses to the L/R/D glyph when the
+// terminal is so narrow that keeping the words would endanger STATUS/minName;
+// the remaining pool is split between NAME and ENDPOINT (splitNameEndpoint).
+// Before the first WindowSizeMsg (m.width == 0, unit tests) it returns the
+// historical fixed widths so un-sized output is stable.
+func (m Model) columnBudget() columns {
+	if m.width == 0 {
+		return columns{colName, colType, colEndpoint, colStatus, uptimeBudget}
+	}
+	const lead = 4 // cursor + space + indicator + space
+	fixed := lead + 2*sideMargin + 4*len(gutter) + colStatus + uptimeBudget
+	typeW := colType
+	if m.width-fixed <= typeW+minName {
+		typeW = 1
+	}
+	avail := m.width - fixed - typeW
+	nameW, epW := splitNameEndpoint(avail, longestName(m.list))
+	return columns{nameW, typeW, epW, colStatus, uptimeBudget}
+}
+
+// splitNameEndpoint divides the NAME+ENDPOINT pool. NAME takes its content
+// width (clamped to [minName, maxName]); ENDPOINT gets the rest up to
+// colEndpoint. Under squeeze ENDPOINT shrinks first (toward minEndpoint), then
+// NAME clamps to minName; slack when ENDPOINT is at its cap goes to NAME up to
+// maxName. The returned epW is always >= 1 so fitEndpoint's truncate fallback
+// never takes a zero/negative size.
+func splitNameEndpoint(avail, longest int) (nameW, epW int) {
+	nameW = clampN(longest, minName, maxName)
+	epW = avail - nameW
+	if epW < minEndpoint {
+		epW = minEndpoint
+		nameW = avail - epW
+		if nameW < minName {
+			nameW = minName
+			epW = avail - nameW
+			if epW < 1 {
+				epW = 1
+			}
+		}
+	}
+	if epW > colEndpoint {
+		epW = colEndpoint
+		nameW = clampN(avail-epW, minName, maxName)
+	}
+	return nameW, epW
+}
+
+func longestName(list []controller.Status) int {
 	longest := 0
-	for _, s := range m.list {
+	for _, s := range list {
 		if w := lipgloss.Width(s.Name); w > longest {
 			longest = w
 		}
 	}
-	nameW := longest
-	nameW = max(nameW, minName)
-	nameW = min(nameW, maxName)
-	if m.width == 0 {
-		return colName
-	}
-	leading := sideMargin + 4
-	avail := m.width - leading - 4*len(gutter) - colType - colEndpoint - colStatus - uptimeBudget
-	avail = max(avail, minName)
-	return min(nameW, avail)
+	return longest
 }
 
-func columnHeader(pal palette, nameW int) string {
+func clampN(v, lo, hi int) int { return min(max(v, lo), hi) }
+
+// fitType renders the TYPE cell at width w: the full word when it fits,
+// otherwise the single-letter L/R/D degradation (only reached on very narrow
+// terminals, where columnBudget collapses typeW to 1).
+func fitType(typ string, w int) string {
+	if w >= colType || typ == "" {
+		return typ
+	}
+	return strings.ToUpper(typ[:1])
+}
+
+// fitTypeHeader is the TYPE column-header analogue: "TYPE" when it fits, "T"
+// on the degraded width.
+func fitTypeHeader(w int) string {
+	if w >= len("TYPE") {
+		return "TYPE"
+	}
+	if w >= 1 {
+		return "T"
+	}
+	return ""
+}
+
+func columnHeader(pal palette, c columns) string {
 	return pal.header.Render(
 		"    " +
-			pad("NAME", nameW) + gutter +
-			pad("TYPE", colType) + gutter +
-			pad("ENDPOINT", colEndpoint) + gutter +
-			pad("STATUS", colStatus) + gutter +
-			"UPTIME",
+			pad("NAME", c.nameW) + gutter +
+			pad(fitTypeHeader(c.typeW), c.typeW) + gutter +
+			pad("ENDPOINT", c.epW) + gutter +
+			pad("STATUS", c.statusW) + gutter +
+			fmt.Sprintf("%*s", c.upW, "UPTIME"),
 	)
 }
 
-func (m Model) row(i int, s controller.Status, nameW int) string {
+func (m Model) row(i int, s controller.Status, c columns) string {
 	selected := i == m.cursor
-	endpoint := fitEndpoint(s.Endpoint(), colEndpoint)
+	endpoint := fitEndpoint(s.Endpoint(), c.epW)
 	status := stateLabel(m.pal, s.State)
 	if s.Error != "" {
 		status += " " + m.pal.dim.Render(truncate(s.Error, 18))
@@ -296,7 +369,11 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 		status += " " + m.pal.dim.Render("password? (o)")
 	}
 
-	name, typ, ep, up := fitName(s.Name, nameW), s.Type, endpoint, uptime(s)
+	up := uptime(s)
+	if up != "" {
+		up = fmt.Sprintf("%*s", c.upW, up) // right-aligned numeric (audit §6.5)
+	}
+	name, typ, ep := fitName(s.Name, c.nameW), fitType(s.Type, c.typeW), endpoint
 	if selected {
 		// Selection is marked by the ❯ cursor glyph; the plain text cells are
 		// bolded for emphasis. The cells are styled individually (not wrapped
@@ -319,10 +396,10 @@ func (m Model) row(i int, s controller.Status, nameW int) string {
 	}
 
 	cells := indicator(m.pal, s) + " " +
-		pad(name, nameW) + gutter +
-		pad(typ, colType) + gutter +
-		pad(ep, colEndpoint) + gutter +
-		pad(status, colStatus) + gutter +
+		pad(name, c.nameW) + gutter +
+		pad(typ, c.typeW) + gutter +
+		pad(ep, c.epW) + gutter +
+		pad(status, c.statusW) + gutter +
 		up
 
 	cursor := " "

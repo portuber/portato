@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -495,67 +496,140 @@ func TestFitName(t *testing.T) {
 	})
 }
 
-func TestNameWidth(t *testing.T) {
+func TestColumnBudget(t *testing.T) {
 	mixed := []controller.Status{
 		{Name: "db"},
-		{Name: "pntr-sberhealth-browser"},
+		{Name: "pntr-sberhealth-browser"}, // 24 display cells
 	}
-	avail := func(termWidth int) int {
-		return termWidth - (sideMargin + 4) - 4*len(gutter) - colType - colEndpoint - colStatus - uptimeBudget
-	}
-	t.Run("width=0 falls back to colName", func(t *testing.T) {
+
+	// width=0: pre-WindowSize fallback returns the historical fixed widths.
+	t.Run("width=0 falls back to fixed widths", func(t *testing.T) {
 		m := New(newFake(mixed...), Options{Mode: "standalone"})
 		m.width = 0
-		if got := m.nameWidth(); got != colName {
-			t.Errorf("width=0: nameWidth=%d want colName=%d", got, colName)
+		c := m.columnBudget()
+		if c != (columns{colName, colType, colEndpoint, colStatus, uptimeBudget}) {
+			t.Errorf("width=0: budget = %+v", c)
 		}
 	})
-	t.Run("short names clamp to minName", func(t *testing.T) {
-		m := New(newFake(controller.Status{Name: "db"}, controller.Status{Name: "x"}), Options{Mode: "standalone"})
-		m.width = 200
-		if got := m.nameWidth(); got != minName {
-			t.Errorf("short names: nameWidth=%d want minName=%d", got, minName)
-		}
-	})
-	t.Run("long name fits on wide terminal", func(t *testing.T) {
+
+	// STATUS + indicator are untouchable at every width — the core F5 fix.
+	// ENDPOINT shrinks first; NAME absorbs slack up to maxName; the block
+	// never exceeds the terminal width (no ragged right edge).
+	for _, width := range []int{120, 90, 80, 62} {
+		t.Run(fmt.Sprintf("field width=%d", width), func(t *testing.T) {
+			m := New(newFake(mixed...), Options{Mode: "standalone"})
+			m.width = width
+			c := m.columnBudget()
+			if c.statusW != colStatus {
+				t.Errorf("statusW=%d want colStatus=%d (untouchable)", c.statusW, colStatus)
+			}
+			if c.upW != uptimeBudget {
+				t.Errorf("upW=%d want uptimeBudget=%d", c.upW, uptimeBudget)
+			}
+			if c.typeW != colType {
+				t.Errorf("typeW=%d want colType=%d (full words at this width)", c.typeW, colType)
+			}
+			if c.nameW < minName || c.nameW > maxName {
+				t.Errorf("nameW=%d out of [%d,%d]", c.nameW, minName, maxName)
+			}
+			if c.epW > colEndpoint {
+				t.Errorf("epW=%d > colEndpoint=%d", c.epW, colEndpoint)
+			}
+			if c.epW < 1 {
+				t.Errorf("epW=%d must be >= 1 (truncate would panic)", c.epW)
+			}
+			const lead = 4
+			total := lead + 2*sideMargin + 4*len(gutter) + c.nameW + c.typeW + c.epW + c.statusW + c.upW
+			if total > width {
+				t.Errorf("total column width %d > terminal %d (ragged)", total, width)
+			}
+		})
+	}
+
+	// 120 reference: ENDPOINT keeps its full 48, NAME absorbs the slack.
+	t.Run("120 keeps full ENDPOINT", func(t *testing.T) {
 		m := New(newFake(mixed...), Options{Mode: "standalone"})
-		m.width = 200
-		want := lipgloss.Width("pntr-sberhealth-browser")
-		if got := m.nameWidth(); got != want {
-			t.Errorf("wide: nameWidth=%d want %d", got, want)
+		m.width = 120
+		if c := m.columnBudget(); c.epW != colEndpoint {
+			t.Errorf("120: epW=%d want colEndpoint=%d", c.epW, colEndpoint)
 		}
 	})
-	t.Run("name longer than maxName clamps to maxName", func(t *testing.T) {
+
+	// ENDPOINT shrinks strictly as width decreases (monotonic, never grows).
+	t.Run("ENDPOINT shrinks monotonically with width", func(t *testing.T) {
+		prev := colEndpoint
+		for _, width := range []int{120, 100, 90, 80, 70, 62} {
+			m := New(newFake(mixed...), Options{Mode: "standalone"})
+			m.width = width
+			if c := m.columnBudget(); c.epW > prev {
+				t.Errorf("width=%d: epW=%d grew above prev %d", width, c.epW, prev)
+			} else {
+				prev = c.epW
+			}
+		}
+	})
+
+	// NAME clamps to maxName for very long content.
+	t.Run("NAME clamps to maxName", func(t *testing.T) {
 		m := New(newFake(controller.Status{Name: strings.Repeat("x", 60)}), Options{Mode: "standalone"})
 		m.width = 200
-		if got := m.nameWidth(); got != maxName {
-			t.Errorf("very long: nameWidth=%d want maxName=%d", got, maxName)
+		if c := m.columnBudget(); c.nameW != maxName {
+			t.Errorf("very long name: nameW=%d want maxName=%d", c.nameW, maxName)
 		}
 	})
-	t.Run("narrow terminal caps by avail", func(t *testing.T) {
+
+	// TYPE degrades to 1 (L/R/D) only when STATUS/minName would be endangered.
+	t.Run("TYPE degrades on very narrow terminal", func(t *testing.T) {
 		m := New(newFake(mixed...), Options{Mode: "standalone"})
-		m.width = 110
-		want := avail(110)
-		if got := m.nameWidth(); got != want {
-			t.Errorf("narrow: nameWidth=%d want avail=%d", got, want)
+		m.width = 40
+		if c := m.columnBudget(); c.typeW != 1 {
+			t.Errorf("width=40: typeW=%d want 1 (L/R/D degradation)", c.typeW)
 		}
 	})
-	t.Run("very narrow terminal floors at minName", func(t *testing.T) {
-		m := New(newFake(mixed...), Options{Mode: "standalone"})
-		m.width = 60
-		if got := m.nameWidth(); got != minName {
-			t.Errorf("very narrow: nameWidth=%d want minName=%d", got, minName)
-		}
-	})
-	t.Run("filter does not change width", func(t *testing.T) {
+
+	// filter does not change the budget (it considers every name, even hidden).
+	t.Run("filter does not change budget", func(t *testing.T) {
 		m := New(newFake(mixed...), Options{Mode: "standalone"})
 		m.width = 200
+		base := m.columnBudget()
 		m.filter.SetValue("db")
-		want := lipgloss.Width("pntr-sberhealth-browser")
-		if got := m.nameWidth(); got != want {
-			t.Errorf("with filter: nameWidth=%d want %d (must consider the hidden long name)", got, want)
+		if filtered := m.columnBudget(); base != filtered {
+			t.Errorf("filter changed budget: base=%+v filtered=%+v", base, filtered)
 		}
 	})
+}
+
+// TestTableRender_StatusSurvivesNarrow proves the F5 fix at the render level:
+// the full status word (connected/error/off) survives at every width, and the
+// long ENDPOINT middle-truncates with an ellipsis on narrow terminals instead
+// of clipping STATUS. This is the phase-38 field acceptance (90/62 cols) as a
+// deterministic unit test.
+func TestTableRender_StatusSurvivesNarrow(t *testing.T) {
+	statuses := []controller.Status{
+		{Name: "db", Type: "local", Local: "127.0.0.1:5432", Remote: "db.internal.example.com:5432", State: controller.Connected},
+		{Name: "broken", Type: "local", Local: "127.0.0.1:9", Remote: "127.0.0.1:9", State: controller.Error, Error: "connect refused"},
+		{Name: "idle", Type: "remote", Local: "8080", Remote: "127.0.0.1:9090", State: controller.Off},
+	}
+	for _, width := range []int{120, 90, 80, 62} {
+		m := New(newFake(statuses...), Options{Mode: "standalone"})
+		m.width = width
+		m.height = 24
+		out := m.table()
+		for _, want := range []string{"connected", "error", "off"} {
+			if !strings.Contains(out, want) {
+				t.Errorf("width=%d: status word %q missing from table\n%s", width, want, out)
+			}
+		}
+	}
+	// On the narrow widths the long connected ENDPOINT truncates with "…".
+	for _, width := range []int{90, 80, 62} {
+		m := New(newFake(statuses...), Options{Mode: "standalone"})
+		m.width = width
+		m.height = 24
+		if out := m.table(); !strings.Contains(out, "…") {
+			t.Errorf("width=%d: expected an endpoint ellipsis, got none\n%s", width, out)
+		}
+	}
 }
 
 func TestRowColumnNameAlignment(t *testing.T) {
@@ -568,10 +642,10 @@ func TestRowColumnNameAlignment(t *testing.T) {
 	for _, termWidth := range []int{200, 110} {
 		m := New(newFake(statuses...), Options{Mode: "standalone"})
 		m.width = termWidth
-		nameW := m.nameWidth()
-		want := nameW + 6
+		c := m.columnBudget()
+		want := c.nameW + 6
 		for i, s := range m.list {
-			rowStr := m.row(i, s, nameW)
+			rowStr := m.row(i, s, c)
 			idx := strings.Index(rowStr, s.Type)
 			if idx < 0 {
 				t.Fatalf("width=%d row %d: type %q not found in row %q", termWidth, i, s.Type, rowStr)
