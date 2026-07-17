@@ -46,6 +46,10 @@ func (m Model) handleWindowSize(msg tea.WindowSizeMsg) (Model, tea.Cmd) {
 		cmds = append(cmds, m.logs.update(msg))
 		return m, tea.Batch(cmds...)
 	}
+	if m.help != nil {
+		cmds = append(cmds, m.help.update(msg))
+		return m, tea.Batch(cmds...)
+	}
 	return m, tea.Batch(cmds...)
 }
 
@@ -77,6 +81,9 @@ func (m Model) propagateTheme() {
 	}
 	if m.logs != nil {
 		m.logs.pal = m.pal
+	}
+	if m.help != nil {
+		m.help.pal = m.pal
 	}
 }
 
@@ -166,6 +173,13 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		cmd := m.logs.update(msg)
 		if m.logs.done {
 			m.logs = nil
+		}
+		return m, cmd
+	}
+	if m.help != nil {
+		cmd := m.help.update(msg)
+		if m.help.done {
+			m.help = nil
 		}
 		return m, cmd
 	}
@@ -269,7 +283,11 @@ func (m Model) handleQuitAndViewKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.confirmQuit = true
 		return m, nil
 	case "esc", "?":
-		m.help = !m.help
+		if m.help != nil {
+			m.help = nil
+		} else {
+			m.help = newHelpView(m.pal, m.kind, m.width, m.height)
+		}
 		return m, nil
 	}
 	return m, nil
@@ -485,7 +503,7 @@ func pendingKeyForName(list []controller.Status, name string) string {
 func (m Model) isBusy() bool {
 	return m.editor != nil || m.logs != nil || m.filtering || m.confirmDelete ||
 		m.confirmQuit || m.confirmAccept || m.enteringPassphrase || m.enteringPassword ||
-		m.handoffing || m.help
+		m.handoffing || m.help != nil
 }
 
 // autoOpenIfPending surfaces a pending passphrase / unknown-host prompt for the

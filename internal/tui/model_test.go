@@ -268,17 +268,17 @@ func TestModel_RestartAndReloadAndAll(t *testing.T) {
 func TestModel_HelpAndQuit(t *testing.T) {
 	f := newFake(controller.Status{Name: "a"})
 	m := New(f, Options{Mode: "standalone"})
-	if m.help {
+	if m.help != nil {
 		t.Fatal("help should start hidden")
 	}
 	next, _ := m.handleKey(keyPress("?"))
 	m = next.(Model)
-	if !m.help {
+	if m.help == nil {
 		t.Error("? should toggle help on")
 	}
 	next, _ = m.handleKey(specialKey(tea.KeyEsc))
 	m = next.(Model)
-	if m.help {
+	if m.help != nil {
 		t.Error("esc should toggle help off")
 	}
 
@@ -310,9 +310,9 @@ func TestModel_RenderContainsTubers(t *testing.T) {
 		t.Error("render should show error text")
 	}
 
-	m.help = true
+	m.help = newHelpView(m.pal, m.kind, m.width, m.height)
 	if !strings.Contains(m.render(), "move cursor up") {
-		t.Error("render should show help block when help=true")
+		t.Error("render should show the help view when help is open")
 	}
 }
 

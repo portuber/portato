@@ -111,6 +111,9 @@ func (m Model) render() string {
 	if m.logs != nil {
 		return m.logs.view()
 	}
+	if m.help != nil {
+		return m.help.view()
+	}
 	if m.editor != nil {
 		return m.centered(m.editor.view())
 	}
@@ -158,10 +161,6 @@ func (m Model) render() string {
 		b.WriteString(sep)
 	}
 	b.WriteString(m.footer())
-	if m.help {
-		b.WriteString(sep)
-		b.WriteString(m.helpBlock())
-	}
 	return insetLines(b.String(), sideMargin)
 }
 
@@ -440,44 +439,6 @@ func joinFeet(b []binding, sep string) string {
 		feet[i] = e.foot
 	}
 	return strings.Join(feet, sep)
-}
-
-func (m Model) helpBlock() string {
-	hotkeys := []string{
-		"↑ / k        move cursor up",
-		"↓ / j        move cursor down",
-		"space        toggle selected tuber (on/off)",
-		"p            enter passphrase for the selected tuber",
-		"o            enter SSH password for the selected tuber (also auto-opens)",
-		"r            restart selected tuber",
-		"a            enable all tubers",
-		"x            disable all tubers",
-		"e            edit the selected tuber",
-		"n            create a new tuber",
-		"C            duplicate the selected tuber",
-		"d            delete the selected tuber",
-		"l            view the selected tuber's logs",
-		"/            filter the list (name/type/endpoint; esc clears)",
-		"R            reload config from disk",
-		"? / esc      toggle this help",
-		"q / ctrl+c   quit (stops all tubers)",
-	}
-	title := m.pal.helpTitle.Render("Help")
-	contentW := lipgloss.Width(title)
-	for _, l := range hotkeys {
-		if w := lipgloss.Width(l); w > contentW {
-			contentW = w
-		}
-	}
-	lines := make([]string, 0, len(hotkeys)+4)
-	// Prepend the logo above the title when there is vertical room, centered
-	// within the hotkey block width. Same height gate as the empty-state splash.
-	if m.height >= splashMinH {
-		lines = append(lines, centerBlock(logo.Banner(m.pal.title, m.kind == themeMono), contentW), "")
-	}
-	lines = append(lines, title, "")
-	lines = append(lines, hotkeys...)
-	return m.pal.helpPanel.Render(strings.Join(lines, "\n"))
 }
 
 // confirmQuitView renders the "leave running in background?" modal shown when

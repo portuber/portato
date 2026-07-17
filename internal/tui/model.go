@@ -102,7 +102,11 @@ type Model struct {
 
 	cfgPath string
 
-	help bool
+	// help is the Phase 38 full-screen help overlay (? / esc), nil when
+	// inactive. It mirrors logsView as a sub-model so every binding is
+	// reachable (scrollable) at any terminal size; the potato logo is
+	// prepended only when it fits in addition to the full binding list.
+	help *helpView
 	quit bool
 }
 

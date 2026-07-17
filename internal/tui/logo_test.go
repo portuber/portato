@@ -82,19 +82,33 @@ func TestEmptyListSplashNarrowUsesPotato(t *testing.T) {
 	}
 }
 
-// TestHelpShowsLogo verifies the help (?) overlay prepends the compact logo
-// above the hotkey list on a tall terminal.
-func TestHelpShowsLogo(t *testing.T) {
+// TestHelpLogoListFirst verifies the Phase 38 list-first help layout: at 80x24
+// the binding list takes the viewport and the logo is omitted (the inverse of
+// the F4 bug, where the logo pushed every binding off-screen); on a tall
+// terminal the logo is prepended in addition to the full list.
+func TestHelpLogoListFirst(t *testing.T) {
 	t.Setenv("PORTATO_LOGO", "braille")
+	// 80x24: bindings fill the viewport, no room for the logo in addition.
 	m := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
 	m.width, m.height = 80, 24
-	m.help = true
+	m.help = newHelpView(m.pal, m.kind, m.width, m.height)
 	out := m.render()
-	if !hasBraille(out) {
-		t.Errorf("help on a tall terminal should render the logo\n%s", out)
+	if hasBraille(out) {
+		t.Errorf("80x24 help should omit the logo so the bindings fit\n%s", out)
 	}
 	if !strings.Contains(out, "move cursor up") {
-		t.Errorf("help should still list the hotkeys\n%s", out)
+		t.Errorf("80x24 help should still list the hotkeys\n%s", out)
+	}
+	// Tall terminal: the logo fits in addition to the full binding list.
+	tall := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
+	tall.width, tall.height = 120, 80
+	tall.help = newHelpView(tall.pal, tall.kind, tall.width, tall.height)
+	tallOut := tall.render()
+	if !hasBraille(tallOut) {
+		t.Errorf("tall help should render the logo in addition to the list\n%s", tallOut)
+	}
+	if !strings.Contains(tallOut, "move cursor up") {
+		t.Errorf("tall help should still list the hotkeys\n%s", tallOut)
 	}
 }
 
@@ -111,7 +125,7 @@ func TestLogoOffHidesBranding(t *testing.T) {
 
 	m2 := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
 	m2.width, m2.height = 80, 24
-	m2.help = true
+	m2.help = newHelpView(m2.pal, m2.kind, m2.width, m2.height)
 	out2 := m2.render()
 	if hasBraille(out2) {
 		t.Errorf("PORTATO_LOGO=off should hide the help logo\n%s", out2)
