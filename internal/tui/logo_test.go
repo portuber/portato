@@ -66,8 +66,8 @@ func TestEmptyListSplashWideUsesWordmark(t *testing.T) {
 	t.Setenv("PORTATO_LOGO", "braille")
 	m := New(newFake(), Options{Mode: "standalone"})
 	m.width, m.height = 80, 24
-	if w := maxLineWidth(splashArt(m.table())); w < 60 {
-		t.Errorf("wide terminal should render the wordmark (~70 cells), got max width %d\n%s", w, m.table())
+	if w := maxLineWidth(splashArt(m.table(0))); w < 60 {
+		t.Errorf("wide terminal should render the wordmark (~70 cells), got max width %d\n%s", w, m.table(0))
 	}
 }
 
@@ -77,8 +77,8 @@ func TestEmptyListSplashNarrowUsesPotato(t *testing.T) {
 	t.Setenv("PORTATO_LOGO", "braille")
 	m := New(newFake(), Options{Mode: "standalone"})
 	m.width, m.height = 60, 24
-	if w := maxLineWidth(splashArt(m.table())); w > 50 {
-		t.Errorf("narrow terminal should fall back to the compact potato (~24 cells), got max width %d\n%s", w, m.table())
+	if w := maxLineWidth(splashArt(m.table(0))); w > 50 {
+		t.Errorf("narrow terminal should fall back to the compact potato (~24 cells), got max width %d\n%s", w, m.table(0))
 	}
 }
 

@@ -118,51 +118,97 @@ func (m Model) render() string {
 	if m.editor != nil {
 		return m.centered(m.editor.view())
 	}
-	if m.confirmDelete {
-		return m.centered(m.confirmDeleteView())
+	// Transient progress states stay centered: they are momentary and carry no
+	// context to preserve. The interactive prompts (delete / TOFU / passphrase /
+	// password / quit) instead render in the footer zone via mainView, so the
+	// list stays visible behind them (Phase 39, F7) — the cursor keeps
+	// highlighting the row the prompt refers to.
+	if m.enteringPassphrase && m.passphraseConnecting {
+		return m.centered(m.sproutingView())
 	}
-	if m.confirmAccept {
-		return m.centered(m.confirmAcceptView())
-	}
-	if m.enteringPassphrase {
-		if m.passphraseConnecting {
-			return m.centered(m.sproutingView())
-		}
-		return m.centered(m.passphraseView())
-	}
-	if m.enteringPassword {
-		if m.passwordConnecting {
-			return m.centered(m.sproutingView())
-		}
-		return m.centered(m.passwordView())
-	}
-	if m.confirmQuit {
-		return m.centered(m.confirmQuitView())
+	if m.enteringPassword && m.passwordConnecting {
+		return m.centered(m.sproutingView())
 	}
 	if m.handoffing {
 		return m.centered(m.pal.mode.Render("Starting daemon…"))
 	}
-	// Section separator: dark/mono (transparent surface) get a blank line for
-	// breathing room — it is invisible there (the terminal's own background shows
-	// through, same as the content). Light keeps sections adjacent: a blank
-	// separator would render as the terminal's own background, a dark seam through
-	// the card on terminals that ignore OSC 11 set, and OSC-11-set success is not
-	// detectable, so light assumes the worst case.
-	sep := "\n"
-	if m.pal.surfaceBg == nil {
-		sep = "\n\n"
+	return m.mainView()
+}
+
+// footerZone returns the bottom block of the main view: an interactive prompt
+// (delete / TOFU / passphrase / password / quit) when one is open, otherwise
+// the key-hint footer. The prompt shares the screen with the list — header and
+// table stay rendered above it — so a prompt never erases its context (F7). The
+// connecting "sprouting" and handoff states are routed to centered() in render
+// and never reach here.
+func (m Model) footerZone() string {
+	switch {
+	case m.confirmDelete:
+		return m.confirmDeleteView()
+	case m.confirmAccept:
+		return m.confirmAcceptView()
+	case m.enteringPassphrase:
+		return m.passphraseView()
+	case m.enteringPassword:
+		return m.passwordView()
+	case m.confirmQuit:
+		return m.confirmQuitView()
+	default:
+		return m.footer()
 	}
+}
+
+func (m Model) mainView() string {
+	sep, sepBlank := sectionSep(m.pal)
+	showFilter := m.filtering || m.filter.Value() != ""
+	bottom := m.footerZone()
 	var b strings.Builder
 	b.WriteString(m.header())
 	b.WriteString(sep)
-	b.WriteString(m.table())
+	b.WriteString(m.table(m.tableRowBudget(sepBlank, showFilter, bottom)))
 	b.WriteString(sep)
-	if m.filtering || m.filter.Value() != "" {
+	if showFilter {
 		b.WriteString(m.filterLine())
 		b.WriteString(sep)
 	}
-	b.WriteString(m.footer())
+	b.WriteString(bottom)
 	return insetLines(b.String(), sideMargin)
+}
+
+// sectionSep is the inter-section separator and the number of extra blank
+// lines it contributes (for height budgeting). Dark/mono have a transparent
+// surface, so a blank separator is invisible there (the terminal's own
+// background shows through). Light keeps sections adjacent: a blank would
+// render as the terminal's own background — a dark seam through the card on
+// terminals that ignore OSC 11 set, and OSC-11-set success is not detectable,
+// so light assumes the worst case.
+func sectionSep(pal palette) (sep string, sepBlank int) {
+	if pal.surfaceBg == nil {
+		return "\n\n", 1
+	}
+	return "\n", 0
+}
+
+// tableRowBudget is the maximum number of data rows the table may render so
+// the whole view (header + column header + rows + optional filter + the bottom
+// block) fits m.height. It keeps an interactive prompt on-screen when one
+// shares the view (F7) by shrinking the table vertically. Returns 0 (no cap)
+// before sizing (height 0, unit tests render every row).
+func (m Model) tableRowBudget(sepBlank int, showFilter bool, bottom string) int {
+	if m.height <= 0 {
+		return 0
+	}
+	seps := 2 // header-table, table-(filter|bottom)
+	used := 2 // header line + column-header line
+	if showFilter {
+		used += lipgloss.Height(m.filterLine())
+		seps++ // filter-bottom
+	}
+	used += seps*sepBlank + lipgloss.Height(bottom)
+	if rows := m.height - used; rows >= 1 {
+		return rows
+	}
+	return 1
 }
 
 // centered overlays a single block in the middle of the screen. Width/height
@@ -185,7 +231,7 @@ func (m Model) header() string {
 	return joinRight(left, right, m.width-2*sideMargin)
 }
 
-func (m Model) table() string {
+func (m Model) table(maxRows int) string {
 	if len(m.list) == 0 {
 		hint := m.pal.dim.Render("no tubers — add one to config and press R to reload")
 		if m.height >= splashMinH {
@@ -193,14 +239,12 @@ func (m Model) table() string {
 		}
 		return hint
 	}
-	var rows []int
-	for i, s := range m.list {
-		if m.matches(s) {
-			rows = append(rows, i)
-		}
-	}
+	rows := m.matchedRows()
 	if len(rows) == 0 {
 		return m.pal.dim.Render(fmt.Sprintf("no tubers match %q — esc clears", m.filter.Value()))
+	}
+	if maxRows > 0 && len(rows) > maxRows {
+		rows = m.windowRows(rows, maxRows)
 	}
 	c := m.columnBudget()
 	lines := make([]string, 0, len(rows)+1)
@@ -208,10 +252,49 @@ func (m Model) table() string {
 	for _, i := range rows {
 		lines = append(lines, m.row(i, m.list[i], c))
 	}
-	// No trailing newline: render() joins sections with "\n", and a trailing
+	// No trailing newline: mainView joins sections with "\n", and a trailing
 	// "\n" here would create a whitespace-only separator line (which the v2
 	// renderer strips, leaving a terminal-bg gap in the surface).
 	return strings.Join(lines, "\n")
+}
+
+func (m Model) matchedRows() []int {
+	rows := make([]int, 0, len(m.list))
+	for i, s := range m.list {
+		if m.matches(s) {
+			rows = append(rows, i)
+		}
+	}
+	return rows
+}
+
+// windowRows returns up to limit matched row indices, scrolled so the cursor's
+// row stays visible when the table is taller than the budget. The cursor is
+// anchored at the bottom of the window so the row a prompt refers to sits
+// directly above an open prompt. It is stateless (computed per frame): the
+// cursor does not move while a prompt is open, and in free navigation the view
+// follows the cursor.
+func (m Model) windowRows(rows []int, limit int) []int {
+	pos := 0
+	for j, idx := range rows {
+		if idx == m.cursor {
+			pos = j
+			break
+		}
+	}
+	start := pos - limit + 1
+	if start < 0 {
+		start = 0
+	}
+	end := start + limit
+	if end > len(rows) {
+		end = len(rows)
+		start = end - limit
+		if start < 0 {
+			start = 0
+		}
+	}
+	return rows[start:end]
 }
 
 // splash renders the empty-list state: the centered logo with the hint line

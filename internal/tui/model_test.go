@@ -614,7 +614,7 @@ func TestTableRender_StatusSurvivesNarrow(t *testing.T) {
 		m := New(newFake(statuses...), Options{Mode: "standalone"})
 		m.width = width
 		m.height = 24
-		out := m.table()
+		out := m.table(0)
 		for _, want := range []string{"connected", "error", "off"} {
 			if !strings.Contains(out, want) {
 				t.Errorf("width=%d: status word %q missing from table\n%s", width, want, out)
@@ -626,7 +626,7 @@ func TestTableRender_StatusSurvivesNarrow(t *testing.T) {
 		m := New(newFake(statuses...), Options{Mode: "standalone"})
 		m.width = width
 		m.height = 24
-		if out := m.table(); !strings.Contains(out, "…") {
+		if out := m.table(0); !strings.Contains(out, "…") {
 			t.Errorf("width=%d: expected an endpoint ellipsis, got none\n%s", width, out)
 		}
 	}
@@ -688,9 +688,9 @@ func TestColumnHeader_FitsBudget(t *testing.T) {
 		}
 
 		// (b) Header and every populated data row agree column-for-column.
-		lines := strings.Split(m.table(), "\n")
+		lines := strings.Split(m.table(0), "\n")
 		if len(lines) < 2 {
-			t.Fatalf("width=%d: table produced no data rows\n%s", width, m.table())
+			t.Fatalf("width=%d: table produced no data rows\n%s", width, m.table(0))
 		}
 		want := lipgloss.Width(stripAnsi(lines[0]))
 		for i, ln := range lines[1:] {
