@@ -632,6 +632,76 @@ func TestTableRender_StatusSurvivesNarrow(t *testing.T) {
 	}
 }
 
+// TestFitEndpointHeader locks the ENDPOINT header degradation tiers: the full
+// word when the column holds it, "EP" in the mid-squeeze band, "…" at the
+// floor. This mirrors fitTypeHeader and is what keeps the header inside its
+// cell — the pre-fix pad("ENDPOINT", epW) overflowed on narrow terminals
+// because pad never truncates.
+func TestFitEndpointHeader(t *testing.T) {
+	for _, tc := range []struct {
+		w    int
+		want string
+	}{
+		{1, "…"},
+		{2, "EP"},
+		{7, "EP"},
+		{8, "ENDPOINT"},
+		{12, "ENDPOINT"},
+	} {
+		got := fitEndpointHeader(tc.w)
+		if got != tc.want {
+			t.Errorf("fitEndpointHeader(%d) = %q, want %q", tc.w, got, tc.want)
+		}
+		if w := lipgloss.Width(got); w > tc.w {
+			t.Errorf("fitEndpointHeader(%d) = %q (width %d) exceeds the budget", tc.w, got, w)
+		}
+	}
+}
+
+// TestColumnHeader_FitsBudget is the regression test for the ENDPOINT header
+// overflow: pad("ENDPOINT", epW) used to render the full 8-wide label, pushing
+// the STATUS header right and UPTIME off-screen on widths below 62, where
+// columnBudget squeezes epW under 8. The header must now stay within the
+// column budget and agree column-for-column with the data rows at every width.
+func TestColumnHeader_FitsBudget(t *testing.T) {
+	// Connected + a past ConnectedAt so every row carries a populated UPTIME
+	// cell; idle rows have a blank UPTIME and are legitimately narrower, which
+	// would false-fail a header-vs-row width comparison.
+	statuses := []controller.Status{
+		{Name: "db", Type: "local", Local: "127.0.0.1:5432", Remote: "db.internal.example.com:5432", State: controller.Connected, ConnectedAt: time.Now().Add(-time.Minute)},
+		{Name: "pntr-sberhealth-browser", Type: "dynamic", Local: "1080", State: controller.Connected, ConnectedAt: time.Now().Add(-2 * time.Minute)},
+		{Name: "tv-socks", Type: "remote", Local: "8080", Remote: "127.0.0.1:9090", State: controller.Connected, ConnectedAt: time.Now().Add(-time.Hour)},
+	}
+	const lead = 4
+	for _, width := range []int{48, 55, 62} {
+		m := New(newFake(statuses...), Options{Mode: "standalone"})
+		m.width = width
+		m.height = 24
+		c := m.columnBudget()
+
+		// (a) The header line width equals the column-budget line width: the
+		// ENDPOINT header must occupy exactly its cell, not overflow it.
+		hdr := stripAnsi(columnHeader(m.pal, c))
+		lineWidth := lead + 4*len(gutter) + c.nameW + c.typeW + c.epW + c.statusW + c.upW
+		if hw := lipgloss.Width(hdr); hw != lineWidth {
+			t.Errorf("width=%d epW=%d: header width %d != line width %d\nheader: %q", width, c.epW, hw, lineWidth, hdr)
+		}
+
+		// (b) Header and every populated data row agree column-for-column.
+		lines := strings.Split(m.table(), "\n")
+		if len(lines) < 2 {
+			t.Fatalf("width=%d: table produced no data rows\n%s", width, m.table())
+		}
+		want := lipgloss.Width(stripAnsi(lines[0]))
+		for i, ln := range lines[1:] {
+			if w := lipgloss.Width(stripAnsi(ln)); w != want {
+				t.Errorf("width=%d row %d width %d != header %d (epW=%d)\nhdr: %q\nrow: %q",
+					width, i, w, want, c.epW, stripAnsi(lines[0]), stripAnsi(ln))
+			}
+		}
+	}
+}
+
 func TestRowColumnNameAlignment(t *testing.T) {
 	statuses := []controller.Status{
 		{Name: "db", Type: "local", Local: "1", Remote: "r"},

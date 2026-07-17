@@ -337,12 +337,27 @@ func fitTypeHeader(w int) string {
 	return ""
 }
 
+// fitEndpointHeader is the ENDPOINT column-header analogue of fitTypeHeader:
+// the full word when the column holds it, otherwise a degraded label that fits
+// the budget. Without this pad("ENDPOINT", epW) overflows on narrow terminals
+// (pad never truncates), shifting STATUS right and pushing UPTIME off-screen
+// even though the data cells (via fitEndpoint) honour epW.
+func fitEndpointHeader(w int) string {
+	if w >= len("ENDPOINT") {
+		return "ENDPOINT"
+	}
+	if w >= len("EP") {
+		return "EP"
+	}
+	return "…"
+}
+
 func columnHeader(pal palette, c columns) string {
 	return pal.header.Render(
 		"    " +
 			pad("NAME", c.nameW) + gutter +
 			pad(fitTypeHeader(c.typeW), c.typeW) + gutter +
-			pad("ENDPOINT", c.epW) + gutter +
+			pad(fitEndpointHeader(c.epW), c.epW) + gutter +
 			pad("STATUS", c.statusW) + gutter +
 			fmt.Sprintf("%*s", c.upW, "UPTIME"),
 	)
