@@ -496,6 +496,33 @@ func TestFitName(t *testing.T) {
 	})
 }
 
+func assertBudgetInvariants(t *testing.T, c columns, width int) {
+	t.Helper()
+	if c.statusW != colStatus {
+		t.Errorf("statusW=%d want colStatus=%d (untouchable)", c.statusW, colStatus)
+	}
+	if c.upW != uptimeBudget {
+		t.Errorf("upW=%d want uptimeBudget=%d", c.upW, uptimeBudget)
+	}
+	if c.typeW != colType {
+		t.Errorf("typeW=%d want colType=%d (full words at this width)", c.typeW, colType)
+	}
+	if c.nameW < minName || c.nameW > maxName {
+		t.Errorf("nameW=%d out of [%d,%d]", c.nameW, minName, maxName)
+	}
+	if c.epW > colEndpoint {
+		t.Errorf("epW=%d > colEndpoint=%d", c.epW, colEndpoint)
+	}
+	if c.epW < 1 {
+		t.Errorf("epW=%d must be >= 1 (truncate would panic)", c.epW)
+	}
+	const lead = 4
+	total := lead + 2*sideMargin + 4*len(gutter) + c.nameW + c.typeW + c.epW + c.statusW + c.upW
+	if total > width {
+		t.Errorf("total column width %d > terminal %d (ragged)", total, width)
+	}
+}
+
 func TestColumnBudget(t *testing.T) {
 	mixed := []controller.Status{
 		{Name: "db"},
@@ -519,30 +546,7 @@ func TestColumnBudget(t *testing.T) {
 		t.Run(fmt.Sprintf("field width=%d", width), func(t *testing.T) {
 			m := New(newFake(mixed...), Options{Mode: "standalone"})
 			m.width = width
-			c := m.columnBudget()
-			if c.statusW != colStatus {
-				t.Errorf("statusW=%d want colStatus=%d (untouchable)", c.statusW, colStatus)
-			}
-			if c.upW != uptimeBudget {
-				t.Errorf("upW=%d want uptimeBudget=%d", c.upW, uptimeBudget)
-			}
-			if c.typeW != colType {
-				t.Errorf("typeW=%d want colType=%d (full words at this width)", c.typeW, colType)
-			}
-			if c.nameW < minName || c.nameW > maxName {
-				t.Errorf("nameW=%d out of [%d,%d]", c.nameW, minName, maxName)
-			}
-			if c.epW > colEndpoint {
-				t.Errorf("epW=%d > colEndpoint=%d", c.epW, colEndpoint)
-			}
-			if c.epW < 1 {
-				t.Errorf("epW=%d must be >= 1 (truncate would panic)", c.epW)
-			}
-			const lead = 4
-			total := lead + 2*sideMargin + 4*len(gutter) + c.nameW + c.typeW + c.epW + c.statusW + c.upW
-			if total > width {
-				t.Errorf("total column width %d > terminal %d (ragged)", total, width)
-			}
+			assertBudgetInvariants(t, m.columnBudget(), width)
 		})
 	}
 
