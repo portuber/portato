@@ -1,7 +1,7 @@
 ---
 phase: 38
 title: TUI responsive layout (footer, help, columns)
-status: in-progress
+status: done
 depends_on: [23]
 ---
 
@@ -56,42 +56,42 @@ shrinking first instead of the most-important one dying.
 ## Tasks
 
 ### A — footer that fits
-- [ ] `view.go` `footer()` — replace the single fixed string with a width-aware
+- [x] `view.go` `footer()` — replace the single fixed string with a width-aware
       build: either `bubbles/help` + a `key.Map`, or a priority-fit (`? help`,
       `q quit`, `space toggle` first, append the rest while they fit). Must
       honor `m.width`.
 
 ### B — reachable help
-- [ ] `view.go` / new help model — render `?` help as a full-screen view (or a
+- [x] `view.go` / new help model — render `?` help as a full-screen view (or a
       centered scrollable overlay) so all 17 bindings are reachable at 80×24.
-- [ ] Drop or relocate the `splashMinH`-gated logo so it never pushes the
+- [x] Drop or relocate the `splashMinH`-gated logo so it never pushes the
       binding list off-screen; show the logo only when the list fits beneath it.
 
 ### C — column shrink priority
-- [ ] `view.go` — introduce a shrink order: STATUS + indicator untouchable,
+- [x] `view.go` — introduce a shrink order: STATUS + indicator untouchable,
       ENDPOINT shrinks first (reuse `fitEndpoint`/`middleTruncate`), TYPE
       degrades to `L/R/D` when very tight, NAME stays flex, UPTIME
       right-aligned.
-- [ ] `view.go` `nameWidth()` / `row()` / `columnHeader()` — make ENDPOINT
+- [x] `view.go` `nameWidth()` / `row()` / `columnHeader()` — make ENDPOINT
       width-aware (currently fixed `colEndpoint=48`); hand it a budget derived
       from `m.width` after the untouchable columns are reserved.
 
 ### D — bookkeeping
-- [ ] `docs/ROADMAP.md` — phase-38 row added at plan time; flip status on
+- [x] `docs/ROADMAP.md` — phase-38 row added at plan time; flip status on
       start/complete.
-- [ ] This file — flip status on start/complete.
+- [x] This file — flip status on start/complete.
 
 ## Definition of Done
 
-- [ ] At 80 cols, `? help` and `q quit` are visible in the footer; nothing is
+- [x] At 80 cols, `? help` and `q quit` are visible in the footer; nothing is
       cut mid-word at 60 cols.
-- [ ] At 80×24, pressing `?` shows all 17 bindings (scroll is acceptable); the
+- [x] At 80×24, pressing `?` shows all 17 bindings (scroll is acceptable); the
       logo does not push them off-screen.
-- [ ] At 80 cols the full status word (`connected` / `error` / `off`) is visible
+- [x] At 80 cols the full status word (`connected` / `error` / `off`) is visible
       for every row; ENDPOINT middle-truncates instead.
-- [ ] The right edge is never ragged: slack goes to the flex (NAME) column.
-- [ ] No regression at 120×35 (the reference size) — full layout as today.
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean;
+- [x] The right edge is never ragged: slack goes to the flex (NAME) column.
+- [x] No regression at 120×35 (the reference size) — full layout as today.
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean;
       `make lint` is clean.
 
 ## Verification
