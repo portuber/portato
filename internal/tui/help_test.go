@@ -16,7 +16,7 @@ import (
 func TestHelpView_AllBindingsReachable(t *testing.T) {
 	m := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
 	m.width, m.height = 80, 24
-	m.help = newHelpView(m.pal, m.kind, m.width, m.height)
+	m.help = newHelpView(m.pal, m.kind, m.width, m.height, m.attach)
 	out := m.render()
 
 	if !strings.Contains(out, "Portato") || !strings.Contains(out, "Help") {
@@ -25,7 +25,7 @@ func TestHelpView_AllBindingsReachable(t *testing.T) {
 	if !strings.Contains(out, "?/esc close") {
 		t.Errorf("help view missing the close-hint footer\n%s", out)
 	}
-	for _, line := range helpLines() {
+	for _, line := range helpLines(false) {
 		if !strings.Contains(out, line) {
 			t.Errorf("80x24 help missing binding line %q\n%s", line, out)
 		}
@@ -37,7 +37,7 @@ func TestHelpView_AllBindingsReachable(t *testing.T) {
 // quitting the app — is the expected sub-model behaviour.
 func TestHelpView_CloseKeys(t *testing.T) {
 	for _, k := range []string{"esc", "?", "q"} {
-		hv := newHelpView(darkPalette(), themeDark, 80, 24)
+		hv := newHelpView(darkPalette(), themeDark, 80, 24, false)
 		hv.handleKey(tea.KeyPressMsg{Text: k})
 		if !hv.done {
 			t.Errorf("%q should close the help view", k)
@@ -49,7 +49,7 @@ func TestHelpView_CloseKeys(t *testing.T) {
 // without closing (so the user can reach every binding on a short terminal).
 func TestHelpView_ScrollKeysDontClose(t *testing.T) {
 	for _, k := range []string{"down", "j", "pgdown", "G"} {
-		hv := newHelpView(darkPalette(), themeDark, 80, 8) // short: 8 rows → viewport 5
+		hv := newHelpView(darkPalette(), themeDark, 80, 8, false) // short: 8 rows → viewport 5
 		hv.handleKey(tea.KeyPressMsg{Text: k})
 		if hv.done {
 			t.Errorf("%q should scroll, not close, the help view", k)

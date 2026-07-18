@@ -22,12 +22,13 @@ type helpView struct {
 	pal           palette
 	kind          themeKind
 	width, height int
+	attach        bool
 	done          bool
 }
 
-func newHelpView(pal palette, kind themeKind, width, height int) *helpView {
+func newHelpView(pal palette, kind themeKind, width, height int, attach bool) *helpView {
 	vp := viewport.New(viewport.WithWidth(helpWidth(width)), viewport.WithHeight(helpHeight(height)))
-	hv := &helpView{vp: vp, pal: pal, kind: kind, width: width, height: height}
+	hv := &helpView{vp: vp, pal: pal, kind: kind, width: width, height: height, attach: attach}
 	hv.refresh()
 	return hv
 }
@@ -59,7 +60,7 @@ func (h *helpView) refresh() {
 // measured at runtime so the gate holds for any detected art mode
 // (braille/block) and for PORTATO_LOGO=off (empty art skips the block).
 func (h *helpView) content() string {
-	lines := helpLines()
+	lines := helpLines(h.attach)
 	list := strings.Join(lines, "\n")
 	art := logo.Banner(h.pal.title, h.kind == themeMono)
 	if art == "" {

@@ -23,7 +23,16 @@ type binding struct {
 // the footer's natural reading order. The last two entries (? help, q quit)
 // are the UI-unlocking keys the footer always reserves at its tail; the help
 // view simply renders every binding's help lines in the same order.
-func tuberBindings() []binding {
+//
+// The q-quit help line is mode-aware (Phase 39, Task D): in standalone a quit
+// offers to background running tubers (the hand-off modal), in attach the
+// tubers keep running on the daemon regardless. The footer token stays "q
+// quit" in both modes.
+func tuberBindings(attach bool) []binding {
+	quitHelp := "quit (offers to background running tubers)"
+	if attach {
+		quitHelp = "quit (tubers keep running in the daemon)"
+	}
 	return []binding{
 		{foot: "↑↓/jk move", needsList: true, help: []string{
 			"↑ / k        move cursor up",
@@ -70,16 +79,17 @@ func tuberBindings() []binding {
 			"? / esc      toggle this help",
 		}},
 		{foot: "q quit", help: []string{
-			"q / ctrl+c   quit (stops all tubers)",
+			"q / ctrl+c   " + quitHelp,
 		}},
 	}
 }
 
 // helpLines flattens the bindings into the ordered help-view line list. The
 // help view renders these verbatim (Task B); keeping the assembly here lets
-// the footer and help share one source.
-func helpLines() []string {
-	b := tuberBindings()
+// the footer and help share one source. attach is forwarded to tuberBindings
+// for the mode-aware q-quit line.
+func helpLines(attach bool) []string {
+	b := tuberBindings(attach)
 	out := make([]string, 0, len(b)+2)
 	for _, e := range b {
 		out = append(out, e.help...)

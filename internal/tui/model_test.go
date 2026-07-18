@@ -311,7 +311,7 @@ func TestModel_RenderContainsTubers(t *testing.T) {
 		t.Error("render should show error text")
 	}
 
-	m.help = newHelpView(m.pal, m.kind, m.width, m.height)
+	m.help = newHelpView(m.pal, m.kind, m.width, m.height, m.attach)
 	if !strings.Contains(m.render(), "move cursor up") {
 		t.Error("render should show the help view when help is open")
 	}
@@ -760,6 +760,27 @@ func TestModel_QuitStandaloneNoLiveQuits(t *testing.T) {
 	_, cmd := m.handleKey(keyPress("q"))
 	if cmd == nil {
 		t.Error("standalone q with no live tubers should quit immediately")
+	}
+}
+
+// TestModel_QuitStandaloneErrorTuberShowsModal guards the F10 fix (Phase 39):
+// an enabled tuber in the Error state is mid-retry (Connecting → Error →
+// backoff → Connecting), so q must raise the confirm modal — same as one
+// second earlier in Reconnecting. Previously Error was excluded from
+// hasLiveTubers and q exited silently during the Error window.
+func TestModel_QuitStandaloneErrorTuberShowsModal(t *testing.T) {
+	f := newFake(controller.Status{Name: "a", State: controller.Error})
+	m := New(f, Options{Mode: "standalone"})
+	next, cmd := m.handleKey(keyPress("q"))
+	mm := next.(Model)
+	if !mm.confirmQuit {
+		t.Fatal("standalone q with an enabled Error-state tuber should raise the confirm modal (F10)")
+	}
+	if mm.quit || cmd != nil {
+		t.Errorf("should not quit immediately while the modal is up: quit=%v cmd=%v", mm.quit, cmd)
+	}
+	if !strings.Contains(mm.render(), "still active") {
+		t.Errorf("modal should render the active count\n%s", mm.render())
 	}
 }
 

@@ -13,7 +13,7 @@ import (
 // algorithm never emits a partial (mid-word) token.
 func footSet() map[string]bool {
 	set := make(map[string]bool)
-	for _, e := range tuberBindings() {
+	for _, e := range tuberBindings(false) {
 		set[e.foot] = true
 	}
 	return set
@@ -95,7 +95,7 @@ func TestFooter_FitsWidth(t *testing.T) {
 // validFooterShape reports whether the token slice is exactly [contiguous
 // prefix of the natural-order middle] + ["? help", "q quit"].
 func validFooterShape(tokens []string) bool {
-	b := tuberBindings()
+	b := tuberBindings(false)
 	middle := b[:len(b)-2]
 	if len(tokens) < 2 {
 		return false
@@ -123,19 +123,23 @@ func TestFooter_SharedSource(t *testing.T) {
 	wantFull := "↑↓/jk move · space toggle · p passphrase · o password · " +
 		"r restart · a/x all · e edit · n new · C duplicate · d delete · " +
 		"l logs · / filter · R reload · ? help · q quit"
-	if got := joinFeet(tuberBindings(), " · "); got != wantFull {
+	if got := joinFeet(tuberBindings(false), " · "); got != wantFull {
 		t.Errorf("joinFeet mismatch:\n got: %q\nwant: %q", got, wantFull)
 	}
 	// Help line count matches the audit's 17 (up/down and a/x expand to two).
-	lines := helpLines()
+	lines := helpLines(false)
 	if len(lines) != 17 {
 		t.Errorf("helpLines len = %d, want 17", len(lines))
 	}
-	// The "q quit" wording is shared: footer foot and help line agree on the
-	// key surface (this is the drift the audit flagged — "q quit" vs
-	// "q quit (stops all tubers)" — now both live on one binding).
-	if !strings.Contains(helpLines()[len(lines)-1], "quit (stops all tubers)") {
-		t.Errorf("last help line lost the (stops all tubers) tail: %q", helpLines()[len(lines)-1])
+	// The q-quit help line is mode-aware (Phase 39, Task D): standalone offers
+	// to background running tubers; attach notes they keep running in the daemon.
+	standalone := helpLines(false)[len(lines)-1]
+	if !strings.Contains(standalone, "offers to background running tubers") {
+		t.Errorf("standalone last help line lost the background tail: %q", standalone)
+	}
+	attach := helpLines(true)
+	if got := attach[len(attach)-1]; !strings.Contains(got, "keep running in the daemon") {
+		t.Errorf("attach last help line = %q, want the daemon tail", got)
 	}
 }
 

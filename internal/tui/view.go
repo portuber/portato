@@ -592,7 +592,7 @@ func formatUptime(d time.Duration) string {
 
 func (m Model) footer() string {
 	const sep = " · "
-	b := tuberBindings()
+	b := tuberBindings(m.attach)
 	// Empty list: drop bindings that act on the selected tuber (they are
 	// meaningless with nothing to act on), keeping only the always-applicable
 	// ones (n new, R reload, ? help, q quit). Phase 39, Task C / F9.
@@ -654,16 +654,23 @@ func joinFeet(b []binding, sep string) string {
 }
 
 // confirmQuitView renders the "leave running in background?" modal shown when
-// quitting a standalone TUI that still has live tubers.
+// quitting a standalone TUI that still has live tubers. The count agrees with
+// hasLiveTubers: an enabled tuber in the Error state is mid-retry, so it is
+// treated as live (Phase 39, F10) — quitting would abandon the retry unless
+// handed off to the daemon.
 func (m Model) confirmQuitView() string {
 	n := 0
 	for _, s := range m.list {
 		switch s.State {
-		case controller.Connecting, controller.Connected, controller.Reconnecting:
+		case controller.Connecting, controller.Connected, controller.Reconnecting, controller.Error:
 			n++
 		}
 	}
-	line := fmt.Sprintf("%d tuber(s) active.\nLeave them running in the background? [y/N]", n)
+	noun := "tubers"
+	if n == 1 {
+		noun = "tuber"
+	}
+	line := fmt.Sprintf("%d %s still active.\nLeave them running in the background? [y/N]", n, noun)
 	return m.pal.modal.Render(line)
 }
 

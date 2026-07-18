@@ -286,7 +286,7 @@ func (m Model) handleQuitAndViewKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		if m.help != nil {
 			m.help = nil
 		} else {
-			m.help = newHelpView(m.pal, m.kind, m.width, m.height)
+			m.help = newHelpView(m.pal, m.kind, m.width, m.height, m.attach)
 		}
 		return m, nil
 	}
@@ -747,10 +747,18 @@ func (m Model) handoffCmd() tea.Cmd {
 	}
 }
 
+// hasLiveTubers reports whether any tuber is live for the purposes of the quit
+// gate: Connecting/Connected/Reconnecting, and also Error — an enabled tuber
+// in the Error state is mid-retry (Connecting → Error → backoff → Connecting),
+// so quitting during the Error window would abandon the retry unless the tuber
+// is handed off to the daemon. Treating Error as live closes the F10 hole
+// (Phase 39): q during the Error window now raises the confirm modal, same as
+// one second earlier (Reconnecting). It only ever adds a confirm step, never
+// removes one.
 func (m Model) hasLiveTubers() bool {
 	for _, s := range m.list {
 		switch s.State {
-		case controller.Connecting, controller.Connected, controller.Reconnecting:
+		case controller.Connecting, controller.Connected, controller.Reconnecting, controller.Error:
 			return true
 		}
 	}

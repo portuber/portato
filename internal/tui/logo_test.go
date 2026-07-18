@@ -91,7 +91,7 @@ func TestHelpLogoListFirst(t *testing.T) {
 	// 80x24: bindings fill the viewport, no room for the logo in addition.
 	m := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
 	m.width, m.height = 80, 24
-	m.help = newHelpView(m.pal, m.kind, m.width, m.height)
+	m.help = newHelpView(m.pal, m.kind, m.width, m.height, m.attach)
 	out := m.render()
 	if hasBraille(out) {
 		t.Errorf("80x24 help should omit the logo so the bindings fit\n%s", out)
@@ -102,7 +102,7 @@ func TestHelpLogoListFirst(t *testing.T) {
 	// Tall terminal: the logo fits in addition to the full binding list.
 	tall := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
 	tall.width, tall.height = 120, 80
-	tall.help = newHelpView(tall.pal, tall.kind, tall.width, tall.height)
+	tall.help = newHelpView(tall.pal, tall.kind, tall.width, tall.height, tall.attach)
 	tallOut := tall.render()
 	if !hasBraille(tallOut) {
 		t.Errorf("tall help should render the logo in addition to the list\n%s", tallOut)
@@ -125,7 +125,7 @@ func TestLogoOffHidesBranding(t *testing.T) {
 
 	m2 := New(newFake(controller.Status{Name: "a"}), Options{Mode: "standalone"})
 	m2.width, m2.height = 80, 24
-	m2.help = newHelpView(m2.pal, m2.kind, m2.width, m2.height)
+	m2.help = newHelpView(m2.pal, m2.kind, m2.width, m2.height, m2.attach)
 	out2 := m2.render()
 	if hasBraille(out2) {
 		t.Errorf("PORTATO_LOGO=off should hide the help logo\n%s", out2)
