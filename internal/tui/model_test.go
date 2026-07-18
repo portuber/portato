@@ -1022,6 +1022,63 @@ func TestRenderErrorIndicatorDistinct(t *testing.T) {
 	}
 }
 
+// TestRender_ErrorDetailStrip pins Phase 39 F13: the selected row's full error
+// renders in a one-line strip above the footer, so the conflicting port at the
+// tail of a listen-conflict error stays visible (the row's 18-cell hint cuts
+// the middle). The strip only appears for the selected erroring row.
+func TestRender_ErrorDetailStrip(t *testing.T) {
+	fullErr := "listen tcp 127.0.0.1:3306: bind: address already in use"
+	f := newFake(controller.Status{Name: "db", Type: "local", Local: "1", Remote: "r", State: controller.Error, Error: fullErr})
+	m := New(f, Options{Mode: "standalone"})
+	m.width, m.height = 100, 24
+	out := m.render()
+	if !strings.Contains(out, "↳") {
+		t.Errorf("detail strip should be prefixed with the link arrow\ngot:\n%s", out)
+	}
+	if !strings.Contains(out, fullErr) {
+		t.Errorf("detail strip should show the full error\ngot:\n%s", out)
+	}
+	if !strings.Contains(out, "3306") {
+		t.Errorf("the conflicting port should be visible (via the strip)\ngot:\n%s", out)
+	}
+
+	// No strip when the selected row has no error.
+	m2 := New(newFake(controller.Status{Name: "ok", State: controller.Connected}), Options{Mode: "standalone"})
+	m2.width, m2.height = 100, 24
+	if strings.Contains(m2.render(), "↳") {
+		t.Error("no detail strip when the selected row has no error")
+	}
+}
+
+// TestTruncateTail pins the inverse of truncate: it keeps the tail (where the
+// actionable port/address lives) and prefixes an ellipsis.
+func TestTruncateTail(t *testing.T) {
+	cases := []struct {
+		in   string
+		n    int
+		want string
+	}{
+		{"abc", 5, "abc"},
+		{"", 5, ""},
+		{"abc", 1, "…"},
+		{"abc", 2, "…c"},
+		{"abcdef", 4, "…def"},
+	}
+	for _, c := range cases {
+		if got := truncateTail(c.in, c.n); got != c.want {
+			t.Errorf("truncateTail(%q,%d) = %q, want %q", c.in, c.n, got, c.want)
+		}
+	}
+	err := "listen tcp 127.0.0.1:3306: bind: address already in use"
+	got := truncateTail(err, 18)
+	if !strings.HasPrefix(got, "…") {
+		t.Errorf("tail-truncated error should start with …, got %q", got)
+	}
+	if lipgloss.Width(got) > 18 {
+		t.Errorf("tail-truncated error width %d > 18, got %q", lipgloss.Width(got), got)
+	}
+}
+
 func TestModel_TickIgnoredDuringHandoff(t *testing.T) {
 	f := newFake(controller.Status{Name: "a", State: controller.Connected})
 	m := New(f, Options{Mode: "standalone", CfgPath: "/cfg"})

@@ -162,19 +162,33 @@ func (m Model) mainView() string {
 	sep, sepBlank := sectionSep(m.pal)
 	showFilter := m.filtering || m.filter.Value() != ""
 	bottom := m.footerZone()
-	budget := m.tableRowBudget(sepBlank, showFilter, bottom)
 
-	topSections := []string{m.header(), m.table(budget)}
+	// Error detail strip (Phase 39, F13): the selected row's full error, one
+	// line directly above the footer. Only with the plain footer — a modal is
+	// the focus when one is open — and only when the selected row actually has
+	// an error. It is bundled into the pinned bottom block so the table shrinks
+	// to make room and the footer stays on the last row.
+	var detail string
+	if !m.hasPrompt() && m.hasCurrent() && m.list[m.cursor].Error != "" {
+		detail = m.errorDetail(m.list[m.cursor].Error)
+	}
+	bottomBlock := bottom
+	if detail != "" {
+		bottomBlock = detail + sep + bottom
+	}
+
+	topSections := []string{m.header(), m.table(m.tableRowBudget(sepBlank, showFilter, bottomBlock))}
 	if showFilter {
 		topSections = append(topSections, m.filterLine())
 	}
 	top := strings.Join(topSections, sep)
 
-	// Pin the bottom block (footer or prompt) to the last row: insert blank pad
-	// lines between the top content and the bottom block so the whole view is
-	// exactly m.height rows tall. tableRowBudget caps the table so the pad is
-	// never negative; multi-line prompts shrink the table further. Before sizing
-	// (height 0) no pad is inserted, matching the un-sized output.
+	// Pin the bottom block (detail strip + footer/prompt) to the last row:
+	// insert blank pad lines between the top content and the bottom block so
+	// the whole view is exactly m.height rows tall. tableRowBudget caps the
+	// table so the pad is never negative; multi-line prompts shrink the table
+	// further. Before sizing (height 0) no pad is inserted, matching the
+	// un-sized output.
 	//
 	// Pad colour (measured, Phase 39): the pad rows are whitespace-only, and
 	// whitespace-only rows lose their bg SGR on non-honoring terminals
@@ -188,13 +202,34 @@ func (m Model) mainView() string {
 	// itself is positional and works in every theme.
 	parts := []string{top}
 	if m.height > 0 {
-		padLines := m.height - lipgloss.Height(top) - lipgloss.Height(bottom)
+		padLines := m.height - lipgloss.Height(top) - lipgloss.Height(bottomBlock)
 		for i := 0; i < padLines; i++ {
 			parts = append(parts, "")
 		}
 	}
-	parts = append(parts, bottom)
+	parts = append(parts, bottomBlock)
 	return insetLines(strings.Join(parts, "\n"), sideMargin)
+}
+
+// hasPrompt reports whether an interactive modal prompt is currently open in
+// the footer zone (delete / TOFU / passphrase / password / quit). Used to
+// suppress the error-detail strip — a modal is the focus when open.
+func (m Model) hasPrompt() bool {
+	return m.confirmDelete || m.confirmAccept || m.enteringPassphrase || m.enteringPassword || m.confirmQuit
+}
+
+// errorDetail renders the one-line error strip shown above the footer for the
+// selected row's full error (Phase 39, F13). The leading arrow links it to the
+// row above; the body is tail-truncated to the width so the conflicting port
+// at the end of a listen-conflict error stays visible.
+func (m Model) errorDetail(err string) string {
+	const prefix = "↳ "
+	avail := m.width - 2*sideMargin - lipgloss.Width(prefix)
+	body := err
+	if avail >= 4 {
+		body = truncateTail(err, avail)
+	}
+	return m.pal.err.Render(prefix) + m.pal.body.Render(body)
 }
 
 // sectionSep is the inter-section separator and the number of extra blank
@@ -476,7 +511,7 @@ func (m Model) row(i int, s controller.Status, c columns) string {
 	endpoint := fitEndpoint(s.Endpoint(), c.epW)
 	status := stateLabel(m.pal, s.State)
 	if s.Error != "" {
-		status += " " + m.pal.dim.Render(truncate(s.Error, 18))
+		status += " " + m.pal.dim.Render(truncateTail(s.Error, 18))
 	}
 	// Phase 19: a dial blocked on a passphrase-protected identity is in
 	// Connecting with PendingPassphrase set; flag it with the key that opens
@@ -821,6 +856,25 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n-1] + "…"
+}
+
+// truncateTail caps s to n display cells keeping the TAIL (prefixing an
+// ellipsis) — the inverse of truncate. The actionable part of a forwarder/SSH
+// error lives at the end (the conflicting port, the unresolved address), so a
+// listen-conflict error keeps ":3306: bind: address already in use" visible
+// instead of cutting at the port (Phase 39, F13).
+func truncateTail(s string, n int) string {
+	if n < 1 {
+		return s
+	}
+	if lipgloss.Width(s) <= n {
+		return s
+	}
+	r := []rune(s)
+	for lipgloss.Width(string(r)) >= n && len(r) > 0 {
+		r = r[1:]
+	}
+	return "…" + string(r)
 }
 
 // fitEndpoint shrinks an endpoint to at most max display cells, keeping the
