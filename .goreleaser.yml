@@ -135,6 +135,7 @@ nfpms:
     formats:
       - deb
       - rpm
+      - apk # Alpine (musl) — the static CGO_ENABLED=0 binary runs on it as-is.
     contents:
       - src: ./LICENSE
         dst: /usr/share/doc/portato/LICENSE

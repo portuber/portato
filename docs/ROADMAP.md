@@ -64,7 +64,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 2. **Parallelism:** at most **one** phase may be in work (`[~]`) at a time.
 3. **Definition of Done:** every "Definition of Done" item in the phase file must be `[x]` before the phase status becomes `[x]`.
 4. **Who moves statuses:** the human says "start phase N" / "complete phase N"; the agent verifies the conditions and edits the phase file + this table.
-5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–31 (post-MVP backlog) are planned in detail — all are done (`[x]`), including **17 (Windows)** (IPC over a named pipe via `go-winio`, autostart via the HKCU registry Run key, `windows-smoke` CI green). Phase 21 (packaging) is done (`[x]`): **v0.3.x** is released (GitHub Release + Homebrew cask + Scoop bucket + deb/rpm).
+5. **Level of detail:** phases 0–6 (MVP) and 7–15 (post-MVP) are described in detail above and complete (`[x]`); phases 16–22, 24–31 (post-MVP backlog) are planned in detail — all are done (`[x]`), including **17 (Windows)** (IPC over a named pipe via `go-winio`, autostart via the HKCU registry Run key, `windows-smoke` CI green). Phase 21 (packaging) is done (`[x]`): **v0.4.x** is the release line (GitHub Release + Homebrew cask + Scoop bucket + deb/rpm/apk).
 
 ## Current focus
 
@@ -85,7 +85,7 @@ end-to-end on a real Windows host (named-pipe IPC, daemon/TUI, password auth,
 TOFU host-key prompt, reconnect loop); the `windows-smoke` CI job then ran
 green on main (install/uninstall + daemon/list round-trip over the named pipe).
 `portato doctor` and ssh-agent-over-named-pipe remain maintainer-accepted (see
-phase-17 "Verification status"). Phase 21 (packaging) is done: **v0.3.x is the latest release line** (GitHub Release + Homebrew cask + Scoop bucket + deb/rpm, bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); the Scoop auto-publish pipeline is proven (a release end-to-end, including the Scoop bucket commit, ran green). Phase 34 (`portato license` + `--license`) and Phase 35 (SSH password auth, on by default) shipped in v0.3.0; v0.3.1/v0.3.2 are release-pipeline patches (Scoop publishing) over identical binaries.** The single binary runs the smart launcher
+phase-17 "Verification status"). Phase 21 (packaging) is done: **v0.4.x is the latest release line — v0.4.0 shipped phases 36–39, v0.4.1 adds the Alpine apk package** (GitHub Release + Homebrew cask + Scoop bucket + deb/rpm/apk, bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); the Scoop auto-publish pipeline is proven (a release end-to-end, including the Scoop bucket commit, ran green). Phase 34 (`portato license` + `--license`) and Phase 35 (SSH password auth, on by default) shipped in v0.3.0; v0.3.1/v0.3.2 are release-pipeline patches (Scoop publishing) over identical binaries; v0.4.0 shipped phases 36–39 (CI security hardening, TUI theme portability, responsive layout, TUI polish).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports

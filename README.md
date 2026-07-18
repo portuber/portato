@@ -77,6 +77,17 @@ sudo dpkg -i portato_<version>_linux_amd64.deb
 # or: sudo rpm -i portato_<version>_linux_amd64.rpm
 ```
 
+**Alpine** (apk) — from the
+[latest release](https://github.com/portuber/portato/releases/latest):
+
+```sh
+sudo apk add --allow-untrusted portato_<version>_linux_amd64.apk
+# arm64 (e.g. Raspberry Pi): portato_<version>_linux_arm64.apk
+```
+
+The apk is unsigned, so `--allow-untrusted` is required. It is the same static
+build as the tarball/deb/rpm (CGO is disabled), so it runs on musl unchanged.
+
 **go install** (needs Go 1.26+):
 
 ```sh
@@ -101,7 +112,7 @@ Requires Go 1.26+.
 
 Releases are built with [goreleaser](https://goreleaser.com) across the
 darwin/linux/windows × amd64/arm64 matrix, producing per-target tarballs and a
-Windows zip, a Homebrew cask, a Scoop manifest, deb/rpm packages, and a
+Windows zip, a Homebrew cask, a Scoop manifest, deb/rpm/apk packages, and a
 `checksums.txt`. To build a local snapshot (no publish, writes to `dist/`):
 
 ```sh
