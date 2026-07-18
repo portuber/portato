@@ -32,5 +32,5 @@ func attachRunE(_ *cobra.Command, _ []string) error {
 
 	ctrl := controller.NewRemote(c)
 	defer ctrl.Close()
-	return tui.Run(ctrl, tui.Options{Mode: "attach @ " + socket})
+	return tui.Run(ctrl, tui.Options{Mode: "attach"})
 }

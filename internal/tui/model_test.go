@@ -786,7 +786,7 @@ func TestModel_QuitStandaloneErrorTuberShowsModal(t *testing.T) {
 
 func TestModel_QuitAttachNoModal(t *testing.T) {
 	f := newFake(controller.Status{Name: "a", State: controller.Connected})
-	m := New(f, Options{Mode: "attach @ /sock"})
+	m := New(f, Options{Mode: "attach"})
 	if !m.attach {
 		t.Fatal("attach mode should be detected")
 	}
@@ -797,6 +797,24 @@ func TestModel_QuitAttachNoModal(t *testing.T) {
 	}
 	if mm.confirmQuit {
 		t.Error("no modal in attach mode")
+	}
+}
+
+// TestRender_AttachHeaderDropsSocket pins Phase 39 F12: the attach header reads
+// "mode: attach" with no socket path appended (the 60+ char temp path was
+// permanent header noise); the socket is exposed by `portato doctor` instead.
+func TestRender_AttachHeaderDropsSocket(t *testing.T) {
+	m := New(newFake(controller.Status{Name: "a"}), Options{Mode: "attach"})
+	if !m.attach {
+		t.Fatal("precondition: attach mode")
+	}
+	m.width, m.height = 80, 24
+	out := m.render()
+	if !strings.Contains(out, "mode: attach") {
+		t.Errorf("attach header should read %q\n%s", "mode: attach", out)
+	}
+	if strings.Contains(out, ".sock") || strings.Contains(out, "/sock") {
+		t.Errorf("attach header leaked a socket path\n%s", out)
 	}
 }
 

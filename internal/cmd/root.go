@@ -67,7 +67,7 @@ func rootRunE(cmd *cobra.Command, _ []string) error {
 		if socket, err := daemon.ResolveSocket(); err == nil && socket != "" && probeDaemon(socket) {
 			ctrl := controller.NewRemote(client.New(socket))
 			defer ctrl.Close()
-			return tui.Run(ctrl, tui.Options{Mode: "attach @ " + socket})
+			return tui.Run(ctrl, tui.Options{Mode: "attach"})
 		}
 	}
 	return runStandalone()

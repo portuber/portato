@@ -193,7 +193,7 @@ func TestFilter_SurvivesRedrawTick(t *testing.T) {
 }
 
 func TestFilter_WorksInAttachMode(t *testing.T) {
-	m := New(threeTubers(), Options{Mode: "attach @ /sock"})
+	m := New(threeTubers(), Options{Mode: "attach"})
 	if !m.attach {
 		t.Fatal("precondition: should be in attach mode")
 	}
