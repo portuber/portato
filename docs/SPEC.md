@@ -407,14 +407,25 @@ otherwise NoAuth (the pre-Phase-20 behaviour).
 | `r`            | restart the selected tunnel                           |
 | `a` / `x`      | enable all / disable all                              |
 | `e` / `n` / `d`| edit / create / delete the selected tunnel            |
-| `C`            | duplicate the selected tunnel (under `<name>-copy`)   |
+| `C`            | duplicate the selected tunnel (under `<name>-copy>`); the local port is auto-bumped past ports already used in the config (Phase 39)   |
 | `l`            | view the selected tunnel's logs                       |
 | `/`            | fuzzy (subsequence) filter over name/type/endpoint; `esc` clears (Phase 20; substring fallback) |
 | `R`            | reload the config from disk                           |
 | `?` / `esc`    | toggle help (`esc` also clears an active filter and cancels a confirm modal) |
-| `q` / `ctrl+c` | quit (with the "background?" modal in standalone when there are live tunnels) |
+| `q` / `ctrl+c` | quit (with the "background?" modal in standalone when there are live tunnels — Connecting/Connected/Reconnecting/Error) |
 
-The header shows the mode: `standalone` or `attach @ <socket>`.
+The header shows the mode: `standalone` or `attach` (Phase 39 dropped the
+socket path that used to follow `attach`; `portato doctor` exposes it).
+
+Layout (Phases 38–39): the footer is pinned to the bottom edge regardless of
+how many rows the content occupies (no "jump" when the filter line appears or
+disappears). Interactive prompts (delete / TOFU / passphrase / password /
+quit) render in the footer zone with the header and table still visible above
+them — the cursor keeps highlighting the row the prompt refers to (a true
+dimmed overlay was ruled out: it cannot be theme-complete in mono/dark). The
+selected row's full error shows in a one-line strip directly above the footer
+(err-styled prefix + body), and the in-row error hint keeps the tail where the
+conflicting port/address lives.
 
 ### Sub-screen keys
 
@@ -475,8 +486,8 @@ mono theme / `NO_COLOR` (plain glyphs); the `--version` banner is untinted
 
 When quitting standalone mode (`q`):
 
-1. If there are no live (Connecting/Connected/Reconnecting) tunnels -> exit immediately with `StopAll()`.
-2. If there are live tunnels -> modal: `"N tunnels active. Leave them in the background? [y/N]"`.
+1. If there are no live (Connecting/Connected/Reconnecting/Error — Phase 39 counts an enabled tuber mid-retry in the Error state as live too) tunnels -> exit immediately with `StopAll()`.
+2. If there are live tunnels -> modal: `"N tuber(s) still active. Leave them in the background? [y/N]"` (honestly pluralized — `1 tuber still active.` / `N tubers still active.`; the count includes the Error state).
 3. **`y`**: the standalone moves its live tunnels to a detached daemon via the **seamless FD hand-off** (Phase 16) when possible, falling back to the close+rebind path otherwise:
    - **Seamless (default):** for each live `local`/`dynamic` tunnel the standalone dups its already-bound local listener (`(*net.TCPListener).File`), opens a one-shot SOCK_STREAM unix transfer socket, spawns `portato daemon --config <cfg> --listen-fds <sockpath>` (detached, `Setsid`) and sends the dup'd fds (SCM_RIGHTS) over the transfer socket. The daemon reconstructs each listener (`net.FileListener`) and adopts it — skipping its own `net.Listen` — so the kernel listening socket never closes: the standalone's and the daemon's dup'd fds reference the same socket, and the standalone closes its copy only after the daemon's `GET /healthz` answers. The local port therefore stays continuously available across the transition. The established SSH session is **not** moved — `golang.org/x/crypto/ssh` keeps the transport's crypto state in process memory and cannot resume it in another process — so the daemon re-dials; `type=remote` tunnels have no local listener and simply re-dial.
    - **Fallback** (no live local listeners, or any pre-spawn step fails): the standalone runs `StopAll()` (releasing the local ports), spawns the daemon without `--listen-fds`, and waits for `healthz`. The brief gap between release and the daemon's rebind is the legacy MVP blip.

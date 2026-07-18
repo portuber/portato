@@ -138,11 +138,11 @@ time-based (not just size-based) log rotation.
 - **Phase 14** — duplicate the selected tunnel in the TUI (`Shift+C`): opens the Phase 10 editor in create mode, prefilled under a fresh `<name>-copy`; commits via `AddTunnel`.
 - **Phase 15** — light-theme color tuning: the light theme's surface colour is baked into every style so each row stays readable.
 - **Phase 16** — seamless hand-off via FD-passing: the standalone passes its already-bound local listeners to the spawned daemon over SCM_RIGHTS, so the local ports never go down across the transition (proved by `make e2e-handoff`).
-- **Phase 17** — Windows support (in progress; IPC over a named pipe, autostart via the HKCU Run key).
+- **Phase 17** — Windows support (done, `[x]`; IPC over a named pipe via `go-winio`, autostart via the HKCU Run key, `windows-smoke` CI green).
 - **Phase 18** — IPC authorization token: a 32-byte bearer token layered on the `0600` socket; `--ipc-token off` disables.
 - **Phase 19** — identity passphrase storage: an in-memory cache backed by the OS keyring; `portato add-identity`/`forget-identity`.
 - **Phase 20** — CLI/UX polish: `--log-level`, `portato list --json`, SOCKS5 user/pass auth for `dynamic`, a fuzzy (subsequence) `/` filter.
-- **Phase 21** — packaging and releases (pending; blocked on a public git remote + tap/bucket).
+- **Phase 21** — packaging and releases (done, `[x]`; **v0.3.x** is released — GitHub Release + Homebrew cask + Scoop bucket + deb/rpm).
 - **Phase 22** — robustness: a single-instance flock + systemd socket activation for the IPC socket.
 - **Phase 23** — TUI list column alignment.
 - **Phase 24** — TUI branding / logo banner.
@@ -159,56 +159,41 @@ time-based (not just size-based) log rotation.
 - **Phase 35** — SSH password authentication (done, `[x]`): an on-by-default password-auth fallback (OpenSSH-style — keys tried first, then prompt when no key authenticates) with `password_auth: false` to opt out; the password is supplied interactively (TUI `o` modal / `POST /tubers/{name}/password` / `controller.AcceptPassword`) and, opt-in, persisted to the OS keyring (`defaults.ssh_password_store`), never to config. Keys stay the default; the re-prompt is a dial-level loop (golang.org/x/crypto/ssh does not retry the password method within one handshake). depends_on [19, 30]. Surfaced while verifying Phase 17 on a password-only server.
 - **Phase 36** — CI security hardening (done, `[x]`): close two CI gaps — a `govulncheck` workflow (PR/push + weekly cron) scanning Go dependencies for reachable CVEs, and a `lint` job in `ci.yml` enforcing the existing `.golangci.yml` (which `make lint` runs locally but CI never did). Adding the workflow immediately surfaced 5 reachable stdlib CVEs in the pinned toolchain (crypto/tls, crypto/x509, net, net/http), fixed by bumping the toolchain 1.26.2 → 1.26.5; `govulncheck ./...` now exits 0. depends_on [33]. Out of scope: Dependabot, CodeQL, Go Reference badge.
 - **Phase 37** — TUI theme portability & color correctness (done, `[x]`): pick the palette against the real terminal background (`tea.RequestBackgroundColor` → `BackgroundColorMsg`, with an explicit `PORTATO_THEME` → OSC 11 → `COLORFGBG` → dark degradation chain), move palette resolution off package init onto `Model`, fix the light surface fill under tmux, and correct the contrast-failing dark colors + the mono `connecting`/`connected` glyph split. depends_on [15].
-- **Phase 38** — TUI responsive layout (planned, `[ ]`): make the footer fit at 80/60 cols (`? help`/`q quit` visible), the `?` help overlay reachable at 80×24, and the table columns shrink by priority (STATUS untouchable, ENDPOINT shrinks first, NAME flex, UPTIME right-aligned). depends_on [23].
-- **Phase 39** — TUI polish (planned, `[ ]`): modals overlay the dimmed list instead of erasing it, footer pinned to the bottom edge, empty-state CTA → `n`, the `hasLiveTubers` quit gate counts the Error state and the footer/help/modal microcopy agree, the attach header drops its socket path, and error text keeps the actionable tail. depends_on [].
+- **Phase 38** — TUI responsive layout (done, `[x]`): the footer fits at 80/60 cols (`? help`/`q quit` visible), the `?` help overlay is reachable at 80×24, and the table columns shrink by priority (STATUS untouchable, ENDPOINT shrinks first, NAME flex, UPTIME right-aligned). depends_on [23].
+- **Phase 39** — TUI polish (done, `[x]`): interactive modals render in the footer zone with the list visible (footer-zone replace, not a dimmed overlay — a true overlay can't be theme-complete in mono/dark); footer pinned to the bottom edge; empty-state CTA → `n` with footer keys filtered; `hasLiveTubers` counts the Error state with mode-aware q-quit microcopy; attach header drops its socket path; error text keeps the actionable tail (row tail-truncation + a full-error detail strip); `C` duplicate auto-bumps the local port. depends_on [].
 
 ## Current work
 
-**Phase 33** (CodeFactor cleanup + golangci-lint guardrails) is `[x]` (done):
-renamed the `max` builtin shadows, split four high-complexity production
-methods (`Update`, `handleKey`, `doctorRunE`, `Recv`) and the two flagged test
-funcs (`TestServer_RoundTrip`, `socks5DialUserPass`), and added a
-`golangci-lint` guardrail (`.golangci.yml` + `make lint`) so neither class
-regresses. No behavior change. (A `.codefactor.yml` exclusion was tried for the
-test files but CodeFactor's free tier ignores repo-file path exclusions, so the
-tests were refactored instead.) The one remaining DoD item — confirming
-codefactor.io shows 0 issues — is a deferred-to-push manual check (no push yet,
-per AGENTS.md local-only).
+**Phases 0–39 are all `[x]`** (done). The most recent batch:
 
-**Phase 34** (`portato license` command + `--license` flag) is `[x]` (done): a
-`portato license` subcommand and a `--license` root flag (parallel to
-`version`/`--version`) print the project's MIT license + source URL + a pointer
-to the bundled `THIRD_PARTY_LICENSES.txt`; `license --full` appends the full MIT
-License text embedded via a new module-root `licensetext` package
-(`//go:embed LICENSE`, single source — no drift). `--version` is unchanged. A
-MINOR; shipped in v0.2.0/v0.2.1.
+- **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
+  weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
+  CI enforcing `.golangci.yml`; it surfaced 5 reachable stdlib CVEs in the
+  pinned toolchain (crypto/tls, crypto/x509, net, net/http), fixed by bumping
+  1.26.2 → 1.26.5.
+- **Phase 37** — TUI theme portability & color correctness: the palette is
+  picked against the real terminal background (`tea.RequestBackgroundColor` →
+  `BackgroundColorMsg`, with a `PORTATO_THEME` → OSC 11 → `COLORFGBG` → dark
+  degradation chain), palette resolution moved off package init onto the
+  model, the light surface fill is fixed under tmux, and the contrast-failing
+  dark colors + the mono connecting/connected glyph split are corrected.
+- **Phase 38** — TUI responsive layout: the footer fits at 80/60 cols (`? help`
+  / `q quit` always reserved at the tail), `?` is a full-screen scrollable help
+  view reachable at 80×24, and the table columns shrink by priority (STATUS
+  untouchable, ENDPOINT shrinks first, NAME flex, UPTIME right-aligned).
+- **Phase 39** — TUI polish: interactive modals (delete / TOFU / passphrase /
+  password / quit) render in the footer zone with the list visible
+  (footer-zone replace, not a dimmed overlay — a true overlay can't be
+  theme-complete in mono/dark); the footer is pinned to the bottom edge; the
+  empty state routes to `n` and the footer hides keys that don't apply;
+  `hasLiveTubers` counts the Error state with mode-aware q-quit microcopy;
+  the attach header drops its socket path (`portato doctor` exposes it); error
+  text keeps the actionable tail (row tail-truncation + a one-line full-error
+  detail strip above the footer); and `C` duplicate auto-bumps the local port.
 
-**Phase 17** (Windows support) is `[x]` (done): all code, packaging and CI
-config implemented and the Windows runtime verified by dogfooding Phase 35 on a
-real Windows host. Done: a build-tagged IPC transport seam
-(`internal/daemon/transport` — unix-domain socket on darwin/linux, named pipe
-via `go-winio` on windows) that the daemon/client/probe/doctor call sites route
-through; per-OS paths (`paths_unix.go`/`paths_windows.go`, `ipctoken.TokenPath`
-split); the unix-only primitives build-tagged (`pidAlive`, `stopKill`, the
-hand-off `Setsid`); HKCU registry Run-key autostart (`service_windows.go`) with
-`doctor` reporting it; the FD hand-off gated to the clean close+rebind path
-off unix (`fdpass.Supported()`); `windows` in the goreleaser matrix (zip +
-`portuber/scoop-bucket`); build-tagged ssh-agent dial (`agentdial_windows.go`);
-and a `windows-smoke` CI job (daemon+list round-trip over the named pipe +
-install/uninstall), which ran green on main. `portato doctor` and
-ssh-agent-over-named-pipe are maintainer-accepted (see phase-17
-"Verification status").
-
-**Phase 35** (SSH password authentication) is `[x]` (done): an on-by-default
-password-auth fallback (OpenSSH-style — keys tried first, then prompt when no
-key authenticates) with `password_auth: false` to opt out; the password is
-supplied interactively (TUI `o` modal / `POST /tubers/{name}/password` /
-`controller.AcceptPassword`) and, opt-in, persisted to the OS keyring
-(`defaults.ssh_password_store`), never to config. The re-prompt is a dial-level
-loop (golang.org/x/crypto/ssh does not retry the password method within one
-handshake); a key-only server bails cleanly. Six dogfooding fixes landed (clear
-pending on stop; accurate rejection hint; leading-space guard; actionable
-hints; a "sprouting…" connecting state; host-key-before-password).
+Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
+`--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase
+files in [`docs/phases/`](./phases/) for their detail.
 
 ## Final MVP E2E (on completing Phase 6)
 
