@@ -1,7 +1,7 @@
 ---
 phase: 39
 title: TUI polish (modals, footer pin, microcopy, error display)
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -62,60 +62,69 @@ socket-path noise, and error messages keep the actionable tail.
 ## Tasks
 
 ### A — modals keep context
-- [ ] `view.go` `render()` — for the modal states, render the dimmed list behind
+- [x] `view.go` `render()` — for the modal states, render the dimmed list behind
       the centered prompt (lipgloss v2 layers), or keep header+table and replace
       only the footer zone. No modal may leave the rest of the screen blank.
+      **Shipped footer-zone replace** (header+table stay rendered, cursor keeps
+      highlighting the prompt's row); a true overlay was ruled out — it cannot be
+      theme-complete (mono is NO_COLOR, dark's surface is transparent). Decision
+      locked at Task A review.
 
 ### B — footer pinned to the bottom
-- [ ] `view.go` `render()` — pad content to `m.height - footerHeight` so the
-      footer sits at the bottom edge across all row counts.
-- [ ] (Optional) Add a one-line aggregate stats line
-      (`<n> connected · <n> error · <n> off`).
+- [x] `view.go` `render()` — pad content to `m.height - footerHeight` so the
+      footer sits at the bottom edge across all row counts. (Measured: the pad
+      gap renders as terminal-bg on non-honoring light terminals — same accepted
+      tradeoff as the below-content area; OSC 11 covers honoring terminals.)
+- [ ] (Optional, deferred) Aggregate stats line
+      (`<n> connected · <n> error · <n> off`) — deferred at phase-39 planning;
+      if added later it should share the footer line right-aligned on wide
+      terminals, not be a second line.
 
 ### C — empty state + footer applicability
-- [ ] `view.go` `table()` empty path (`view.go:175`) — change the CTA to point
-      at `n`; keep the config+R alternative.
-- [ ] `view.go` `footer()` — filter entries by applicability (e.g. hide
-      `space toggle` / `p passphrase` when the list is empty or none selected).
+- [x] `view.go` `table()` empty path — change the CTA to point at `n`; keep the
+      config+R alternative.
+- [x] `view.go` `footer()` — filter entries by applicability (hide `space
+      toggle` / `p passphrase` etc. when the list is empty).
 
 ### D — quit gate + microcopy
-- [ ] `update.go` `hasLiveTubers()` (`update.go:688-696`) — count enabled tubers
-      in the Error state as live (so `q` during the retry cycle still confirms).
-- [ ] Unify microcopy: footer, help (`view.go:398`), and the modal
-      (`view.go:428`) must describe the same behavior.
+- [x] `update.go` `hasLiveTubers()` — count enabled tubers in the Error state
+      as live (so `q` during the retry cycle still confirms).
+- [x] Unify microcopy: footer, help, and the modal describe the same behavior
+      (help is mode-aware via `tuberBindings(attach)`; the modal count includes
+      Error and pluralizes honestly).
 
 ### E — attach header
-- [ ] `cmd/root.go:70`, `cmd/attach.go:35` — set the TUI mode to `attach`
-      (drop the `@ <socket>` suffix); expose the socket path elsewhere
-      (`--version`, help text, or logs).
+- [x] `cmd/root.go`, `cmd/attach.go` — set the TUI mode to `attach` (drop the
+      `@ <socket>` suffix); the socket path is exposed by `portato doctor`.
 
 ### F — error display
-- [ ] `view.go` `row()` (`view.go:267-269`) — replace `truncate(s.Error, 18)`
-      with a tail-preserving truncation (keep the port/address tail).
-- [ ] (Optional) Surface the selected row's full error in a persistent one-line
-      strip; (bonus) `C` duplicate could auto-bump the local port to avoid
-      guaranteed listen conflicts.
+- [x] `view.go` `row()` — replace `truncate(s.Error, 18)` with a
+      tail-preserving truncation (keep the port/address tail).
+- [x] Surface the selected row's full error in a persistent one-line strip above
+      the footer (err-styled prefix + body); and `C` duplicate auto-bumps the
+      local port to avoid guaranteed listen conflicts (separate commit).
 
 ### G — bookkeeping
-- [ ] `docs/ROADMAP.md` — phase-39 row added at plan time; flip status on
-      start/complete.
-- [ ] This file — flip status on start/complete.
+- [x] `docs/ROADMAP.md` — phase-39 row flipped on start/complete.
+- [x] This file — status flipped on start/complete.
 
 ## Definition of Done
 
-- [ ] Every modal (delete / TOFU / passphrase / password / quit) renders above a
-      visible (dimmed) list — the screen is never blank around the prompt.
-- [ ] The footer sits at the bottom edge regardless of how many rows the content
+- [x] Every modal (delete / TOFU / passphrase / password / quit) renders above a
+      visible list (footer-zone replace; not dimmed — a true overlay cannot be
+      theme-complete: mono is NO_COLOR, dark's surface is transparent; decision
+      locked at Task A review) — the screen is never blank around the prompt.
+- [x] The footer sits at the bottom edge regardless of how many rows the content
       occupies (no footer "jump" when the filter line appears/disappears).
-- [ ] The empty state routes the user to `n`; the footer hides keys that do not
+- [x] The empty state routes the user to `n`; the footer hides keys that do not
       apply to an empty list.
-- [ ] Pressing `q` while an enabled tuber is in the Error phase still raises the
+- [x] Pressing `q` while an enabled tuber is in the Error phase still raises the
       confirm modal (treats it as live); footer / help / modal microcopy agree.
-- [ ] In attach mode the header reads `mode: attach` without the socket path.
-- [ ] A listen-conflict error keeps the conflicting port visible (not truncated
+- [x] In attach mode the header reads `mode: attach` without the socket path.
+- [x] A listen-conflict error keeps the conflicting port visible (not truncated
       before it).
-- [ ] No regression at the reference size (120×35).
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean;
+- [x] No regression at the reference size (120×35).
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `go test ./...` are clean;
       `make lint` is clean.
 
 ## Verification
