@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -657,6 +658,10 @@ func openDuplicateEditor(ctrl controller.Controller, selected string, width, hei
 	}
 	src.Name = freshName(selected, names)
 	src.Enabled = false
+	// Phase 39, F13 follow-up: a duplicate inherits the source's local address,
+	// so without a bump it is a guaranteed listen conflict. Pick the first free
+	// port after the source's (config-level only — the dialer owns OS probing).
+	src.Local = bumpLocalPort(src.Local, usedLocalPorts(cfg.Tubers))
 	e := newTuberEditor(modeNew, src, names, ctrl)
 	e.original = ""
 	e.width, e.height = width, height
@@ -686,6 +691,63 @@ func containsName(names []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// localPort extracts the integer port from a local address in any of the forms
+// Tuber.ListenAddr accepts: a bare port ("5432"), ":port", or "host:port"
+// (including "[::1]:port"). ok is false when there is no parseable port.
+func localPort(local string) (port int, ok bool) {
+	s := strings.TrimSpace(local)
+	if s == "" {
+		return 0, false
+	}
+	if p, err := strconv.Atoi(s); err == nil {
+		return p, true // bare port
+	}
+	i := strings.LastIndex(s, ":")
+	if i < 0 {
+		return 0, false
+	}
+	p, err := strconv.Atoi(s[i+1:])
+	if err != nil {
+		return 0, false
+	}
+	return p, true
+}
+
+// usedLocalPorts collects the parsed local ports of every tuber (unparseable
+// ports are skipped). The duplicate's bumped port avoids these — config-level
+// collisions only; no OS-level probe (that is the dialer's job).
+func usedLocalPorts(tubers []config.Tuber) map[int]bool {
+	used := make(map[int]bool)
+	for _, t := range tubers {
+		if p, ok := localPort(t.Local); ok {
+			used[p] = true
+		}
+	}
+	return used
+}
+
+// bumpLocalPort increments the port in a local address until it does not
+// collide with any port in used, preserving the address format: a bare port
+// ("5432") stays bare, ":port" keeps its wildcard host, and "host:port" keeps
+// its host. Addresses without a parseable port are returned unchanged. Phase
+// 39, F13 follow-up: a duplicated tuber inherits the source's local port, so
+// without a bump the duplicate is a guaranteed listen conflict.
+func bumpLocalPort(local string, used map[int]bool) string {
+	s := strings.TrimSpace(local)
+	port, ok := localPort(s)
+	if !ok {
+		return local
+	}
+	for used[port] {
+		port++
+	}
+	if _, err := strconv.Atoi(s); err == nil {
+		return strconv.Itoa(port) // bare port stays bare
+	}
+	i := strings.LastIndex(s, ":")
+	return s[:i] + ":" + strconv.Itoa(port)
 }
 
 // handleFilterKey owns the `/`-input: every key but the control keys goes to
