@@ -142,7 +142,7 @@ time-based (not just size-based) log rotation.
 - **Phase 18** — IPC authorization token: a 32-byte bearer token layered on the `0600` socket; `--ipc-token off` disables.
 - **Phase 19** — identity passphrase storage: an in-memory cache backed by the OS keyring; `portato add-identity`/`forget-identity`.
 - **Phase 20** — CLI/UX polish: `--log-level`, `portato list --json`, SOCKS5 user/pass auth for `dynamic`, a fuzzy (subsequence) `/` filter.
-- **Phase 21** — packaging and releases (done, `[x]`; **v0.3.x** is released — GitHub Release + Homebrew cask + Scoop bucket + deb/rpm).
+- **Phase 21** — packaging and releases (done, `[x]`): goreleaser publishes a GitHub Release + Homebrew cask + Scoop bucket + deb/rpm.
 - **Phase 22** — robustness: a single-instance flock + systemd socket activation for the IPC socket.
 - **Phase 23** — TUI list column alignment.
 - **Phase 24** — TUI branding / logo banner.
