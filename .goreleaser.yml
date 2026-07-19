@@ -102,7 +102,7 @@ homebrew_casks:
 scoops:
   # Scoop manifest -> https://github.com/portuber/scoop-bucket (bucket/portato.json)
   # `scoop bucket add portuber https://github.com/portuber/scoop-bucket`
-  # `scoop install portato/portato`
+  # `scoop install portuber/portato`
   # Windows-only (Scoop is a Windows installer); published alongside the
   # windows zip archive on release (Phase 17).
   - name: portato

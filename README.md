@@ -48,7 +48,7 @@ brew install --cask portuber/tap/portato
 
 ```pwsh
 scoop bucket add portuber https://github.com/portuber/scoop-bucket
-scoop install portato/portato
+scoop install portuber/portato
 ```
 
 **Binary** — download the archive for your platform from the
