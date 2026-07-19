@@ -205,6 +205,7 @@ brew install --cask portuber/tap/portato</code></pre>
           <div class="code-block">
             <button type="button" class="copy" aria-label="Copy install command">Copy</button>
             <pre><code># Windows
+# If Scoop reports git is required: scoop install git
 scoop bucket add portuber https://github.com/portuber/scoop-bucket
 scoop install portuber/portato</code></pre>
           </div>
@@ -248,7 +249,8 @@ go install github.com/portuber/portato/cmd/portato@latest</code></pre>
           <p>Homebrew (macOS / Linuxbrew)</p>
           <pre><code>brew install --cask portuber/tap/portato</code></pre>
           <p>Scoop (Windows)</p>
-          <pre><code>scoop bucket add portuber https://github.com/portuber/scoop-bucket
+          <pre><code># If Scoop reports git is required: scoop install git
+scoop bucket add portuber https://github.com/portuber/scoop-bucket
 scoop install portuber/portato</code></pre>
           <p>deb / rpm (Linux)</p>
           <pre><code>sudo dpkg -i portato_&lt;version&gt;_linux_amd64.deb

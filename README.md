@@ -51,6 +51,8 @@ scoop bucket add portuber https://github.com/portuber/scoop-bucket
 scoop install portuber/portato
 ```
 
+Scoop needs git for buckets — if it reports git is required, run `scoop install git` first.
+
 **Binary** — download the archive for your platform from the
 [latest release](https://github.com/portuber/portato/releases/latest), extract
 it, and put the `portato` binary on your `PATH`:
