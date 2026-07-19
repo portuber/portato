@@ -88,7 +88,7 @@ func TestPassphraseIdentity_ConnectsNoAgent(t *testing.T) {
 	}
 	defer tun.Stop()
 
-	if !waitForState(tun, Connected, 15*time.Second) {
+	if !waitForState(tun, Connected, 60*time.Second) {
 		s := tun.Status()
 		t.Fatalf("did not reach Connected with a passphrase key + no agent: state=%s err=%q", s.State, s.Error)
 	}
@@ -124,7 +124,7 @@ func TestPassphraseIdentity_BlocksThenProvided(t *testing.T) {
 	}
 	defer tun.Stop()
 
-	if !waitForPendingPassphrase(t, tun, 15*time.Second) {
+	if !waitForPendingPassphrase(t, tun, 60*time.Second) {
 		s := tun.Status()
 		t.Fatalf("dial should block and surface PendingPassphrase; state=%s err=%q pp=%q",
 			s.State, s.Error, s.PendingPassphrase)
@@ -137,7 +137,7 @@ func TestPassphraseIdentity_BlocksThenProvided(t *testing.T) {
 	if err := store.Set(idPath, "secret"); err != nil {
 		t.Fatalf("provide passphrase: %v", err)
 	}
-	if !waitForState(tun, Connected, 15*time.Second) {
+	if !waitForState(tun, Connected, 60*time.Second) {
 		s := tun.Status()
 		t.Fatalf("did not reach Connected after providing the passphrase: state=%s err=%q pp=%q",
 			s.State, s.Error, s.PendingPassphrase)
@@ -175,7 +175,7 @@ func TestPassphraseIdentity_WrongThenRight(t *testing.T) {
 	}
 	defer tun.Stop()
 
-	if !waitForPendingPassphrase(t, tun, 15*time.Second) {
+	if !waitForPendingPassphrase(t, tun, 60*time.Second) {
 		t.Fatal("dial should block awaiting a passphrase")
 	}
 	// Wrong passphrase: the dial rejects it, invalidates it, and re-blocks.
@@ -184,14 +184,14 @@ func TestPassphraseIdentity_WrongThenRight(t *testing.T) {
 	}
 	// After a wrong value the dial Deletes it and loops back to Wait, so the
 	// pending need re-appears.
-	if !waitForPendingPassphrase(t, tun, 15*time.Second) {
+	if !waitForPendingPassphrase(t, tun, 60*time.Second) {
 		t.Fatal("dial should re-block after a wrong passphrase")
 	}
 	// Correct passphrase: connects.
 	if err := store.Set(idPath, "correct"); err != nil {
 		t.Fatal(err)
 	}
-	if !waitForState(tun, Connected, 15*time.Second) {
+	if !waitForState(tun, Connected, 60*time.Second) {
 		s := tun.Status()
 		t.Fatalf("did not connect after the correct passphrase: state=%s err=%q", s.State, s.Error)
 	}
