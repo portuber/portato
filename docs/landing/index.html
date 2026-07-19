@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Portato — SSH port-forwarding manager with a TUI</title>
   <meta name="description" content="Portato is an SSH port-forwarding manager with a TUI. Toggle, restart and watch every tunnel from one screen — standalone or attached to a background daemon. Single binary, native SSH, macOS / Linux / Windows.">
+  <link rel="canonical" href="https://portuber.github.io/portato/">
   <meta property="og:title" content="Portato">
   <meta property="og:description" content="SSH port-forwarding manager with a TUI. Single binary, native SSH, macOS / Linux / Windows.">
   <meta property="og:type" content="website">
@@ -12,6 +13,7 @@
   <meta name="twitter:card" content="summary">
   <!-- TODO(og:image): add a screenshot/demo PNG under assets/ once captured. -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%94%3C/text%3E%3C/svg%3E">
+  <noscript><style>.tabs, .tab-panels { display: none; }</style></noscript>
   <style>
     :root {
       --bg: #ffffff;
@@ -54,7 +56,7 @@
     .wordmark { font-size: clamp(2.6rem, 7vw, 4rem); margin: 0 0 .35rem; letter-spacing: -.02em; font-weight: 800; }
     .wordmark .potato { font-size: .9em; vertical-align: -.04em; }
     .tagline { font-size: 1.3rem; margin: 0 0 .7rem; font-weight: 600; }
-    .lede { color: var(--fg-muted); max-width: 660px; margin: 0 auto 1.5rem; font-size: 1.05rem; }
+    .lede { color: var(--fg-muted); max-width: 680px; margin: 0 auto 1.5rem; font-size: 1.05rem; }
     .badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 1.7rem; }
     .badges img { height: 22px; }
     .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
@@ -68,14 +70,26 @@
     .card { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
     .card h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
     .card p { margin: 0; color: var(--fg-muted); font-size: .95rem; }
+    .table-wrap { overflow-x: auto; }
+    .why-table { width: 100%; border-collapse: collapse; font-size: .95rem; min-width: 480px; }
+    .why-table th, .why-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    .why-table th { font-weight: 600; }
+    .why-table tbody td { color: var(--fg-muted); }
+    .why-table tbody td:first-child { color: var(--fg); font-weight: 500; white-space: nowrap; }
     .tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
     .tabs button { appearance: none; background: transparent; border: 0; padding: 10px 14px; color: var(--fg-muted); font: inherit; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
     .tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
     .tab-panel { display: none; }
     .tab-panel.active { display: block; }
+    .code-block { position: relative; }
+    .copy { position: absolute; top: 8px; right: 8px; appearance: none; background: var(--bg); color: var(--fg-muted); border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; font-size: .8rem; cursor: pointer; }
+    .copy:hover { color: var(--fg); border-color: var(--accent); }
+    .copy.copied { color: var(--accent); border-color: var(--accent); }
     pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; overflow-x: auto; margin: 0; }
     code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: .9rem; }
     pre code { color: var(--fg); white-space: pre; }
+    .noscript-install h3 { margin: 0 0 .6rem; font-size: 1.1rem; }
+    .noscript-install p { margin: .8rem 0 .25rem; color: var(--fg); font-weight: 600; }
     .links ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
     footer { padding: 32px 0; text-align: center; color: var(--fg-muted); font-size: .9rem; border-top: 1px solid var(--border); }
     footer p { margin: .2rem 0; }
@@ -86,14 +100,14 @@
     <div class="container">
       <h1 class="wordmark"><span class="potato">🥔</span> Portato</h1>
       <p class="tagline">SSH port-forwarding manager with a TUI.</p>
-      <p class="lede">Toggle, restart and watch every tunnel from one screen — standalone, or attached to a background daemon. A single binary with native SSH for macOS, Linux and Windows.</p>
+      <p class="lede">One binary that manages all your SSH forwards — native SSH (no system <code>ssh</code>), runs standalone or as a background daemon that keeps tunnels alive across logout. macOS, Linux, and Windows from the same release.</p>
       <div class="badges">
-        <img src="https://github.com/portuber/portato/actions/workflows/ci.yml/badge.svg" alt="CI">
-        <img src="https://github.com/portuber/portato/actions/workflows/security.yml/badge.svg" alt="security">
-        <img src="https://img.shields.io/github/v/release/portuber/portato" alt="Release">
-        <img src="https://img.shields.io/github/license/portuber/portato" alt="License: MIT">
-        <img src="https://img.shields.io/github/go-mod/go-version/portuber/portato" alt="Go Version">
-        <img src="https://www.codefactor.io/repository/github/portuber/portato/badge" alt="Codefactor">
+        <a href="https://github.com/portuber/portato/actions/workflows/ci.yml"><img src="https://github.com/portuber/portato/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+        <a href="https://github.com/portuber/portato/actions/workflows/security.yml"><img src="https://github.com/portuber/portato/actions/workflows/security.yml/badge.svg" alt="security"></a>
+        <a href="https://github.com/portuber/portato/releases"><img src="https://img.shields.io/github/v/release/portuber/portato" alt="Release"></a>
+        <a href="https://github.com/portuber/portato/blob/main/LICENSE"><img src="https://img.shields.io/github/license/portuber/portato" alt="License: MIT"></a>
+        <a href="https://github.com/portuber/portato/blob/main/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/portuber/portato" alt="Go Version"></a>
+        <a href="https://www.codefactor.io/repository/github/portuber/portato"><img src="https://www.codefactor.io/repository/github/portuber/portato/badge" alt="Codefactor"></a>
       </div>
       <div class="cta">
         <a class="btn btn-primary" href="#install">Install</a>
@@ -146,55 +160,117 @@
     </div>
   </section>
 
+  <section class="why" id="why">
+    <div class="container">
+      <h2>Why Portato</h2>
+      <p class="lede" style="text-align:left;margin:0 0 1rem;">Plain <code>ssh -L</code> is fine for one tunnel in one terminal. Portato is for everything past that.</p>
+      <div class="table-wrap">
+        <table class="why-table">
+          <thead>
+            <tr><th scope="col">What you want</th><th scope="col"><code>ssh -L</code> / <code>autossh</code></th><th scope="col">Portato</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>See what's running</td><td>nothing — <code>ps</code> and scrollback</td><td>one TUI screen, live status for every tunnel</td></tr>
+            <tr><td>Reconnect after sleep / drop</td><td><code>autossh</code>, one process per tunnel</td><td>built-in backoff + reconnect, all tunnels</td></tr>
+            <tr><td>Many tunnels</td><td>one command and process each</td><td>named tunnels from one <code>config.yaml</code></td></tr>
+            <tr><td>Survive logout</td><td>hand-rolled systemd / launchd unit</td><td><code>portato install</code> — launchd / systemd / Windows Run key</td></tr>
+            <tr><td>Toggle without re-running</td><td>—</td><td><code>space</code> in the TUI</td></tr>
+            <tr><td>Don't drop the port on hand-off</td><td>—</td><td>FD-passing — standalone→daemon, port stays up</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <section class="install" id="install">
     <div class="container">
       <h2>Install</h2>
       <div class="tabs" role="tablist" aria-label="Install methods">
-        <button type="button" role="tab" data-tab="brew" class="active" aria-selected="true">Homebrew</button>
-        <button type="button" role="tab" data-tab="scoop">Scoop</button>
-        <button type="button" role="tab" data-tab="deb">deb / rpm</button>
-        <button type="button" role="tab" data-tab="apk">apk</button>
-        <button type="button" role="tab" data-tab="binary">Binary</button>
-        <button type="button" role="tab" data-tab="go">go install</button>
+        <button type="button" role="tab" id="tab-brew"  aria-controls="panel-brew"  aria-selected="true"  tabindex="0"  data-tab="brew"  class="active">Homebrew</button>
+        <button type="button" role="tab" id="tab-scoop" aria-controls="panel-scoop" aria-selected="false" tabindex="-1" data-tab="scoop">Scoop</button>
+        <button type="button" role="tab" id="tab-deb"   aria-controls="panel-deb"   aria-selected="false" tabindex="-1" data-tab="deb">deb / rpm</button>
+        <button type="button" role="tab" id="tab-apk"   aria-controls="panel-apk"   aria-selected="false" tabindex="-1" data-tab="apk">apk</button>
+        <button type="button" role="tab" id="tab-binary" aria-controls="panel-binary" aria-selected="false" tabindex="-1" data-tab="binary">Binary</button>
+        <button type="button" role="tab" id="tab-go"    aria-controls="panel-go"    aria-selected="false" tabindex="-1" data-tab="go">go install</button>
       </div>
       <div class="tab-panels">
-        <div class="tab-panel active" data-tab="brew">
-          <pre><code># macOS / Linuxbrew
+        <div class="tab-panel active" id="panel-brew" role="tabpanel" aria-labelledby="tab-brew" data-tab="brew">
+          <div class="code-block">
+            <button type="button" class="copy" aria-label="Copy install command">Copy</button>
+            <pre><code># macOS / Linuxbrew
 brew install --cask portuber/tap/portato</code></pre>
+          </div>
         </div>
-        <div class="tab-panel" data-tab="scoop">
-          <pre><code># Windows
+        <div class="tab-panel" id="panel-scoop" role="tabpanel" aria-labelledby="tab-scoop" data-tab="scoop">
+          <div class="code-block">
+            <button type="button" class="copy" aria-label="Copy install command">Copy</button>
+            <pre><code># Windows
 scoop bucket add portuber https://github.com/portuber/scoop-bucket
-scoop install portato/portato</code></pre>
+scoop install portuber/portato</code></pre>
+          </div>
         </div>
-        <div class="tab-panel" data-tab="deb">
-          <pre><code># Linux (deb / rpm) — from the latest GitHub Release
+        <div class="tab-panel" id="panel-deb" role="tabpanel" aria-labelledby="tab-deb" data-tab="deb">
+          <div class="code-block">
+            <button type="button" class="copy" aria-label="Copy install command">Copy</button>
+            <pre><code># Linux (deb / rpm) — from the latest GitHub Release
 sudo dpkg -i portato_&lt;version&gt;_linux_amd64.deb
 # or: sudo rpm -i portato_&lt;version&gt;_linux_amd64.rpm</code></pre>
+          </div>
         </div>
-        <div class="tab-panel" data-tab="apk">
-          <pre><code># Alpine (apk) — unsigned, so allow-untrusted is required
+        <div class="tab-panel" id="panel-apk" role="tabpanel" aria-labelledby="tab-apk" data-tab="apk">
+          <div class="code-block">
+            <button type="button" class="copy" aria-label="Copy install command">Copy</button>
+            <pre><code># Alpine (apk) — unsigned, so allow-untrusted is required
 sudo apk add --allow-untrusted portato_&lt;version&gt;_linux_amd64.apk</code></pre>
+          </div>
         </div>
-        <div class="tab-panel" data-tab="binary">
-          <pre><code># macOS / Linux — download the archive from the latest Release, then:
+        <div class="tab-panel" id="panel-binary" role="tabpanel" aria-labelledby="tab-binary" data-tab="binary">
+          <div class="code-block">
+            <button type="button" class="copy" aria-label="Copy install command">Copy</button>
+            <pre><code># macOS / Linux — download the archive from the latest Release, then:
 tar -xzf portato_&lt;version&gt;_macOS_arm64.tar.gz
 install -m 0755 portato ~/.local/bin/portato
 # Windows: expand the .zip and put portato.exe on PATH
 portato version</code></pre>
+          </div>
         </div>
-        <div class="tab-panel" data-tab="go">
-          <pre><code># needs Go 1.26+
+        <div class="tab-panel" id="panel-go" role="tabpanel" aria-labelledby="tab-go" data-tab="go">
+          <div class="code-block">
+            <button type="button" class="copy" aria-label="Copy install command">Copy</button>
+            <pre><code># needs Go 1.26+
 go install github.com/portuber/portato/cmd/portato@latest</code></pre>
+          </div>
         </div>
       </div>
+      <noscript>
+        <div class="noscript-install">
+          <h3>All install methods</h3>
+          <p>Homebrew (macOS / Linuxbrew)</p>
+          <pre><code>brew install --cask portuber/tap/portato</code></pre>
+          <p>Scoop (Windows)</p>
+          <pre><code>scoop bucket add portuber https://github.com/portuber/scoop-bucket
+scoop install portuber/portato</code></pre>
+          <p>deb / rpm (Linux)</p>
+          <pre><code>sudo dpkg -i portato_&lt;version&gt;_linux_amd64.deb
+# or: sudo rpm -i portato_&lt;version&gt;_linux_amd64.rpm</code></pre>
+          <p>apk (Alpine — unsigned)</p>
+          <pre><code>sudo apk add --allow-untrusted portato_&lt;version&gt;_linux_amd64.apk</code></pre>
+          <p>Binary</p>
+          <pre><code>tar -xzf portato_&lt;version&gt;_macOS_arm64.tar.gz
+install -m 0755 portato ~/.local/bin/portato</code></pre>
+          <p>go install (needs Go 1.26+)</p>
+          <pre><code>go install github.com/portuber/portato/cmd/portato@latest</code></pre>
+        </div>
+      </noscript>
     </div>
   </section>
 
   <section class="quickstart" id="quickstart">
     <div class="container">
       <h2>Quick start</h2>
-      <pre><code># macOS / Linux: ~/.config/portato/config.yaml
+      <div class="code-block">
+        <button type="button" class="copy" aria-label="Copy quick start">Copy</button>
+        <pre><code># macOS / Linux: ~/.config/portato/config.yaml
 # Windows:        %AppData%\portato\config.yaml
 tubers:
   - name: redis
@@ -206,6 +282,7 @@ tubers:
 portato          # TUI (smart launcher: attaches to a running daemon or starts standalone)
 portato daemon   # background daemon + IPC server
 portato list     # status on stdout</code></pre>
+      </div>
     </div>
   </section>
 
@@ -231,17 +308,48 @@ portato list     # status on stdout</code></pre>
 
   <script>
     (function () {
-      var tabs = document.querySelectorAll('[role=tab]');
-      var panels = document.querySelectorAll('.tab-panel');
+      var tabs = Array.prototype.slice.call(document.querySelectorAll('[role=tab]'));
+      var panels = Array.prototype.slice.call(document.querySelectorAll('.tab-panel'));
+      var order = tabs.map(function (b) { return b.dataset.tab; });
+
+      function setTab(id, focus) {
+        tabs.forEach(function (b) {
+          var on = b.dataset.tab === id;
+          b.classList.toggle('active', on);
+          b.setAttribute('aria-selected', on ? 'true' : 'false');
+          b.tabIndex = on ? 0 : -1;
+        });
+        panels.forEach(function (p) { p.classList.toggle('active', p.dataset.tab === id); });
+        if (focus !== false) document.getElementById('tab-' + id).focus();
+      }
       tabs.forEach(function (btn) {
+        btn.addEventListener('click', function () { setTab(btn.dataset.tab); });
+        btn.addEventListener('keydown', function (e) {
+          var i = order.indexOf(btn.dataset.tab);
+          if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); setTab(order[(i + 1) % order.length]); }
+          else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); setTab(order[(i - 1 + order.length) % order.length]); }
+          else if (e.key === 'Home') { e.preventDefault(); setTab(order[0]); }
+          else if (e.key === 'End') { e.preventDefault(); setTab(order[order.length - 1]); }
+        });
+      });
+
+      document.querySelectorAll('.copy').forEach(function (btn) {
         btn.addEventListener('click', function () {
-          var id = btn.dataset.tab;
-          tabs.forEach(function (b) {
-            var on = b.dataset.tab === id;
-            b.classList.toggle('active', on);
-            b.setAttribute('aria-selected', on ? 'true' : 'false');
-          });
-          panels.forEach(function (p) { p.classList.toggle('active', p.dataset.tab === id); });
+          var block = btn.parentElement;
+          var code = block && block.querySelector('pre code');
+          if (!code) return;
+          var text = code.innerText;
+          var done = function () {
+            btn.classList.add('copied'); btn.textContent = 'Copied';
+            setTimeout(function () { btn.classList.remove('copied'); btn.textContent = 'Copy'; }, 1500);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(done, done);
+          } else {
+            // fallback for non-secure contexts (e.g. file:// preview)
+            var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+            try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta); done();
+          }
         });
       });
     })();
