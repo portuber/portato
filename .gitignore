@@ -1,12 +1,35 @@
+# build artifacts
 bin/
 dist/
 third_party/
 THIRD_PARTY_LICENSES.txt
+/portato
+*.exe
+*.test
+
+# coverage / profiling
+cover.out
+*.prof
+
+# runtime artifacts
 *.log
 *.sock
 *.pid
-cover.out
-.idea/
 config.yaml
+
+# editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS metadata
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# E2E fixture binary
 e2e/systemd-docker/portato
-*.exe
