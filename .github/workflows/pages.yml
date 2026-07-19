@@ -1,0 +1,40 @@
+name: pages
+
+# Deploys the product landing page (docs/landing/) to GitHub Pages.
+# The published URL is https://portuber.github.io/portato/ — link it from the
+# repo's About → Website. Rebuilds only when the landing changes.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/landing/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Avoid concurrent deploys; a newer push supersedes an in-flight one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - name: Upload landing
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/landing
+      - name: Deploy
+        id: deploy
+        uses: actions/deploy-pages@v4

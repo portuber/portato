@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portato — SSH port-forwarding manager with a TUI</title>
+  <meta name="description" content="Portato is an SSH port-forwarding manager with a TUI. Toggle, restart and watch every tunnel from one screen — standalone or attached to a background daemon. Single binary, native SSH, macOS / Linux / Windows.">
+  <meta property="og:title" content="Portato">
+  <meta property="og:description" content="SSH port-forwarding manager with a TUI. Single binary, native SSH, macOS / Linux / Windows.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://portuber.github.io/portato/">
+  <meta name="twitter:card" content="summary">
+  <!-- TODO(og:image): add a screenshot/demo PNG under assets/ once captured. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%94%3C/text%3E%3C/svg%3E">
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-soft: #f6f7f9;
+      --fg: #1b1d22;
+      --fg-muted: #5a6072;
+      --border: #e3e6ec;
+      --accent: #5f5faf;
+      --code-bg: #f3f4f8;
+      --radius: 10px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0e1014;
+        --bg-soft: #15181e;
+        --fg: #e8eaf0;
+        --fg-muted: #99a0b3;
+        --border: #232832;
+        --accent: #8a8fe0;
+        --code-bg: #1a1d24;
+      }
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      font-size: 17px;
+    }
+    .container { max-width: 980px; margin: 0 auto; padding: 0 20px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    h1, h2, h3 { line-height: 1.2; }
+    h2 { font-size: 1.5rem; margin: 0 0 1.2rem; }
+    section { padding: 56px 0; border-top: 1px solid var(--border); }
+    .hero { border-top: none; padding-top: 84px; padding-bottom: 56px; text-align: center; }
+    .wordmark { font-size: clamp(2.6rem, 7vw, 4rem); margin: 0 0 .35rem; letter-spacing: -.02em; font-weight: 800; }
+    .wordmark .potato { font-size: .9em; vertical-align: -.04em; }
+    .tagline { font-size: 1.3rem; margin: 0 0 .7rem; font-weight: 600; }
+    .lede { color: var(--fg-muted); max-width: 660px; margin: 0 auto 1.5rem; font-size: 1.05rem; }
+    .badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-bottom: 1.7rem; }
+    .badges img { height: 22px; }
+    .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .btn { display: inline-block; padding: 10px 22px; border-radius: var(--radius); border: 1px solid var(--border); font-weight: 600; color: var(--fg); }
+    .btn:hover { text-decoration: none; border-color: var(--accent); }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { color: #fff; opacity: .92; }
+    .demo-frame { background: var(--bg-soft); border: 1px dashed var(--border); border-radius: var(--radius); padding: 56px 20px; text-align: center; color: var(--fg-muted); }
+    .demo-potato { font-size: 2.6rem; display: block; margin-bottom: .4rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .card { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+    .card h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
+    .card p { margin: 0; color: var(--fg-muted); font-size: .95rem; }
+    .tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+    .tabs button { appearance: none; background: transparent; border: 0; padding: 10px 14px; color: var(--fg-muted); font: inherit; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .tabs button.active { color: var(--fg); border-bottom-color: var(--accent); }
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+    pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; overflow-x: auto; margin: 0; }
+    code { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace; font-size: .9rem; }
+    pre code { color: var(--fg); white-space: pre; }
+    .links ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+    footer { padding: 32px 0; text-align: center; color: var(--fg-muted); font-size: .9rem; border-top: 1px solid var(--border); }
+    footer p { margin: .2rem 0; }
+  </style>
+</head>
+<body>
+  <header class="hero">
+    <div class="container">
+      <h1 class="wordmark"><span class="potato">🥔</span> Portato</h1>
+      <p class="tagline">SSH port-forwarding manager with a TUI.</p>
+      <p class="lede">Toggle, restart and watch every tunnel from one screen — standalone, or attached to a background daemon. A single binary with native SSH for macOS, Linux and Windows.</p>
+      <div class="badges">
+        <img src="https://github.com/portuber/portato/actions/workflows/ci.yml/badge.svg" alt="CI">
+        <img src="https://github.com/portuber/portato/actions/workflows/security.yml/badge.svg" alt="security">
+        <img src="https://img.shields.io/github/v/release/portuber/portato" alt="Release">
+        <img src="https://img.shields.io/github/license/portuber/portato" alt="License: MIT">
+        <img src="https://img.shields.io/github/go-mod/go-version/portuber/portato" alt="Go Version">
+        <img src="https://www.codefactor.io/repository/github/portuber/portato/badge" alt="Codefactor">
+      </div>
+      <div class="cta">
+        <a class="btn btn-primary" href="#install">Install</a>
+        <a class="btn" href="https://github.com/portuber/portato">Source</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="demo" aria-label="Demo">
+    <div class="container">
+      <div class="demo-frame">
+        <!-- TODO: replace the placeholder with a demo GIF/screenshot:
+             <img src="assets/demo.gif" alt="Portato TUI demo" style="max-width:100%;border-radius:var(--radius)">
+        -->
+        <span class="demo-potato">🥔</span>
+        <p>Demo coming soon.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <div class="container">
+      <h2>What it does</h2>
+      <div class="grid">
+        <div class="card">
+          <h3>One screen for every tunnel</h3>
+          <p>Toggle, restart and watch all your SSH forwards from a single TUI — running standalone, or attached to a background daemon that keeps them alive.</p>
+        </div>
+        <div class="card">
+          <h3>Local, Remote, Dynamic SOCKS5</h3>
+          <p><code>-L</code>, <code>-R</code> and <code>-D</code> tunnels. A dynamic forward runs a SOCKS5 proxy so you can reach any internal address through the bastion without a forward per port.</p>
+        </div>
+        <div class="card">
+          <h3>Background daemon + seamless hand-off</h3>
+          <p>Start standalone, then hand off to the daemon without dropping a connection — already-bound local listeners are passed over SCM_RIGHTS, so the port never goes down.</p>
+        </div>
+        <div class="card">
+          <h3>Cross-platform</h3>
+          <p>macOS, Linux and Windows from the same release. Named-pipe IPC, ssh-agent over the OpenSSH pipe, and a registry Run-key autostart on Windows.</p>
+        </div>
+        <div class="card">
+          <h3>Security by default</h3>
+          <p>Native SSH via <code>golang.org/x/crypto/ssh</code> — no system <code>ssh</code> dependency. IPC bearer-token auth, OS-keyring identity storage, and <code>govulncheck</code> scanning in CI.</p>
+        </div>
+        <div class="card">
+          <h3>Dark / Light / Mono themes</h3>
+          <p>Auto-detected from <code>NO_COLOR</code> / <code>COLORFGBG</code>; force one with <code>PORTATO_THEME</code>. The light theme paints a real light surface across the whole TUI.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="install" id="install">
+    <div class="container">
+      <h2>Install</h2>
+      <div class="tabs" role="tablist" aria-label="Install methods">
+        <button type="button" role="tab" data-tab="brew" class="active" aria-selected="true">Homebrew</button>
+        <button type="button" role="tab" data-tab="scoop">Scoop</button>
+        <button type="button" role="tab" data-tab="deb">deb / rpm</button>
+        <button type="button" role="tab" data-tab="apk">apk</button>
+        <button type="button" role="tab" data-tab="binary">Binary</button>
+        <button type="button" role="tab" data-tab="go">go install</button>
+      </div>
+      <div class="tab-panels">
+        <div class="tab-panel active" data-tab="brew">
+          <pre><code># macOS / Linuxbrew
+brew install --cask portuber/tap/portato</code></pre>
+        </div>
+        <div class="tab-panel" data-tab="scoop">
+          <pre><code># Windows
+scoop bucket add portuber https://github.com/portuber/scoop-bucket
+scoop install portato/portato</code></pre>
+        </div>
+        <div class="tab-panel" data-tab="deb">
+          <pre><code># Linux (deb / rpm) — from the latest GitHub Release
+sudo dpkg -i portato_&lt;version&gt;_linux_amd64.deb
+# or: sudo rpm -i portato_&lt;version&gt;_linux_amd64.rpm</code></pre>
+        </div>
+        <div class="tab-panel" data-tab="apk">
+          <pre><code># Alpine (apk) — unsigned, so allow-untrusted is required
+sudo apk add --allow-untrusted portato_&lt;version&gt;_linux_amd64.apk</code></pre>
+        </div>
+        <div class="tab-panel" data-tab="binary">
+          <pre><code># macOS / Linux — download the archive from the latest Release, then:
+tar -xzf portato_&lt;version&gt;_macOS_arm64.tar.gz
+install -m 0755 portato ~/.local/bin/portato
+# Windows: expand the .zip and put portato.exe on PATH
+portato version</code></pre>
+        </div>
+        <div class="tab-panel" data-tab="go">
+          <pre><code># needs Go 1.26+
+go install github.com/portuber/portato/cmd/portato@latest</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="quickstart" id="quickstart">
+    <div class="container">
+      <h2>Quick start</h2>
+      <pre><code># macOS / Linux: ~/.config/portato/config.yaml
+# Windows:        %AppData%\portato\config.yaml
+tubers:
+  - name: redis
+    type: local          # -L: listen here, forward to the host
+    local: 6379
+    remote: 6379
+    ssh: user@bastion.example.com
+
+portato          # TUI (smart launcher: attaches to a running daemon or starts standalone)
+portato daemon   # background daemon + IPC server
+portato list     # status on stdout</code></pre>
+    </div>
+  </section>
+
+  <section class="links">
+    <div class="container">
+      <h2>Learn more</h2>
+      <ul>
+        <li><a href="https://github.com/portuber/portato#readme">README</a></li>
+        <li><a href="https://github.com/portuber/portato/blob/main/docs/SPEC.md">Technical spec</a></li>
+        <li><a href="https://github.com/portuber/portato/blob/main/docs/ROADMAP.md">Roadmap</a></li>
+        <li><a href="https://github.com/portuber/portato/releases">Releases</a></li>
+        <li><a href="https://github.com/portuber/portato/issues">Issues</a></li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>Distributed under the <a href="https://github.com/portuber/portato/blob/main/LICENSE">MIT License</a>. © 2026 Valerii Kipkaev.</p>
+      <p><a href="https://github.com/portuber/portato">github.com/portuber/portato</a></p>
+    </div>
+  </footer>
+
+  <script>
+    (function () {
+      var tabs = document.querySelectorAll('[role=tab]');
+      var panels = document.querySelectorAll('.tab-panel');
+      tabs.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.dataset.tab;
+          tabs.forEach(function (b) {
+            var on = b.dataset.tab === id;
+            b.classList.toggle('active', on);
+            b.setAttribute('aria-selected', on ? 'true' : 'false');
+          });
+          panels.forEach(function (p) { p.classList.toggle('active', p.dataset.tab === id); });
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
