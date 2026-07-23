@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -33,6 +35,32 @@ func TestRuntimeSocketPathUidScoped(t *testing.T) {
 	}
 	if filepath.Base(p) == "portato.sock" {
 		t.Fatalf("runtime socket name must be uid-scoped to avoid collisions, got %q", p)
+	}
+}
+
+// TestRuntimeSocketPathDarwinStableDir locks the Phase 40 fix: on macOS the
+// socket lives under the stable runtimeSocketDir (default xdg.StateHome/portato,
+// which macOS never reaps), NOT under the reaped os.TempDir()/$TMPDIR — so a
+// long-running daemon is not wedged when $TMPDIR rotates.
+func TestRuntimeSocketPathDarwinStableDir(t *testing.T) {
+	if runtime.GOOS != "darwin" {
+		t.Skip("darwin socket location only")
+	}
+	saved := runtimeSocketDir
+	t.Cleanup(func() { runtimeSocketDir = saved })
+	dir := "/tmp/pt-darwin-stable"
+	runtimeSocketDir = func() string { return dir }
+	t.Setenv("TMPDIR", "/tmp/some-reaped-tmpdir")
+
+	p, err := RuntimeSocketPath()
+	if err != nil {
+		t.Fatalf("RuntimeSocketPath: %v", err)
+	}
+	if filepath.Dir(p) != dir {
+		t.Fatalf("darwin socket dir = %q, want stable dir %q", filepath.Dir(p), dir)
+	}
+	if !strings.Contains(filepath.Base(p), "portato-") {
+		t.Fatalf("darwin socket name must stay uid-scoped, got %q", filepath.Base(p))
 	}
 }
 
@@ -127,16 +155,22 @@ func withIsolatedDiscovery(t *testing.T) (markerPath, runtimePath string) {
 	savedLock := lockPathFn
 	lockPathFn = func() (string, error) { return lp, nil }
 	t.Cleanup(func() { lockPathFn = savedLock })
-	// RuntimeSocketPath uses os.TempDir() on darwin; redirect it to a short
-	// dir under /tmp so (a) a host daemon's socket is not picked up by the
-	// fallback probe, and (b) the runtime path stays under sockaddr_un's
-	// sun_path limit (104 on macOS).
+	// RuntimeSocketPath's location differs by OS (Phase 40): on non-darwin it
+	// honours XDG_RUNTIME_DIR then os.TempDir(); on darwin it uses the
+	// runtimeSocketDir seam (xdg.StateHome is cached at package init, so
+	// t.Setenv cannot redirect it). Redirect BOTH to a short dir under /tmp so
+	// (a) a host daemon's socket is not picked up by the fallback probe, and
+	// (b) the runtime path stays under sockaddr_un's sun_path limit (104 on
+	// macOS).
 	shortTmp, err := os.MkdirTemp("/tmp", "pt-")
 	if err != nil {
 		t.Fatalf("MkdirTemp: %v", err)
 	}
 	t.Cleanup(func() { os.RemoveAll(shortTmp) })
 	t.Setenv("TMPDIR", shortTmp)
+	savedDir := runtimeSocketDir
+	runtimeSocketDir = func() string { return shortTmp }
+	t.Cleanup(func() { runtimeSocketDir = savedDir })
 	rp, err := RuntimeSocketPath()
 	if err != nil {
 		t.Fatalf("RuntimeSocketPath: %v", err)

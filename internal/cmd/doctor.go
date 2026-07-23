@@ -37,6 +37,15 @@ per check and exits non-zero on any failure.`,
 
 const doctorProbeTimeout = 500 * time.Millisecond
 
+// Overridable seams so tests can drive the daemon/wedged check without a real
+// daemon, marker, PID or `ps` invocation.
+var (
+	doctorResolveSocket    = daemon.ResolveSocket
+	doctorDiscoveryPath    = daemon.DiscoveryPath
+	doctorPidAlive         = daemon.PidAlive
+	doctorProcessIsPortato = processIsPortato
+)
+
 func doctorRunE(cmd *cobra.Command, _ []string) error {
 	out := cmd.OutOrStdout()
 	d := newDoctor(out)
@@ -157,10 +166,20 @@ func checkLogs(d *doctor) {
 }
 
 // checkDaemon probes daemon reachability (the daemon is optional, so absent is
-// informational) and, when reachable, that the IPC socket is owner-only.
+// informational) and, when reachable, that the IPC socket is owner-only. When
+// no socket answers but the marker records an alive portato PID, the daemon is
+// wedged (alive, holding the flock + ports, but its socket file was reaped) —
+// fail with the PID and the recovery hint instead of the benign "not running".
 func checkDaemon(d *doctor) {
-	socket, err := daemon.ResolveSocket()
+	socket, err := doctorResolveSocket()
 	if err != nil || socket == "" {
+		if mp, _ := doctorDiscoveryPath(); mp != "" {
+			if m, merr := daemon.ReadMarker(mp); merr == nil && m.PID > 0 &&
+				doctorPidAlive(m.PID) && doctorProcessIsPortato(m.PID) {
+				d.fail("daemon", "wedged: pid %d alive but its socket is unreachable; run `portato stop`", m.PID)
+				return
+			}
+		}
 		d.info("daemon", "not running (start with `portato daemon` or `portato install`)")
 		return
 	}

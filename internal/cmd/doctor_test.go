@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/portuber/portato/internal/daemon"
 )
 
 func runDoctor(t *testing.T, cfgPath string) (string, error) {
@@ -262,5 +264,60 @@ func TestDoctor_AutostartMissing(t *testing.T) {
 	}
 	if !strings.Contains(out, "· autostart") {
 		t.Errorf("output should report autostart as info\ngot:\n%s", out)
+	}
+}
+
+// withDaemonSeams wires doctor's daemon check at a marker that records pid, with
+// the given socket resolution and liveness/portato verdicts, restoring on cleanup.
+func withDaemonSeams(t *testing.T, resolveSocket func() (string, error), pid int, alive, isPortato bool) {
+	t.Helper()
+	rs, dp, pa, pp := doctorResolveSocket, doctorDiscoveryPath, doctorPidAlive, doctorProcessIsPortato
+	t.Cleanup(func() {
+		doctorResolveSocket, doctorDiscoveryPath, doctorPidAlive, doctorProcessIsPortato = rs, dp, pa, pp
+	})
+	doctorResolveSocket = resolveSocket
+	mp := filepath.Join(t.TempDir(), "daemon.socket")
+	if err := daemon.WriteMarker(mp, "/tmp/portato-test.sock", pid); err != nil {
+		t.Fatalf("write marker: %v", err)
+	}
+	doctorDiscoveryPath = func() (string, error) { return mp, nil }
+	doctorPidAlive = func(int) bool { return alive }
+	doctorProcessIsPortato = func(int) bool { return isPortato }
+}
+
+// TestDoctor_ReportsWedgedDaemon covers the Phase 40 diagnostic: no socket
+// answers, but the marker records an alive portato PID — a wedged daemon. doctor
+// fails with a "wedged" line naming the PID and the recovery hint.
+func TestDoctor_ReportsWedgedDaemon(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := writeMinimalConfig(t, dir)
+	withDaemonSeams(t, func() (string, error) { return "", nil }, 4242, true, true)
+	withLookPath(t, func(string) (string, error) { return "", os.ErrNotExist })
+
+	out, err := runDoctor(t, cfgPath)
+	if err == nil {
+		t.Fatalf("doctor should fail on a wedged daemon\ngot:\n%s", out)
+	}
+	for _, want := range []string{"✗ daemon", "wedged", "4242", "portato stop"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\ngot:\n%s", want, out)
+		}
+	}
+}
+
+// TestDoctor_IdleWhenMarkerPIDDead confirms doctor does not cry wolf when the
+// marker's PID is gone (a normal stale marker, not a wedged daemon).
+func TestDoctor_IdleWhenMarkerPIDDead(t *testing.T) {
+	dir := t.TempDir()
+	cfgPath := writeMinimalConfig(t, dir)
+	withDaemonSeams(t, func() (string, error) { return "", nil }, 99999, false, false)
+	withLookPath(t, func(string) (string, error) { return "", os.ErrNotExist })
+
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor should pass when no daemon is alive\ngot err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "· daemon") {
+		t.Errorf("output should report the daemon as idle info\ngot:\n%s", out)
 	}
 }

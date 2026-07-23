@@ -15,9 +15,11 @@ import (
 // cleanup.
 func restoreStopSeams(t *testing.T) {
 	t.Helper()
-	rs, rmp, rk, rp := stopResolveSocket, stopMarkerPath, stopKill, stopProbe
+	rs, rmp, rk, rp, rpa, rpp :=
+		stopResolveSocket, stopMarkerPath, stopKill, stopProbe, stopPidAlive, stopProcessIsPortato
 	t.Cleanup(func() {
-		stopResolveSocket, stopMarkerPath, stopKill, stopProbe = rs, rmp, rk, rp
+		stopResolveSocket, stopMarkerPath, stopKill, stopProbe, stopPidAlive, stopProcessIsPortato =
+			rs, rmp, rk, rp, rpa, rpp
 	})
 }
 
@@ -83,6 +85,49 @@ func TestStop_Timeout(t *testing.T) {
 	err := stopRunE(nil, nil)
 	if err == nil || !strings.Contains(err.Error(), "did not stop") {
 		t.Errorf("expected timeout error, got %v", err)
+	}
+}
+
+// TestStop_WedgedDaemonRecoversByPID covers the Phase 40 recovery path: no
+// socket answers (ResolveSocket returns ""), but the marker records an alive
+// portato PID — a daemon wedged by its reaped socket file. stop must SIGTERM
+// that PID (not delete the marker and report idle) and poll process liveness.
+func TestStop_WedgedDaemonRecoversByPID(t *testing.T) {
+	restoreStopSeams(t)
+	writeStopMarker(t, 7777)
+	stopResolveSocket = func() (string, error) { return "", nil }
+	stopProbe = func(string) bool { return false }
+	alive := atomic.Bool{}
+	alive.Store(true)
+	stopPidAlive = func(int) bool { return alive.Load() }
+	stopProcessIsPortato = func(int) bool { return true }
+	var signaled int32
+	stopKill = func(int) error { atomic.AddInt32(&signaled, 1); alive.Store(false); return nil }
+	stopPollInterval = 5 * time.Millisecond
+	stopTimeout = time.Second
+
+	if err := stopRunE(nil, nil); err != nil {
+		t.Fatalf("stopRunE: %v", err)
+	}
+	if atomic.LoadInt32(&signaled) != 1 {
+		t.Errorf("want exactly one SIGTERM by PID for a wedged daemon, got %d", signaled)
+	}
+}
+
+// TestStop_WedgedWrongProcessNoSignal guards against PID reuse: the marker's
+// PID is alive but is no longer portato, so stop must not signal it and falls
+// through to "no daemon running".
+func TestStop_WedgedWrongProcessNoSignal(t *testing.T) {
+	restoreStopSeams(t)
+	writeStopMarker(t, 8888)
+	stopResolveSocket = func() (string, error) { return "", nil }
+	stopProbe = func(string) bool { return false }
+	stopPidAlive = func(int) bool { return true }          // alive ...
+	stopProcessIsPortato = func(int) bool { return false } // ... but not portato (reused PID)
+	stopKill = func(int) error { t.Error("should not signal a non-portato PID"); return nil }
+
+	if err := stopRunE(nil, nil); err != nil {
+		t.Fatalf("stopRunE: %v", err)
 	}
 }
 
