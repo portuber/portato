@@ -55,7 +55,7 @@
 | 37  | TUI theme portability & color     | `[x]` | [phase-37-tui-theme-portability.md](./phases/phase-37-tui-theme-portability.md) |
 | 38  | TUI responsive layout              | `[x]` | [phase-38-tui-responsive-layout.md](./phases/phase-38-tui-responsive-layout.md) |
 | 39  | TUI polish (modals, microcopy)     | `[x]` | [phase-39-tui-polish.md](./phases/phase-39-tui-polish.md) |
-| 40  | Recover from / prevent the wedged daemon | `[~]` | [phase-40-wedged-daemon-recovery.md](./phases/phase-40-wedged-daemon-recovery.md) |
+| 40  | Recover from / prevent the wedged daemon | `[x]` | [phase-40-wedged-daemon-recovery.md](./phases/phase-40-wedged-daemon-recovery.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -162,11 +162,11 @@ time-based (not just size-based) log rotation.
 - **Phase 37** — TUI theme portability & color correctness (done, `[x]`): pick the palette against the real terminal background (`tea.RequestBackgroundColor` → `BackgroundColorMsg`, with an explicit `PORTATO_THEME` → OSC 11 → `COLORFGBG` → dark degradation chain), move palette resolution off package init onto `Model`, fix the light surface fill under tmux, and correct the contrast-failing dark colors + the mono `connecting`/`connected` glyph split. depends_on [15].
 - **Phase 38** — TUI responsive layout (done, `[x]`): the footer fits at 80/60 cols (`? help`/`q quit` visible), the `?` help overlay is reachable at 80×24, and the table columns shrink by priority (STATUS untouchable, ENDPOINT shrinks first, NAME flex, UPTIME right-aligned). depends_on [23].
 - **Phase 39** — TUI polish (done, `[x]`): interactive modals render in the footer zone with the list visible (footer-zone replace, not a dimmed overlay — a true overlay can't be theme-complete in mono/dark); footer pinned to the bottom edge; empty-state CTA → `n` with footer keys filtered; `hasLiveTubers` counts the Error state with mode-aware q-quit microcopy; attach header drops its socket path; error text keeps the actionable tail (row tail-truncation + a full-error detail strip); `C` duplicate auto-bumps the local port. depends_on [].
-- **Phase 40** — recover from / prevent the wedged daemon (in progress, `[~]`): on macOS the IPC socket lives under the reaped `$TMPDIR`, so when macOS unlinks it a running daemon is wedged (alive, holding the flock + local ports, but unreachable); `portato daemon` then says "already running", `portato stop` says "no daemon running", and the standalone TUI hits "address already in use". Prevention moves the darwin socket into the stable `xdg.StateHome/portato/` dir; recovery makes `stop` SIGTERM the wedged PID from the marker (guarded against PID reuse) and `doctor` diagnose it. depends_on [].
+- **Phase 40** — recover from / prevent the wedged daemon (done, `[x]`): on macOS the IPC socket lived under the reaped `$TMPDIR`, so when macOS unlinked it a running daemon was wedged (alive, holding the flock + local ports, but unreachable); `portato daemon` then said "already running", `portato stop` said "no daemon running", and the standalone TUI hit "address already in use". Prevention moves the darwin socket into the stable `xdg.StateHome/portato/` dir; recovery makes `stop` SIGTERM the wedged PID from the marker (guarded against PID reuse) and `doctor` diagnose it. Shipped in v0.4.2. depends_on [].
 
 ## Current work
 
-**Phases 0–39 are all `[x]`** (done). **Phase 40 is `[~]`** (in progress). The most recent batch:
+**Phases 0–40 are all `[x]`** (done). The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
@@ -192,12 +192,12 @@ time-based (not just size-based) log rotation.
   the attach header drops its socket path (`portato doctor` exposes it); error
   text keeps the actionable tail (row tail-truncation + a one-line full-error
   detail strip above the footer); and `C` duplicate auto-bumps the local port.
-- **Phase 40** — recover from / prevent the wedged daemon: on macOS the IPC
-  socket moves out of the reaped `$TMPDIR` into the stable
-  `xdg.StateHome/portato/` dir, and `portato stop`/`doctor` recover from /
-  diagnose the wedged state (an alive PID holding the flock + local ports but
-  an unreachable socket) instead of deleting the marker and reporting "no
-  daemon running".
+- **Phase 40** — recover from / prevent the wedged daemon (done, `[x]`; shipped
+  in v0.4.2): on macOS the IPC socket moved out of the reaped `$TMPDIR` into
+  the stable `xdg.StateHome/portato/` dir, and `portato stop`/`doctor` recover
+  from / diagnose the wedged state (an alive PID holding the flock + local
+  ports but an unreachable socket) instead of deleting the marker and reporting
+  "no daemon running".
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase

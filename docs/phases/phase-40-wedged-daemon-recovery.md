@@ -1,7 +1,7 @@
 ---
 phase: 40
 title: "Recover from / prevent the wedged daemon"
-status: in-progress
+status: done
 depends_on: []
 ---
 
