@@ -84,3 +84,12 @@ with the proper architecture: a runtime socket + a stable pointer to it.
 - Marker format: JSON vs plain two lines? (lean JSON for extensibility.)
 - Include the `--socket` / `PORTATO_SOCKET` override now or later? (lean: now,
   trivial.)
+
+## Later (Phase 40)
+
+The macOS `$TMPDIR` socket location chosen here turned out to be unstable:
+macOS periodically reaps and rotates `$TMPDIR`, which unlinks the socket file
+under a running daemon and *wedges* it (alive, but unreachable). Phase 40
+moved the macOS socket into the stable `xdg.StateHome/portato/` dir and added
+`stop`/`doctor` recovery for an already-wedged daemon. This history is kept
+intact; see [phase-40-wedged-daemon-recovery.md](./phase-40-wedged-daemon-recovery.md).

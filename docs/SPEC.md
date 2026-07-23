@@ -170,15 +170,20 @@ Implementations:
     `xdg.ConfigHome/portato/daemon.socket` — a small JSON document
     `{"socket":"<path>","pid":<int>}`, written atomically (tmp + rename),
     mode `0600`. Stable and env-independent.
-  - **Socket** (the thing that is listened on), under a runtime/temp dir,
-    uid-scoped to avoid collisions:
+  - **Socket** (the thing that is listened on), uid-scoped to avoid collisions:
     - Linux: `$XDG_RUNTIME_DIR/portato-<uid>.sock` (`/run/user/<uid>`, a per-user
       tmpfs set by systemd/logind; falls back to `os.TempDir()` when unset).
-    - macOS: `$TMPDIR/portato-<uid>.sock` (via `os.TempDir()`); macOS has no
-      reliable per-user runtime dir (`XDG_RUNTIME_DIR` is not set by the OS and
-      varies across terminal/tmux sessions), which is exactly why the marker is
-      needed — the socket path differs per session but the marker always points
-      at the live one.
+    - macOS: `~/Library/Application Support/portato/portato-<uid>.sock` (the XDG
+      state home). macOS has no reliable per-user runtime dir (`XDG_RUNTIME_DIR`
+      is not set by the OS and varies across terminal/tmux sessions). The earlier
+      choice of `$TMPDIR` was unstable: macOS periodically reaps and rotates
+      `$TMPDIR`, unlinking the socket file under a running daemon and *wedging*
+      it (alive — holding the single-instance lock and the local ports — but
+      unreachable, since the listener fd stays open on the orphaned inode). The
+      state home is stable and owner-only, so the socket survives temp-dir
+      cleanup (Phase 40). The marker still resolves the per-session variance
+      that remains on Linux, and `portato stop`/`doctor` recover from / diagnose
+      a wedged daemon by its marker PID when the rare reap + restart wedges it.
     - Windows: a named pipe `\\.\pipe\portato` (no socket file). The marker
       still records it as the `socket` field; the PID and the IPC token live in
       `%LOCALAPPDATA%\portato\` (the pipe has no sibling file to chmod).
