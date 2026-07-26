@@ -234,3 +234,104 @@ func TestWithTuberRemoved(t *testing.T) {
 		t.Error("expected not-found error")
 	}
 }
+
+func TestMoveTuberNode_SwapNext(t *testing.T) {
+	p := writeTmpConfig(t, commentedConfig)
+	if err := MoveTuberNode(p, "keep-me", +1); err != nil {
+		t.Fatalf("MoveTuberNode: %v", err)
+	}
+	c, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load after move: %v", err)
+	}
+	if len(c.Tubers) != 2 {
+		t.Fatalf("expected 2 tubers, got %d", len(c.Tubers))
+	}
+	if c.Tubers[0].Name != "edit-me" || c.Tubers[1].Name != "keep-me" {
+		t.Errorf("order after move: got %s, %s", c.Tubers[0].Name, c.Tubers[1].Name)
+	}
+}
+
+func TestMoveTuberNode_SwapPrev(t *testing.T) {
+	p := writeTmpConfig(t, commentedConfig)
+	if err := MoveTuberNode(p, "edit-me", -1); err != nil {
+		t.Fatalf("MoveTuberNode: %v", err)
+	}
+	c, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load after move: %v", err)
+	}
+	if c.Tubers[0].Name != "edit-me" || c.Tubers[1].Name != "keep-me" {
+		t.Errorf("order after move: got %s, %s", c.Tubers[0].Name, c.Tubers[1].Name)
+	}
+}
+
+func TestMoveTuberNode_AtBoundsIsNoOp(t *testing.T) {
+	p := writeTmpConfig(t, commentedConfig)
+	if err := MoveTuberNode(p, "keep-me", -1); err != nil { // first cannot move up
+		t.Fatalf("MoveTuberNode at top: %v", err)
+	}
+	if err := MoveTuberNode(p, "edit-me", +1); err != nil { // last cannot move down
+		t.Fatalf("MoveTuberNode at bottom: %v", err)
+	}
+	c, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if c.Tubers[0].Name != "keep-me" || c.Tubers[1].Name != "edit-me" {
+		t.Errorf("bounds move changed order: got %s, %s", c.Tubers[0].Name, c.Tubers[1].Name)
+	}
+}
+
+func TestMoveTuberNode_PreservesComments(t *testing.T) {
+	p := writeTmpConfig(t, commentedConfig)
+	if err := MoveTuberNode(p, "keep-me", +1); err != nil {
+		t.Fatalf("MoveTuberNode: %v", err)
+	}
+	data, _ := os.ReadFile(p)
+	out := string(data)
+	for _, want := range []string{
+		"# top-of-file comment",
+		"# manage production access here",
+		"# do not lose this comment",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestMoveTuberNode_NotFound(t *testing.T) {
+	p := writeTmpConfig(t, commentedConfig)
+	err := MoveTuberNode(p, "nope", +1)
+	if err == nil || !strings.Contains(err.Error(), "not found") {
+		t.Errorf("expected not-found error, got %v", err)
+	}
+}
+
+func TestWithTuberMoved(t *testing.T) {
+	c, err := Load(writeTmpConfig(t, commentedConfig))
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	out, err := c.WithTuberMoved("keep-me", +1)
+	if err != nil {
+		t.Fatalf("WithTuberMoved: %v", err)
+	}
+	if out.Tubers[0].Name != "edit-me" || out.Tubers[1].Name != "keep-me" {
+		t.Errorf("order after move: got %s, %s", out.Tubers[0].Name, out.Tubers[1].Name)
+	}
+	if c.Tubers[0].Name != "keep-me" || c.Tubers[1].Name != "edit-me" {
+		t.Errorf("original config mutated: got %s, %s", c.Tubers[0].Name, c.Tubers[1].Name)
+	}
+	bounds, err := c.WithTuberMoved("keep-me", -1)
+	if err != nil {
+		t.Fatalf("WithTuberMoved at bounds: %v", err)
+	}
+	if bounds.Tubers[0].Name != "keep-me" || bounds.Tubers[1].Name != "edit-me" {
+		t.Errorf("bounds move changed order: got %s, %s", bounds.Tubers[0].Name, bounds.Tubers[1].Name)
+	}
+	if _, err := c.WithTuberMoved("nope", +1); err == nil {
+		t.Error("expected not-found error")
+	}
+}

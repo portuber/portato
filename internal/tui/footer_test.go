@@ -120,16 +120,16 @@ func validFooterShape(tokens []string) bool {
 // compatible with the pre-Phase-38 fixed string) and the help lines are the
 // flattened binding.help entries in order.
 func TestFooter_SharedSource(t *testing.T) {
-	wantFull := "↑↓/jk move · space toggle · p passphrase · o password · " +
+	wantFull := "↑↓/jk move · shift+↑↓ reorder · space toggle · p passphrase · o password · " +
 		"r restart · a/x all · e edit · n new · C duplicate · d delete · " +
 		"l logs · / filter · R reload · ? help · q quit"
 	if got := joinFeet(tuberBindings(false), " · "); got != wantFull {
 		t.Errorf("joinFeet mismatch:\n got: %q\nwant: %q", got, wantFull)
 	}
-	// Help line count matches the audit's 17 (up/down and a/x expand to two).
+	// Help line count matches the audit (up/down, a/x and shift+↑↓ expand).
 	lines := helpLines(false)
-	if len(lines) != 17 {
-		t.Errorf("helpLines len = %d, want 17", len(lines))
+	if len(lines) != 19 {
+		t.Errorf("helpLines len = %d, want 19", len(lines))
 	}
 	// The q-quit help line is mode-aware (Phase 39, Task D): standalone offers
 	// to background running tubers; attach notes they keep running in the daemon.

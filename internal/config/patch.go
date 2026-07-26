@@ -127,6 +127,38 @@ func DeleteTuberNode(path, name string) error {
 	return SaveNode(path, doc)
 }
 
+// MoveTuberNode moves the tuber named name by delta positions within the
+// tubers sequence in the file at path. A delta of +1 swaps with the next
+// tuber, -1 with the previous; larger magnitudes move further. A move that
+// would leave the sequence bounds is a silent no-op, so callers can pass a
+// cursor delta without pre-checking edges. A missing name is an error. Only
+// the two swapped nodes are touched, so comments on every other tuber and on
+// defaults: are preserved.
+func MoveTuberNode(path, name string, delta int) error {
+	doc, err := LoadNode(path)
+	if err != nil {
+		return err
+	}
+	root, err := documentRoot(doc)
+	if err != nil {
+		return err
+	}
+	seq, err := tubersSequence(root, false)
+	if err != nil {
+		return err
+	}
+	idx := findTuberIndex(seq, name)
+	if idx < 0 {
+		return fmt.Errorf("tuber %q not found", name)
+	}
+	target := idx + delta
+	if target < 0 || target >= len(seq.Content) {
+		return nil
+	}
+	seq.Content[idx], seq.Content[target] = seq.Content[target], seq.Content[idx]
+	return SaveNode(path, doc)
+}
+
 // WithTuberAdded returns a copy of c with t appended, then prepared and
 // validated. It does not touch the file. Use it to validate a creation before
 // applying AddTuberNode.
@@ -177,6 +209,35 @@ func (c *Config) WithTuberRemoved(name string) (*Config, error) {
 		return nil, fmt.Errorf("tuber %q not found", name)
 	}
 	out.Tubers = append(out.Tubers[:idx], out.Tubers[idx+1:]...)
+	out.prepare()
+	if err := out.Validate(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// WithTuberMoved returns a copy of c where the tuber named name is moved by
+// delta positions, then prepared and validated. A move that would leave the
+// slice bounds is a silent no-op (the returned config keeps the input order),
+// mirroring MoveTuberNode. Use it to validate a move before applying
+// MoveTuberNode.
+func (c *Config) WithTuberMoved(name string, delta int) (*Config, error) {
+	out := c.clone()
+	idx := -1
+	for i := range out.Tubers {
+		if out.Tubers[i].Name == name {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil, fmt.Errorf("tuber %q not found", name)
+	}
+	target := idx + delta
+	if target < 0 || target >= len(out.Tubers) {
+		return out, nil
+	}
+	out.Tubers[idx], out.Tubers[target] = out.Tubers[target], out.Tubers[idx]
 	out.prepare()
 	if err := out.Validate(); err != nil {
 		return nil, err

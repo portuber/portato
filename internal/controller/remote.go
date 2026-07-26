@@ -28,6 +28,7 @@ type daemonClient interface {
 	AddTuber(t config.Tuber) error
 	UpdateTuber(name string, t config.Tuber) error
 	DeleteTuber(name string) error
+	MoveTuber(name string, delta int) error
 	Logs(name string) ([]routelog.Entry, error)
 	AcceptHost(name string) error
 	SetPassphrase(name, passphrase string) error
@@ -88,6 +89,13 @@ func (r *Remote) UpdateTuber(name string, t config.Tuber) error {
 }
 
 func (r *Remote) DeleteTuber(name string) error { return r.client.DeleteTuber(name) }
+
+// MoveTuber asks the daemon to reorder the tuber by delta positions in its
+// config. The daemon persists the new order and reloads; attached clients see
+// the change via the SSE event stream.
+func (r *Remote) MoveTuber(name string, delta int) error {
+	return r.client.MoveTuber(name, delta)
+}
 
 // Logs fetches the daemon's recent in-memory log entries for the TUI logs
 // screen. The daemon owns the ring buffer. Phase 11.

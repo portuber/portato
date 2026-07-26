@@ -26,8 +26,9 @@ type fakeCtrl struct {
 	adds      []config.Tuber
 	updates   []config.Tuber
 	deletes   []string
+	moves     []fakeMove
 	cfg       *config.Config
-	tunErr    error // returned by Add/Update/Delete when set
+	tunErr    error // returned by Add/Update/Delete/Move when set
 	logs      []routelog.Entry
 	accepted  []string
 	// passphrases records AcceptPassphrase submissions (name -> passphrase).
@@ -35,6 +36,12 @@ type fakeCtrl struct {
 	// passwords records AcceptPassword submissions (name -> password).
 	passwords map[string]string
 	changes   chan struct{}
+}
+
+// fakeMove records a MoveTuber call for assertions.
+type fakeMove struct {
+	name  string
+	delta int
 }
 
 func (f *fakeCtrl) List() []controller.Status {
@@ -115,6 +122,26 @@ func (f *fakeCtrl) DeleteTuber(name string) error {
 		return f.tunErr
 	}
 	f.deletes = append(f.deletes, name)
+	return nil
+}
+func (f *fakeCtrl) MoveTuber(name string, delta int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.tunErr != nil {
+		return f.tunErr
+	}
+	f.moves = append(f.moves, fakeMove{name: name, delta: delta})
+	for i := range f.statuses {
+		if f.statuses[i].Name != name {
+			continue
+		}
+		target := i + delta
+		if target < 0 || target >= len(f.statuses) {
+			return nil
+		}
+		f.statuses[i], f.statuses[target] = f.statuses[target], f.statuses[i]
+		return nil
+	}
 	return nil
 }
 

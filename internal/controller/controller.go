@@ -41,6 +41,11 @@ type Controller interface {
 	// DeleteTuber removes the tuber named name, persists and applies it; an
 	// active tuber is stopped by the engine reload.
 	DeleteTuber(name string) error
+	// MoveTuber moves the tuber named name by delta positions in the config
+	// (delta of +1 swaps with the next tuber, -1 with the previous), persists
+	// the new order and reloads. A move that would leave the list bounds is a
+	// silent no-op.
+	MoveTuber(name string, delta int) error
 
 	// Logs returns the recent in-memory log entries for the tuber named name
 	// (the Phase 11 ring buffer). An empty name returns every tuber's logs.

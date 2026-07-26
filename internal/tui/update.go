@@ -263,6 +263,8 @@ func (m Model) handleListKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleQuitAndViewKey(k)
 	case "up", "k", "down", "j":
 		return m.handleNavKey(k)
+	case "shift+up", "shift+down":
+		return m.handleReorderKey(k)
 	case "space", "p", "o", "r", "a", "x", "R", "/":
 		return m.handleToggleKey(k)
 	case "e", "n", "C", "d", "l":
@@ -300,6 +302,20 @@ func (m Model) handleNavKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		(&m).moveCursor(-1)
 	case "down", "j":
 		(&m).moveCursor(1)
+	}
+	return m, nil
+}
+
+// handleReorderKey reorders the selected tuber within the config: shift+up
+// moves it one slot earlier, shift+down one slot later. The cursor follows the
+// tuber to its new position. Kept as its own handler so handleListKey stays a
+// thin dispatcher under the gocyclo limit, like the other thematic groups.
+func (m Model) handleReorderKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	switch k.String() {
+	case "shift+up":
+		(&m).moveCurrent(-1)
+	case "shift+down":
+		(&m).moveCurrent(1)
 	}
 	return m, nil
 }
@@ -869,6 +885,28 @@ func (m *Model) moveCursor(delta int) {
 			return
 		}
 	}
+}
+
+// moveCurrent reorders the selected tuber by delta positions via the controller
+// and keeps the cursor on it. It is a no-op when a filter is narrowing the list
+// (reordering against hidden rows is ambiguous), when nothing is selected, or
+// when the move would leave the list bounds — the controller no-ops there too.
+func (m *Model) moveCurrent(delta int) {
+	if m.filter.Value() != "" || !m.hasCurrent() {
+		return
+	}
+	name := m.list[m.cursor].Name
+	if err := m.ctrl.MoveTuber(name, delta); err != nil {
+		return
+	}
+	m.list = m.ctrl.List()
+	for i, s := range m.list {
+		if s.Name == name {
+			m.cursor = i
+			return
+		}
+	}
+	m.clampCursor()
 }
 
 func (m *Model) clampCursor() {

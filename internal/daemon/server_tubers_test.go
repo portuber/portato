@@ -204,6 +204,77 @@ func TestServer_DeleteTuber_Unknown(t *testing.T) {
 	}
 }
 
+const testTwoTubersYAML = `# top comment
+defaults:
+  identity: ~/.ssh/id
+# the tubers
+tubers:
+  - name: db  # keep this comment
+    type: local
+    local: 5432
+    remote: db:5432
+    ssh: u@h:22
+    enabled: false
+  - name: web
+    type: local
+    local: 8080
+    remote: web:80
+    ssh: u@h:22
+    enabled: false
+`
+
+func TestServer_MoveTuber(t *testing.T) {
+	_, fe, cfgPath, tc := newTuberServer(t, testTwoTubersYAML)
+
+	if err := tc.MoveTuber("db", +1); err != nil {
+		t.Fatalf("MoveTuber: %v", err)
+	}
+	persisted, err := config.Load(cfgPath)
+	if err != nil {
+		t.Fatalf("Load after move: %v", err)
+	}
+	if len(persisted.Tubers) != 2 || persisted.Tubers[0].Name != "web" || persisted.Tubers[1].Name != "db" {
+		t.Errorf("persisted order = %s, %s", persisted.Tubers[0].Name, persisted.Tubers[1].Name)
+	}
+	names := tuberNames(fe)
+	if names[0] != "web" || names[1] != "db" {
+		t.Errorf("engine order after reload = %v", names)
+	}
+}
+
+func TestServer_MoveTuber_AtBoundsNoOp(t *testing.T) {
+	_, _, cfgPath, tc := newTuberServer(t, testTwoTubersYAML)
+	// web is last: moving it down is a silent no-op but still answers 200.
+	if err := tc.MoveTuber("web", +1); err != nil {
+		t.Fatalf("MoveTuber at bottom: %v", err)
+	}
+	persisted, _ := config.Load(cfgPath)
+	if persisted.Tubers[0].Name != "db" || persisted.Tubers[1].Name != "web" {
+		t.Errorf("bounds move changed order: %s, %s", persisted.Tubers[0].Name, persisted.Tubers[1].Name)
+	}
+}
+
+func TestServer_MoveTuber_PreservesComments(t *testing.T) {
+	_, _, cfgPath, tc := newTuberServer(t, testTwoTubersYAML)
+	if err := tc.MoveTuber("db", +1); err != nil {
+		t.Fatalf("MoveTuber: %v", err)
+	}
+	data, _ := os.ReadFile(cfgPath)
+	out := string(data)
+	for _, want := range []string{"# top comment", "# the tubers", "# keep this comment"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("output missing %q\n%s", want, out)
+		}
+	}
+}
+
+func TestServer_MoveTuber_Unknown(t *testing.T) {
+	_, _, _, tc := newTuberServer(t, testTwoTubersYAML)
+	if err := tc.MoveTuber("nope", +1); err == nil {
+		t.Error("expected not-found error")
+	}
+}
+
 func tuberNames(fe *fakeEngine) []string {
 	fe.mu.Lock()
 	defer fe.mu.Unlock()

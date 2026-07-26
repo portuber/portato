@@ -204,6 +204,14 @@ func (c *Client) DeleteTuber(name string) error {
 	return c.sendBody(http.MethodDelete, fmt.Sprintf("/tubers/%s", name), nil)
 }
 
+// MoveTuber asks the daemon to reorder the tuber named name by delta positions
+// (delta of +1 swaps with the next tuber, -1 with the previous). A move that
+// would leave the list bounds is a silent no-op on the daemon side.
+func (c *Client) MoveTuber(name string, delta int) error {
+	_, err := c.post(fmt.Sprintf("/tubers/%s/move?delta=%d", name, delta))
+	return err
+}
+
 // Logs fetches the recent in-memory log entries for a tuber from the daemon's
 // ring buffer (Phase 11). An empty name returns every tuber's entries.
 func (c *Client) Logs(name string) ([]routelog.Entry, error) {

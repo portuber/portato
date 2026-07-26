@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -371,6 +372,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /tubers", s.handleAddTuber)
 	mux.HandleFunc("PUT /tubers/{name}", s.handleUpdateTuber)
 	mux.HandleFunc("DELETE /tubers/{name}", s.handleDeleteTuber)
+	mux.HandleFunc("POST /tubers/{name}/move", s.handleMoveTuber)
 	if s.token == "" {
 		return mux
 	}
@@ -847,6 +849,39 @@ func (s *Server) handleDeleteTuber(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "tuber": name})
+}
+
+// handleMoveTuber reorders the tuber named {name} by ?delta= positions: parse
+// the delta, validate the prospective order, patch the file (comment-
+// preserving), reload. A move that would leave the list bounds is a silent
+// no-op (validate and patch both allow it through with no change), answered
+// 200 with status "moved".
+func (s *Server) handleMoveTuber(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	delta, err := strconv.Atoi(r.URL.Query().Get("delta"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "delta must be an integer")
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.hasTuber(name) {
+		writeError(w, http.StatusNotFound, "unknown tuber %q", name)
+		return
+	}
+	if _, err := s.cfg.WithTuberMoved(name, delta); err != nil {
+		writeError(w, http.StatusBadRequest, "%v", err)
+		return
+	}
+	if err := config.MoveTuberNode(s.cfgPath, name, delta); err != nil {
+		writeError(w, http.StatusInternalServerError, "persist: %v", err)
+		return
+	}
+	if err := s.applyReload(); err != nil {
+		writeError(w, http.StatusInternalServerError, "reload: %v", err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "moved", "tuber": name})
 }
 
 func decodeTuber(r *http.Request) (config.Tuber, error) {

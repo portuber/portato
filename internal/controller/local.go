@@ -163,6 +163,19 @@ func (l *Local) DeleteTuber(name string) error {
 	return l.Reload()
 }
 
+// MoveTuber reorders the tuber named name by delta positions: validate the
+// prospective order, patch the file (comment-preserving), reload. A move that
+// would leave the list bounds is a silent no-op at every layer.
+func (l *Local) MoveTuber(name string, delta int) error {
+	if _, err := l.cfg.WithTuberMoved(name, delta); err != nil {
+		return err
+	}
+	if err := config.MoveTuberNode(l.cfgPath, name, delta); err != nil {
+		return err
+	}
+	return l.Reload()
+}
+
 // Logs returns the recent in-memory log entries for name from the shared ring
 // buffer (nil-safe: an unconfigured ring yields nil). Phase 11.
 func (l *Local) Logs(name string) ([]routelog.Entry, error) {

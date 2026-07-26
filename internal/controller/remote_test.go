@@ -14,6 +14,11 @@ import (
 	routelog "github.com/portuber/portato/internal/log"
 )
 
+type moveCall struct {
+	name  string
+	delta int
+}
+
 type fakeClient struct {
 	list []forward.Status
 	err  error
@@ -24,6 +29,7 @@ type fakeClient struct {
 	adds     []config.Tuber
 	updates  []config.Tuber
 	deletes  []string
+	moves    []moveCall
 	muTubers sync.Mutex
 
 	mu      sync.Mutex
@@ -62,6 +68,12 @@ func (f *fakeClient) DeleteTuber(name string) error {
 	f.muTubers.Lock()
 	defer f.muTubers.Unlock()
 	f.deletes = append(f.deletes, name)
+	return f.err
+}
+func (f *fakeClient) MoveTuber(name string, delta int) error {
+	f.muTubers.Lock()
+	defer f.muTubers.Unlock()
+	f.moves = append(f.moves, moveCall{name: name, delta: delta})
 	return f.err
 }
 
@@ -140,6 +152,23 @@ func TestRemote_MutationsDelegate(t *testing.T) {
 	}
 	if fc.enables != 1 || fc.disables != 1 || fc.restarts != 1 || fc.reloads != 1 {
 		t.Fatalf("counts = enables:%d disables:%d restarts:%d reloads:%d", fc.enables, fc.disables, fc.restarts, fc.reloads)
+	}
+}
+
+// TestRemote_MoveTuberDelegates asserts MoveTuber forwards name and delta to
+// the daemon client, and that the client's error propagates.
+func TestRemote_MoveTuberDelegates(t *testing.T) {
+	fc := &fakeClient{}
+	r := newRemote(fc)
+	if err := r.MoveTuber("db", -1); err != nil {
+		t.Fatalf("MoveTuber: %v", err)
+	}
+	if len(fc.moves) != 1 || fc.moves[0].name != "db" || fc.moves[0].delta != -1 {
+		t.Fatalf("got %+v", fc.moves)
+	}
+	fc.err = errors.New("boom")
+	if err := r.MoveTuber("db", +1); err == nil {
+		t.Error("expected the fake error to propagate from MoveTuber")
 	}
 }
 
