@@ -1,7 +1,7 @@
 ---
 phase: 42
 title: "portato logs"
-status: in-progress
+status: done
 depends_on: [13]
 ---
 
@@ -60,17 +60,17 @@ full history + archives, and supports `--follow` / `--since`.
 
 ## Definition of Done
 
-- [ ] `portato logs` prints the daemon log (fallback standalone) from the
+- [x] `portato logs` prints the daemon log (fallback standalone) from the
       persisted file, with no running daemon required.
-- [ ] `-f/--follow` tails new lines and survives a rotation (re-opens
+- [x] `-f/--follow` tails new lines and survives a rotation (re-opens
       when the file shrinks or the inode changes).
-- [ ] `-n/--lines`, `--since`, `--tuber`, `--all` all behave as specified.
-- [ ] A nonexistent log file prints a clear message (path + "run portato
+- [x] `-n/--lines`, `--since`, `--tuber`, `--all` all behave as specified.
+- [x] A nonexistent log file prints a clear message (path + "run portato
       / portato daemon to create it") and exits 0 (not an error).
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run
       ./...` are clean; new functions sit under gocyclo 15; the phase's
       tests are green.
-- [ ] README command-table + SPEC note updated.
+- [x] README command-table + SPEC note updated.
 
 ## Verification
 

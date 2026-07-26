@@ -57,7 +57,7 @@
 | 39  | TUI polish (modals, microcopy)     | `[x]` | [phase-39-tui-polish.md](./phases/phase-39-tui-polish.md) |
 | 40  | Recover from / prevent the wedged daemon | `[x]` | [phase-40-wedged-daemon-recovery.md](./phases/phase-40-wedged-daemon-recovery.md) |
 | 41  | Forwarding-permission diagnostics | `[x]` | [phase-41-forwarding-permission-diagnostics.md](./phases/phase-41-forwarding-permission-diagnostics.md) |
-| 42  | `portato logs` (tail/follow)      | `[~]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
+| 42  | `portato logs` (tail/follow)      | `[x]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -166,11 +166,11 @@ time-based (not just size-based) log rotation.
 - **Phase 39** — TUI polish (done, `[x]`): interactive modals render in the footer zone with the list visible (footer-zone replace, not a dimmed overlay — a true overlay can't be theme-complete in mono/dark); footer pinned to the bottom edge; empty-state CTA → `n` with footer keys filtered; `hasLiveTubers` counts the Error state with mode-aware q-quit microcopy; attach header drops its socket path; error text keeps the actionable tail (row tail-truncation + a full-error detail strip); `C` duplicate auto-bumps the local port. depends_on [].
 - **Phase 40** — recover from / prevent the wedged daemon (done, `[x]`): on macOS the IPC socket lived under the reaped `$TMPDIR`, so when macOS unlinked it a running daemon was wedged (alive, holding the flock + local ports, but unreachable); `portato daemon` then said "already running", `portato stop` said "no daemon running", and the standalone TUI hit "address already in use". Prevention moves the darwin socket into the stable `xdg.StateHome/portato/` dir; recovery makes `stop` SIGTERM the wedged PID from the marker (guarded against PID reuse) and `doctor` diagnose it. Shipped in v0.4.2. depends_on [].
 - **Phase 41** — forwarding-permission diagnostics (done, `[x]`): `portato doctor --probe` (opt-in) dials each configured host with key-only auth and classifies the server-side sshd gate — chiefly detecting `AllowTcpForwarding no` (a direct-tcpip open rejected with `ssh.Prohibited`), plus connectivity/auth; a non-loopback `-R` bind gets an honest "GatewayPorts not verifiable client-side" caveat (the silent-loopback downgrade is not client-detectable — RFC 4254 §7.1). The `-L`/`-D` runtime dial surfaces an `AllowTcpForwarding` hint on such a rejection. depends_on [11, 7, 8].
-- **Phase 42** — `portato logs` (in progress, `[~]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
+- **Phase 42** — `portato logs` (done, `[x]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
 
 ## Current work
 
-**Phases 0–41 are all `[x]`; phase 42 (`portato logs`) is `[~]`.** The most recent batch:
+**Phases 0–42 are all `[x]`.** The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
@@ -212,10 +212,12 @@ time-based (not just size-based) log rotation.
   client-side" caveat (the silent-loopback downgrade is not client-detectable —
   RFC 4254 §7.1).
 
-- **Phase 42** — `portato logs` (in progress, `[~]`): a CLI command to read the
+- **Phase 42** — `portato logs` (done, `[x]`): a CLI command to read the
   persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`,
   `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` /
   `journalctl` equivalent (the TUI `l` view is a live ring buffer only).
+  Verified end-to-end against the real daemon log: `--tuber` filters on the
+  current `tuber=` attr, and `--follow` streams live.
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase
