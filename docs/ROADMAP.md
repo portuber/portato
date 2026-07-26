@@ -57,6 +57,7 @@
 | 39  | TUI polish (modals, microcopy)     | `[x]` | [phase-39-tui-polish.md](./phases/phase-39-tui-polish.md) |
 | 40  | Recover from / prevent the wedged daemon | `[x]` | [phase-40-wedged-daemon-recovery.md](./phases/phase-40-wedged-daemon-recovery.md) |
 | 41  | Forwarding-permission diagnostics | `[x]` | [phase-41-forwarding-permission-diagnostics.md](./phases/phase-41-forwarding-permission-diagnostics.md) |
+| 42  | `portato logs` (tail/follow)      | `[~]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -87,7 +88,7 @@ end-to-end on a real Windows host (named-pipe IPC, daemon/TUI, password auth,
 TOFU host-key prompt, reconnect loop); the `windows-smoke` CI job then ran
 green on main (install/uninstall + daemon/list round-trip over the named pipe).
 `portato doctor` and ssh-agent-over-named-pipe remain maintainer-accepted (see
-phase-17 "Verification status"). Phase 21 (packaging) is done: **v0.4.x is the latest release line — v0.4.0 shipped phases 36–39, v0.4.1 adds the Alpine apk package** (GitHub Release + Homebrew cask + Scoop bucket + deb/rpm/apk, bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); the Scoop auto-publish pipeline is proven (a release end-to-end, including the Scoop bucket commit, ran green). Phase 34 (`portato license` + `--license`) and Phase 35 (SSH password auth, on by default) shipped in v0.3.0; v0.3.1/v0.3.2 are release-pipeline patches (Scoop publishing) over identical binaries; v0.4.0 shipped phases 36–39 (CI security hardening, TUI theme portability, responsive layout, TUI polish).** The single binary runs the smart launcher
+phase-17 "Verification status"). Phase 21 (packaging) is done: **v0.6.0 is the latest release — v0.4.0 shipped phases 36–39, v0.4.1 adds the Alpine apk package** (GitHub Release + Homebrew cask + Scoop bucket + deb/rpm/apk, bundling `THIRD_PARTY_LICENSES.txt` via Phase 32); the Scoop auto-publish pipeline is proven (a release end-to-end, including the Scoop bucket commit, ran green). Phase 34 (`portato license` + `--license`) and Phase 35 (SSH password auth, on by default) shipped in v0.3.0; v0.3.1/v0.3.2 are release-pipeline patches (Scoop publishing) over identical binaries; v0.4.0 shipped phases 36–39 (CI security hardening, TUI theme portability, responsive layout, TUI polish).** The single binary runs the smart launcher
 (attaches to a running daemon or starts standalone), a background daemon with
 HTTP-over-unix-socket IPC, an interactive TUI, the CLI commands, and system
 autostart (`install`/`uninstall` via launchd / systemd --user). It supports
@@ -165,10 +166,11 @@ time-based (not just size-based) log rotation.
 - **Phase 39** — TUI polish (done, `[x]`): interactive modals render in the footer zone with the list visible (footer-zone replace, not a dimmed overlay — a true overlay can't be theme-complete in mono/dark); footer pinned to the bottom edge; empty-state CTA → `n` with footer keys filtered; `hasLiveTubers` counts the Error state with mode-aware q-quit microcopy; attach header drops its socket path; error text keeps the actionable tail (row tail-truncation + a full-error detail strip); `C` duplicate auto-bumps the local port. depends_on [].
 - **Phase 40** — recover from / prevent the wedged daemon (done, `[x]`): on macOS the IPC socket lived under the reaped `$TMPDIR`, so when macOS unlinked it a running daemon was wedged (alive, holding the flock + local ports, but unreachable); `portato daemon` then said "already running", `portato stop` said "no daemon running", and the standalone TUI hit "address already in use". Prevention moves the darwin socket into the stable `xdg.StateHome/portato/` dir; recovery makes `stop` SIGTERM the wedged PID from the marker (guarded against PID reuse) and `doctor` diagnose it. Shipped in v0.4.2. depends_on [].
 - **Phase 41** — forwarding-permission diagnostics (done, `[x]`): `portato doctor --probe` (opt-in) dials each configured host with key-only auth and classifies the server-side sshd gate — chiefly detecting `AllowTcpForwarding no` (a direct-tcpip open rejected with `ssh.Prohibited`), plus connectivity/auth; a non-loopback `-R` bind gets an honest "GatewayPorts not verifiable client-side" caveat (the silent-loopback downgrade is not client-detectable — RFC 4254 §7.1). The `-L`/`-D` runtime dial surfaces an `AllowTcpForwarding` hint on such a rejection. depends_on [11, 7, 8].
+- **Phase 42** — `portato logs` (in progress, `[~]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
 
 ## Current work
 
-**Phases 0–41 are all `[x]`** (done). The most recent batch:
+**Phases 0–41 are all `[x]`; phase 42 (`portato logs`) is `[~]`.** The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
@@ -209,6 +211,11 @@ time-based (not just size-based) log rotation.
   non-loopback `-R` bind gets an honest "GatewayPorts not verifiable
   client-side" caveat (the silent-loopback downgrade is not client-detectable —
   RFC 4254 §7.1).
+
+- **Phase 42** — `portato logs` (in progress, `[~]`): a CLI command to read the
+  persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`,
+  `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` /
+  `journalctl` equivalent (the TUI `l` view is a live ring buffer only).
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase
