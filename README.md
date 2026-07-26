@@ -13,6 +13,8 @@
 individual SSH tunnels on and off, restart them, and watch their status from a
 single screen — either running standalone, or attached to a background daemon.
 
+<p align="center"><img src="docs/landing/assets/hero.gif" alt="Portato TUI demo" width="720"></p>
+
 The single binary works in several modes:
 
 | Command                          | What it does                                                        |
