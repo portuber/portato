@@ -652,7 +652,7 @@ func (t *Tuber) runRemote(ctx context.Context, done chan<- struct{}) {
 		bindAddr := t.cfg.RemoteListenAddr()
 		ln, lerr := client.Listen("tcp", bindAddr)
 		if lerr != nil {
-			t.setStateErr(Error, fmt.Sprintf("listen %s on server: %v (check GatewayPorts in sshd_config)", bindAddr, lerr))
+			t.setStateErr(Error, fmt.Sprintf("listen %s on server: %v (check AllowTcpForwarding on the server; for a non-loopback bind also GatewayPorts, in sshd_config)", bindAddr, lerr))
 			_ = client.Close()
 			attempt++
 			if !t.sleep(ctx, nextBackoff(attempt)) {
