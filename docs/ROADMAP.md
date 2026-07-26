@@ -56,6 +56,7 @@
 | 38  | TUI responsive layout              | `[x]` | [phase-38-tui-responsive-layout.md](./phases/phase-38-tui-responsive-layout.md) |
 | 39  | TUI polish (modals, microcopy)     | `[x]` | [phase-39-tui-polish.md](./phases/phase-39-tui-polish.md) |
 | 40  | Recover from / prevent the wedged daemon | `[x]` | [phase-40-wedged-daemon-recovery.md](./phases/phase-40-wedged-daemon-recovery.md) |
+| 41  | Forwarding-permission diagnostics | `[~]` | [phase-41-forwarding-permission-diagnostics.md](./phases/phase-41-forwarding-permission-diagnostics.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -163,10 +164,15 @@ time-based (not just size-based) log rotation.
 - **Phase 38** — TUI responsive layout (done, `[x]`): the footer fits at 80/60 cols (`? help`/`q quit` visible), the `?` help overlay is reachable at 80×24, and the table columns shrink by priority (STATUS untouchable, ENDPOINT shrinks first, NAME flex, UPTIME right-aligned). depends_on [23].
 - **Phase 39** — TUI polish (done, `[x]`): interactive modals render in the footer zone with the list visible (footer-zone replace, not a dimmed overlay — a true overlay can't be theme-complete in mono/dark); footer pinned to the bottom edge; empty-state CTA → `n` with footer keys filtered; `hasLiveTubers` counts the Error state with mode-aware q-quit microcopy; attach header drops its socket path; error text keeps the actionable tail (row tail-truncation + a full-error detail strip); `C` duplicate auto-bumps the local port. depends_on [].
 - **Phase 40** — recover from / prevent the wedged daemon (done, `[x]`): on macOS the IPC socket lived under the reaped `$TMPDIR`, so when macOS unlinked it a running daemon was wedged (alive, holding the flock + local ports, but unreachable); `portato daemon` then said "already running", `portato stop` said "no daemon running", and the standalone TUI hit "address already in use". Prevention moves the darwin socket into the stable `xdg.StateHome/portato/` dir; recovery makes `stop` SIGTERM the wedged PID from the marker (guarded against PID reuse) and `doctor` diagnose it. Shipped in v0.4.2. depends_on [].
+- **Phase 41** — forwarding-permission diagnostics (in progress, `[~]`): `portato doctor --probe` non-interactively dials each configured host and classifies the server-side sshd gate (`AllowTcpForwarding no` / `GatewayPorts no` silent loopback / connectivity / auth); the runtime also detects the `-R` silent-loopback downgrade (inspect `ln.Addr()`) and adds `AllowTcpForwarding` hints to `-L`/`-D` dial failures. depends_on [11, 7, 8].
 
 ## Current work
 
-**Phases 0–40 are all `[x]`** (done). The most recent batch:
+**Phases 0–40 are all `[x]`** (done). **Phase 41 (forwarding-permission
+diagnostics) is `[~]`** (in progress): `portato doctor --probe` classifies the
+server-side sshd gate per host, and the runtime detects the `-R` silent-loopback
+downgrade + adds `AllowTcpForwarding` hints to `-L`/`-D` dial failures. The most
+recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
