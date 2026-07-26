@@ -80,6 +80,11 @@ type SSHD struct {
 	// entry when accept_new_hosts is false.
 	Ed25519Pub ssh.PublicKey
 
+	// rejectForward, when true, models `AllowTcpForwarding no`: direct-tcpip
+	// channel opens are rejected with ssh.Prohibited and tcpip-forward global
+	// requests reply false. Set by NewSSHDNoForward.
+	rejectForward bool
+
 	listener net.Listener
 	tracker  *connTracker
 }
@@ -136,6 +141,19 @@ func NewSSHDKeyAndPassword(tb testing.TB, authorizedKey ssh.PublicKey, password 
 		return nil, fmt.Errorf("wrong password")
 	}
 	return &SSHD{tb: tb, cfg: cfg, tracker: &connTracker{}, Ed25519Pub: edPub}
+}
+
+// NewSSHDNoForward builds a test SSH server that authenticates authorizedKey
+// but rejects every direct-tcpip channel open (ssh.Prohibited) and every
+// tcpip-forward global request (reply false) — modelling an sshd with
+// `AllowTcpForwarding no`. It is the Phase 41 forwarding-probe fixture: a
+// client.Dial surfaces *ssh.OpenChannelError{Reason: ssh.Prohibited} and a
+// client.Listen surfaces a tcpip-forward request failure.
+func NewSSHDNoForward(tb testing.TB, authorizedKey ssh.PublicKey) *SSHD {
+	tb.Helper()
+	s := NewSSHD(tb, authorizedKey)
+	s.rejectForward = true
+	return s
 }
 
 // hostKeyConfig returns a fresh ssh.ServerConfig carrying both an ED25519 and an
@@ -230,6 +248,10 @@ func (s *SSHD) handleConn(nConn net.Conn) {
 			_ = nch.Reject(ssh.UnknownChannelType, "only direct-tcpip")
 			continue
 		}
+		if s.rejectForward {
+			_ = nch.Reject(ssh.Prohibited, "allowtcpforwarding off")
+			continue
+		}
 		var d directTCPIP
 		if err := ssh.Unmarshal(nch.ExtraData(), &d); err != nil {
 			_ = nch.Reject(ssh.Prohibited, "bad payload")
@@ -300,6 +322,10 @@ func (s *SSHD) serveForwards(sconn *ssh.ServerConn, reqs <-chan *ssh.Request) {
 	for r := range reqs {
 		switch r.Type {
 		case "tcpip-forward":
+			if s.rejectForward {
+				r.Reply(false, nil)
+				continue
+			}
 			var p forwardRequest
 			if err := ssh.Unmarshal(r.Payload, &p); err != nil {
 				r.Reply(false, nil)
