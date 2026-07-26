@@ -5,10 +5,12 @@ import (
 	"crypto/ed25519"
 	"crypto/rand"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/portuber/portato/internal/config"
@@ -125,5 +127,21 @@ func TestIsNonLoopbackBind(t *testing.T) {
 		if got := isNonLoopbackBind(c.addr); got != c.want {
 			t.Errorf("isNonLoopbackBind(%q) = %v, want %v", c.addr, got, c.want)
 		}
+	}
+}
+
+func TestDialHintMsg(t *testing.T) {
+	prohibited := &ssh.OpenChannelError{Reason: ssh.Prohibited, Message: "admin"}
+	connFailed := &ssh.OpenChannelError{Reason: ssh.ConnectionFailed, Message: "refused"}
+
+	if got := dialHintMsg("dial remote failed", errors.New("boom")); got != "dial remote failed" {
+		t.Errorf("plain error: got %q, want prefix unchanged", got)
+	}
+	got := dialHintMsg("dial remote failed", prohibited)
+	if !strings.Contains(got, "AllowTcpForwarding") {
+		t.Errorf("prohibited rejection: got %q, want the AllowTcpForwarding hint", got)
+	}
+	if got := dialHintMsg("socks5 dial failed", connFailed); got != "socks5 dial failed" {
+		t.Errorf("non-prohibited rejection: got %q, want prefix unchanged", got)
 	}
 }

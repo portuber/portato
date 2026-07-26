@@ -140,6 +140,18 @@ func isProhibited(err error) bool {
 	return errors.As(err, &oce) && oce.Reason == ssh.Prohibited
 }
 
+// dialHintMsg returns the log message for a -L/-D client.Dial failure, with an
+// AllowTcpForwarding hint appended when the server rejected the direct-tcpip
+// open (ssh.Prohibited). Used by the runtime dial paths so a -L/-D tunnel that
+// fails because of `AllowTcpForwarding no` says so in the `l` log screen
+// instead of a bare "dial remote failed".
+func dialHintMsg(prefix string, err error) string {
+	if isProhibited(err) {
+		return prefix + ": direct-tcpip rejected (AllowTcpForwarding no on the server?)"
+	}
+	return prefix
+}
+
 // isNonLoopbackBind reports whether addr (a RemoteListenAddr such as ":16379",
 // "*:16379", "0.0.0.0:16379", or "127.0.0.1:16379") asks the server to bind a
 // non-loopback interface — the case where GatewayPorts matters.

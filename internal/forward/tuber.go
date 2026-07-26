@@ -545,7 +545,7 @@ func (t *Tuber) acceptLoop(ctx context.Context, ln net.Listener) {
 func (t *Tuber) handleConn(client *ssh.Client, conn net.Conn) {
 	remote, err := client.Dial("tcp", t.cfg.Remote)
 	if err != nil {
-		t.log.Warn("dial remote failed", "remote", t.cfg.Remote, "err", err)
+		t.log.Warn(dialHintMsg("dial remote failed", err), "remote", t.cfg.Remote, "err", err)
 		_ = conn.Close()
 		return
 	}
@@ -566,7 +566,7 @@ func (t *Tuber) handleDynamicConn(client *ssh.Client, conn net.Conn) {
 		Dial: func(_ context.Context, network, addr string) (net.Conn, error) {
 			c, derr := client.Dial(network, addr)
 			if derr != nil {
-				t.log.Warn("socks5 dial failed", "dest", addr, "err", derr)
+				t.log.Warn(dialHintMsg("socks5 dial failed", derr), "dest", addr, "err", derr)
 				return nil, derr
 			}
 			t.log.Debug("socks5 dial", "dest", addr)
