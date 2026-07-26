@@ -30,7 +30,7 @@ The single binary works in several modes:
 | `portato uninstall`          | Remove system autostart                                             |
 | `portato add-identity <path>`| Cache a passphrase for a passphrase-protected SSH key (OS keyring)  |
 | `portato forget-identity <path>` | Forget a cached identity passphrase                             |
-| `portato doctor`             | Diagnose the setup (config, keys, agent, daemon, logs)             |
+| `portato doctor`             | Diagnose the setup (config, keys, agent, daemon); `--probe` also checks each server's forwarding permission |
 | `portato version`            | Print the version                                                   |
 | `portato license`            | Print license information (`--full` prints the full MIT text)       |
 
@@ -304,8 +304,8 @@ daemon, and prints a `✓`/`✗` line per check.
 | `portato list` errors with "daemon not running" | Start the daemon: `portato daemon`, or `portato install` to autostart it. |
 | `✗ auth failed` | Start `ssh-agent` / `ssh-add`, or set an `identity:` key. Run `portato doctor`. |
 | Tunnels die after logout (Linux) | Enable lingering: `loginctl enable-linger "$USER"`. |
-| `✗ listen <addr> on server` (remote tunnel won't bind on the host) | `AllowTcpForwarding no` on the server, or the port is in use there. `AllowTcpForwarding yes` is the default — ask the admin to re-enable it. |
-| `remote` (`-R`) to a public address isn't reachable | `GatewayPorts no` on the server silently binds loopback. Set `GatewayPorts yes` (or `clientspecified`), or use `remote: 127.0.0.1:port` for server-internal only. |
+| `✗ listen <addr> on server` (remote tunnel won't bind on the host) | `AllowTcpForwarding no` on the server, or the port is in use there. `AllowTcpForwarding yes` is the default — ask the admin to re-enable it. Run `portato doctor --probe` to confirm. |
+| `remote` (`-R`) to a public address isn't reachable | `GatewayPorts no` on the server silently binds loopback. Set `GatewayPorts yes` (or `clientspecified`), or use `remote: 127.0.0.1:port` for server-internal only. (Not auto-detected client-side; `portato doctor --probe` covers the rest.) |
 | macOS: "can't be opened — Apple cannot check it for malicious software" | Gatekeeper. Right-click → Open, or `xattr -dr com.apple.quarantine /path/to/portato`. |
 | TUI shows a passphrase / password prompt | Press `o` to enter it inline. Cache a key passphrase in the OS keyring with `portato add-identity <key>`. |
 | `✗ connection refused` / dial timeout to `remote` | Check `host:port` in the config, the host firewall, and that the service is running on the remote side. |

@@ -368,6 +368,17 @@ Phase 20 adds optional SOCKS5 user/pass auth: a resolved
 installed as a `StaticCredentials` store, switching the proxy to `UserPass`;
 otherwise NoAuth (the pre-Phase-20 behaviour).
 
+**Server-side requirements.** Every tunnel type needs `AllowTcpForwarding yes`
+on the server (the OpenSSH default). With `AllowTcpForwarding no` sshd rejects
+the `direct-tcpip` open (`-L`/`-D`) and the `tcpip-forward` request (`-R`), so
+the tunnel fails to forward; `portato doctor --probe` (Phase 41) detects this
+non-interactively, and the `-L`/`-D` runtime dial surfaces an
+`AllowTcpForwarding` hint in the `l` log. A `remote` (`-R`) tunnel that asks for
+a non-loopback bind additionally needs `GatewayPorts yes|clientspecified`;
+otherwise sshd silently binds loopback and the public address stays unreachable
+(this silent downgrade is **not detectable from the client** — the
+`tcpip-forward` reply carries only the port, per RFC 4254 §7.1).
+
 ## 9. SSH client (native)
 
 - `ssh.Dial` to the server with an `ssh.ClientConfig`:
