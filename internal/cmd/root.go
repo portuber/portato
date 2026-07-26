@@ -194,6 +194,7 @@ func Execute() error {
 		daemonCmd,
 		attachCmd,
 		listCmd,
+		logsCmd,
 		enableCmd,
 		disableCmd,
 		restartCmd,

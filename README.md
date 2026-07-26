@@ -23,6 +23,7 @@ The single binary works in several modes:
 | `portato daemon`             | Background process running tunnels + an IPC server (unix socket)    |
 | `portato attach`             | TUI client connected to a running daemon                            |
 | `portato list`               | Print status of all tunnels (stdout)                                |
+| `portato logs`               | Print the daemon log (`-f` follow, `-n`, `--since`, `--tuber`, `--all`) |
 | `portato enable <name>`      | Enable a tunnel on the daemon                                       |
 | `portato disable <name>`     | Disable a tunnel on the daemon                                      |
 | `portato restart <name>`     | Restart a tunnel                                                    |

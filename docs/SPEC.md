@@ -250,6 +250,14 @@ heartbeat comment). The client reacts by re-fetching `GET /tunnels`. This
 replaces the former 1s polling — an idle attached client issues no periodic
 requests.
 
+The daemon also persists its log to a size-rotated file under the XDG state
+home — `daemon.log` for `portato daemon`, `portato.log` for the standalone
+TUI — capped at `defaults.log.max_size_mb` with `retain` archives
+(`.1`/`.2`/`.3`). The `GET /logs` ring above is the TUI's short live window;
+for the full history from the shell, `portato logs` reads the persisted file
+directly (no running daemon required), with `-f/--follow`, `-n/--lines`,
+`--since`, `--tuber`, and `--all` (archives).
+
 The Phase 10 config-editing endpoints (`GET /config`, `POST/PUT/DELETE
 /tunnels`) make the daemon the single owner of config writes: an attached TUI
 never touches the YAML directly, so a custom `--config` path on the daemon is

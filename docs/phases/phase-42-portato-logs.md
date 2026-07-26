@@ -37,24 +37,24 @@ full history + archives, and supports `--follow` / `--since`.
 
 ## Tasks
 
-- [ ] Phase file + ROADMAP row/summary/current-work updated; status `[~]`.
-- [ ] `internal/cmd/logs.go`: `logsCmd` (`portato logs`) + `runLogs`.
+- [x] Phase file + ROADMAP row/summary/current-work updated; status `[~]`.
+- [x] `internal/cmd/logs.go`: `logsCmd` (`portato logs`) + `runLogs`.
       Resolves the file via `log.DaemonPath()`, falling back to
       `log.Path()` when the daemon log is absent. Prints filtered slog
       text lines to stdout.
-- [ ] Flags: `-f, --follow` (tail live, re-open on rotation);
+- [x] Flags: `-f, --follow` (tail live, re-open on rotation);
       `-n, --lines N` (last N records; default: the whole current file);
       `--since <dur|time>` (records newer than; parse the `time=` attr);
       `--tuber <name>` (records whose `tuber=` attr matches, with a
       substring fallback); `--all` (merge archives `.1`/`.2`/`.3`
       oldest-first, then the current file).
-- [ ] Register `logsCmd` on the root command (`internal/cmd/root.go`),
+- [x] Register `logsCmd` on the root command (`internal/cmd/root.go`),
       parallel to `list`/`stop`/`reload`.
-- [ ] `internal/cmd/logs_test.go`: a temp log file + archives with sample
+- [x] `internal/cmd/logs_test.go`: a temp log file + archives with sample
       records (various times / levels / tubers); cover the default dump,
       `--since`, `-n`, `--tuber`, `--all`. (`--follow` is timing-based —
       manual / a light test.)
-- [ ] `docs/SPEC.md` + `README.md`: a command-table row for
+- [x] `docs/SPEC.md` + `README.md`: a command-table row for
       `portato logs` + a short logging note (path, rotation, the
       command); cross-link from Troubleshooting.
 
