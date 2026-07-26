@@ -73,8 +73,8 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 **Phases 0–42 are all `[x]`** — the roadmap's core is complete. The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
-no planned breaking changes, so the next release is **`v1.0.0`** — the
-commitment that subsequent breaks go through the deprecation cycle. For the
+no planned breaking changes. **`v1.0.0`** is the latest release — subsequent
+breaks go through the deprecation cycle. For the
 most recent batch see [Current work](#current-work); for per-phase status see
 the table above.
 
