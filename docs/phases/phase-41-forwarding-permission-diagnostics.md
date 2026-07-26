@@ -1,7 +1,7 @@
 ---
 phase: 41
 title: "Forwarding-permission diagnostics"
-status: in-progress
+status: done
 depends_on: [11, 7, 8]
 ---
 
@@ -48,38 +48,38 @@ passphrases, and skips password-auth tubers with an informational line.
 
 ## Tasks
 
-- [ ] Phase file + ROADMAP row/summary/current-work updated; status `[~]`.
-- [ ] `internal/sshtest`: extend the in-process server with two fixtures the
+- [x] Phase file + ROADMAP row/summary/current-work updated; status `[~]`.
+- [x] `internal/sshtest`: extend the in-process server with two fixtures the
       probe tests against — (a) reject `direct-tcpip` opens + `tcpip-forward`
       requests (simulating `AllowTcpForwarding no`), (b) accept `tcpip-forward`
       but bind loopback regardless of the requested address (simulating
       `GatewayPorts no` silent downgrade). Reuse the existing direct-tcpip /
       tcpip-forward plumbing.
-- [ ] `internal/forward`: a non-interactive probe path (no passphrase/password
+- [x] `internal/forward`: a non-interactive probe path (no passphrase/password
       sinks) reusing `dialSSH`'s transport; a classifier returning, per tuber,
       the server-side outcome — `client.Dial` probe for `-L`/`-D`,
       `client.Listen` + `ln.Addr()` inspection for `-R` — distinguishing
       healthy / `AllowTcpForwarding`-no / `GatewayPorts`-silent-loopback /
       connectivity / auth.
-- [ ] `internal/forward` runtime: in `handleConn`/`handleDynamicConn`, detect
+- [x] `internal/forward` runtime: in `handleConn`/`handleDynamicConn`, detect
       the administratively-prohibited signature
       (`*ssh.OpenChannelError{Reason: ssh.Prohibited}`) on a `client.Dial`
       failure and append an `AllowTcpForwarding` hint to the log line. (A `-R`
       silent-loopback warning is **not** achievable client-side — see Background
       — and stays a docs concern.)
-- [ ] `internal/cmd/doctor.go`: a `--probe` flag; when set, run the classifier
+- [x] `internal/cmd/doctor.go`: a `--probe` flag; when set, run the classifier
       per configured tuber (key/agent + keyring-passphrase; skip password-auth
       with an info line)       under a per-host timeout (~5s), printing `✓ forwarding` /
       `✗ forwarding  AllowTcpForwarding no on <host>` /
       `· forwarding  <connectivity/auth>`; for a `-R` non-loopback bind it
       additionally notes `GatewayPorts not verifiable client-side`. Default
       `doctor` (no `--probe`) is unchanged.
-- [ ] Tests: sshtest fixtures covered; the classifier unit-tested against all
+- [x] Tests: sshtest fixtures covered; the classifier unit-tested against all
       outcomes; `doctor --probe` integration against the sshtest fixtures
       (permission denied, silent loopback, healthy); runtime `-R`
       silent-loopback warning + `-L`/`-D` dial-hint covered by tuber
       integration tests.
-- [ ] `docs/SPEC.md`: a short "Server-side requirements" note
+- [x] `docs/SPEC.md`: a short "Server-side requirements" note
       (`AllowTcpForwarding` default-on for all types; `GatewayPorts` for
       non-loopback `-R`) + the doctor `--probe` description. README
       Troubleshooting's AllowTcpForwarding / GatewayPorts rows already point at
@@ -87,20 +87,20 @@ passphrases, and skips password-auth tubers with an informational line.
 
 ## Definition of Done
 
-- [ ] `portato doctor --probe` distinguishes, per configured tuber, the classes
+- [x] `portato doctor --probe` distinguishes, per configured tuber, the classes
       (healthy / `AllowTcpForwarding`-no / `GatewayPorts`-silent-loopback /
       connectivity-or-auth), verified against `sshtest` fixtures.
-- [ ] Default `portato doctor` (no `--probe`) makes **no** SSH connections —
+- [x] Default `portato doctor` (no `--probe`) makes **no** SSH connections —
       unchanged behaviour and output.
-- [ ] `doctor --probe` prints an honest `GatewayPorts not verifiable
+- [x] `doctor --probe` prints an honest `GatewayPorts not verifiable
       client-side` note for `-R` non-loopback binds (auto-detection is
       impossible client-side — see Background); the silent-loopback case stays
       covered by README docs.
-- [ ] `-L`/`-D` dial failures under `AllowTcpForwarding no` log a hint pointing
+- [x] `-L`/`-D` dial failures under `AllowTcpForwarding no` log a hint pointing
       at the server knob.
-- [ ] The remote listen-error hint stays consistent with the new detection
+- [x] The remote listen-error hint stays consistent with the new detection
       (AllowTcpForwarding first, GatewayPorts for the non-loopback case).
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run ./...`
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run ./...`
       are clean; new functions sit under gocyclo 15; the phase's tests are green.
 
 ## Verification
