@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff third-party-licenses release release-patch release-minor release-major
+.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff third-party-licenses optimize-assets release release-patch release-minor release-major
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -84,6 +84,14 @@ third-party-licenses:
 	  done; \
 	} > THIRD_PARTY_LICENSES.txt
 	@rm -rf third_party
+
+# optimize-assets compresses the landing demo assets in place: gifsicle on
+# hero.gif (palette trim + lossy frame diff) and pngquant on the still PNGs
+# (8-bit palette, q70-85 — near-lossless for UI screenshots). Run after a vhs
+# re-record (see demo.tape). Requires: brew install gifsicle pngquant.
+optimize-assets:
+	gifsicle -O3 --lossy=80 --colors 128 docs/landing/assets/hero.gif -o docs/landing/assets/hero.gif
+	pngquant --quality=70-85 --force --ext .png -- docs/landing/assets/*.png
 
 # release cuts and pushes a release tag, which triggers the GitHub Actions
 # 'release' workflow (goreleaser). Tags are strictly vX.Y.Z (no pre-releases;
