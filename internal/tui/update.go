@@ -263,7 +263,7 @@ func (m Model) handleListKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m.handleQuitAndViewKey(k)
 	case "up", "k", "down", "j":
 		return m.handleNavKey(k)
-	case "shift+up", "shift+down":
+	case "shift+up", "shift+down", "ctrl+k", "ctrl+j":
 		return m.handleReorderKey(k)
 	case "space", "p", "o", "r", "a", "x", "R", "/":
 		return m.handleToggleKey(k)
@@ -307,14 +307,15 @@ func (m Model) handleNavKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleReorderKey reorders the selected tuber within the config: shift+up
-// moves it one slot earlier, shift+down one slot later. The cursor follows the
-// tuber to its new position. Kept as its own handler so handleListKey stays a
-// thin dispatcher under the gocyclo limit, like the other thematic groups.
+// (or ctrl+k) moves it one slot earlier, shift+down (or ctrl+j) one slot
+// later. The cursor follows the tuber to its new position. Kept as its own
+// handler so handleListKey stays a thin dispatcher under the gocyclo limit,
+// like the other thematic groups.
 func (m Model) handleReorderKey(k tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch k.String() {
-	case "shift+up":
+	case "shift+up", "ctrl+k":
 		(&m).moveCurrent(-1)
-	case "shift+down":
+	case "shift+down", "ctrl+j":
 		(&m).moveCurrent(1)
 	}
 	return m, nil

@@ -11,6 +11,10 @@ import (
 // "shift+up" / "shift+down".
 func shiftKey(code rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: code, Mod: tea.ModShift} }
 
+// ctrlKey builds a ctrl+<letter> key press, which bubbletea v2 reports as
+// "ctrl+k" / "ctrl+j" (the scriptable reorder alias of shift+up / shift+down).
+func ctrlKey(code rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: code, Mod: tea.ModCtrl} }
+
 func namesOf(list []controller.Status) []string {
 	out := make([]string, len(list))
 	for i, s := range list {
@@ -114,5 +118,50 @@ func TestModel_Reorder_EmptyListNoOp(t *testing.T) {
 	m = next.(Model)
 	if len(m.list) != 0 || m.cursor != 0 {
 		t.Errorf("empty-list reorder should be a no-op: list=%v cursor=%d", m.list, m.cursor)
+	}
+}
+
+// TestModel_Reorder_CtrlAliases covers the ctrl+k (up) / ctrl+j (down) aliases
+// added so reorder is scriptable by terminal-automation tools that cannot send
+// shift+<arrow> (e.g. vhs). ctrl+k must behave like shift+up, ctrl+j like
+// shift+down, including cursor-follows-tuber.
+func TestModel_Reorder_CtrlAliases(t *testing.T) {
+	// ctrl+k -> up (delta -1): "c" at index 2 swaps with "b".
+	fUp := newFake(
+		controller.Status{Name: "a"},
+		controller.Status{Name: "b"},
+		controller.Status{Name: "c"},
+	)
+	mUp := New(fUp, Options{Mode: "standalone"})
+	mUp.cursor = 2 // on "c"
+	next, _ := mUp.handleKey(ctrlKey('k'))
+	mUp = next.(Model)
+	if got := namesOf(mUp.list); got[0] != "a" || got[1] != "c" || got[2] != "b" {
+		t.Fatalf("order after ctrl+k = %v", got)
+	}
+	if mUp.cursor != 1 {
+		t.Errorf("ctrl+k cursor should follow to index 1, got %d", mUp.cursor)
+	}
+	if len(fUp.moves) != 1 || fUp.moves[0].name != "c" || fUp.moves[0].delta != -1 {
+		t.Errorf("ctrl+k fake moves = %+v", fUp.moves)
+	}
+
+	// ctrl+j -> down (delta +1): "a" at index 0 swaps with "b".
+	fDown := newFake(
+		controller.Status{Name: "a"},
+		controller.Status{Name: "b"},
+		controller.Status{Name: "c"},
+	)
+	mDown := New(fDown, Options{Mode: "standalone"})
+	next, _ = mDown.handleKey(ctrlKey('j'))
+	mDown = next.(Model)
+	if got := namesOf(mDown.list); got[0] != "b" || got[1] != "a" || got[2] != "c" {
+		t.Fatalf("order after ctrl+j = %v", got)
+	}
+	if mDown.cursor != 1 {
+		t.Errorf("ctrl+j cursor should follow to index 1, got %d", mDown.cursor)
+	}
+	if len(fDown.moves) != 1 || fDown.moves[0].name != "a" || fDown.moves[0].delta != 1 {
+		t.Errorf("ctrl+j fake moves = %+v", fDown.moves)
 	}
 }

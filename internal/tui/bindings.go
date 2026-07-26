@@ -41,6 +41,8 @@ func tuberBindings(attach bool) []binding {
 		{foot: "shift+↑↓ reorder", needsList: true, help: []string{
 			"shift+↑      move selected tuber up",
 			"shift+↓      move selected tuber down",
+			"ctrl+k       move selected tuber up (alias of shift+↑)",
+			"ctrl+j       move selected tuber down (alias of shift+↓)",
 		}},
 		{foot: "space toggle", needsList: true, help: []string{
 			"space        toggle selected tuber (on/off)",

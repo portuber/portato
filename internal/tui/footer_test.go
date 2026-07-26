@@ -126,10 +126,11 @@ func TestFooter_SharedSource(t *testing.T) {
 	if got := joinFeet(tuberBindings(false), " · "); got != wantFull {
 		t.Errorf("joinFeet mismatch:\n got: %q\nwant: %q", got, wantFull)
 	}
-	// Help line count matches the audit (up/down, a/x and shift+↑↓ expand).
+	// Help line count matches the audit (up/down, a/x and shift+↑↓ expand,
+	// plus the ctrl+k/ctrl+j reorder aliases).
 	lines := helpLines(false)
-	if len(lines) != 19 {
-		t.Errorf("helpLines len = %d, want 19", len(lines))
+	if len(lines) != 21 {
+		t.Errorf("helpLines len = %d, want 21", len(lines))
 	}
 	// The q-quit help line is mode-aware (Phase 39, Task D): standalone offers
 	// to background running tubers; attach notes they keep running in the daemon.
