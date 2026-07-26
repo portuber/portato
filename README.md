@@ -304,6 +304,12 @@ daemon, and prints a `✓`/`✗` line per check.
 | `portato list` errors with "daemon not running" | Start the daemon: `portato daemon`, or `portato install` to autostart it. |
 | `✗ auth failed` | Start `ssh-agent` / `ssh-add`, or set an `identity:` key. Run `portato doctor`. |
 | Tunnels die after logout (Linux) | Enable lingering: `loginctl enable-linger "$USER"`. |
+| `✗ listen <addr> on server` (remote tunnel won't bind on the host) | `AllowTcpForwarding no` on the server, or the port is in use there. `AllowTcpForwarding yes` is the default — ask the admin to re-enable it. |
+| `remote` (`-R`) to a public address isn't reachable | `GatewayPorts no` on the server silently binds loopback. Set `GatewayPorts yes` (or `clientspecified`), or use `remote: 127.0.0.1:port` for server-internal only. |
+| macOS: "can't be opened — Apple cannot check it for malicious software" | Gatekeeper. Right-click → Open, or `xattr -dr com.apple.quarantine /path/to/portato`. |
+| TUI shows a passphrase / password prompt | Press `o` to enter it inline. Cache a key passphrase in the OS keyring with `portato add-identity <key>`. |
+| `✗ connection refused` / dial timeout to `remote` | Check `host:port` in the config, the host firewall, and that the service is running on the remote side. |
+| Daemon says "already running" but `list`/`stop` say "not running" | Wedged daemon — `portato stop` recovers by PID. `portato doctor` reports "wedged: pid N". |
 
 ## Documentation
 
