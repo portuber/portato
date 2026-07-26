@@ -91,6 +91,8 @@
     .noscript-install h3 { margin: 0 0 .6rem; font-size: 1.1rem; }
     .noscript-install p { margin: .8rem 0 .25rem; color: var(--fg); font-weight: 600; }
     .links ul { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 8px; }
+    .note { background: var(--bg-soft); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--radius); padding: 12px 16px; margin: 0 0 16px; color: var(--fg); font-size: .95rem; }
+    .note code { color: var(--fg); }
     footer { padding: 32px 0; text-align: center; color: var(--fg-muted); font-size: .9rem; border-top: 1px solid var(--border); }
     footer p { margin: .2rem 0; }
   </style>
@@ -185,6 +187,7 @@
   <section class="install" id="install">
     <div class="container">
       <h2>Install</h2>
+      <p class="note"><strong>Requirements.</strong> An SSH account on a reachable host, plus a key (or password). <code>local</code> (<code>-L</code>) and <code>dynamic</code> (<code>-D</code>) tunnels work with default sshd settings; <code>remote</code> (<code>-R</code>) to a non-loopback address also needs <code>GatewayPorts yes</code> in the server's <code>sshd_config</code>. If a tunnel won't connect, run <code>portato doctor</code>.</p>
       <div class="tabs" role="tablist" aria-label="Install methods">
         <button type="button" role="tab" id="tab-brew"  aria-controls="panel-brew"  aria-selected="true"  tabindex="0"  data-tab="brew"  class="active">Homebrew</button>
         <button type="button" role="tab" id="tab-scoop" aria-controls="panel-scoop" aria-selected="false" tabindex="-1" data-tab="scoop">Scoop</button>
@@ -303,6 +306,7 @@ portato list     # status on stdout</code></pre>
 
   <footer>
     <div class="container">
+      <p>Not working? Run <code>portato doctor</code>, or see the <a href="https://github.com/portuber/portato#troubleshooting">Troubleshooting</a> section in the README.</p>
       <p>Distributed under the <a href="https://github.com/portuber/portato/blob/main/LICENSE">MIT License</a>. © 2026 Valerii Kipkaev.</p>
       <p><a href="https://github.com/portuber/portato">github.com/portuber/portato</a></p>
     </div>
