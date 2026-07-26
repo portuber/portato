@@ -23,11 +23,15 @@ client side.
   (`-L`/`-D`, surfaced by `client.Dial`) and the `tcpip-forward` global request
   (`-R`, surfaced by `client.Listen`) — both come back as errors
   (administratively prohibited / request failed).
-- `GatewayPorts no` does **not** error: sshd honours the `tcpip-forward` request
-  but binds the listener to loopback regardless of the requested address. So a
-  `*:port` `-R` "succeeds" yet is unreachable publicly — the current code never
-  inspects `ln.Addr()` after a successful `client.Listen`, so the silent
-  downgrade is invisible.
+- `GatewayPorts no` does **not** error: sshd honours the `tcpip-forward`
+  request but binds the listener to loopback regardless of the requested
+  address. So a `*:port` `-R` "succeeds" yet is unreachable publicly. This is
+  **not detectable from the client**: the `tcpip-forward` reply carries only the
+  bound port (RFC 4254 §7.1), so `ssh.Client.Listen` builds its listener address
+  from the **requested** host — `ln.Addr()` always reflects what was asked for,
+  never what sshd actually bound. The silent-loopback case is therefore a
+  documentation concern (README Prerequisites + Troubleshooting), not something
+  this phase auto-detects.
 
 The `tuber.go` remote listen-error hint (widened to `AllowTcpForwarding` in the
 preceding docs/fix batch) names the right knob for an error; Phase 41 adds the
@@ -57,19 +61,19 @@ passphrases, and skips password-auth tubers with an informational line.
       `client.Listen` + `ln.Addr()` inspection for `-R` — distinguishing
       healthy / `AllowTcpForwarding`-no / `GatewayPorts`-silent-loopback /
       connectivity / auth.
-- [ ] `internal/forward` runtime: after a successful `client.Listen` for `-R`,
-      compare `ln.Addr()` to the requested bind; on a silent-loopback downgrade
-      emit a warning (log + a non-fatal state hint). In `handleConn`/
-      `handleDynamicConn`, detect the administratively-prohibited signature on
-      `client.Dial` failure and append an `AllowTcpForwarding` hint to the log
-      line.
+- [ ] `internal/forward` runtime: in `handleConn`/`handleDynamicConn`, detect
+      the administratively-prohibited signature
+      (`*ssh.OpenChannelError{Reason: ssh.Prohibited}`) on a `client.Dial`
+      failure and append an `AllowTcpForwarding` hint to the log line. (A `-R`
+      silent-loopback warning is **not** achievable client-side — see Background
+      — and stays a docs concern.)
 - [ ] `internal/cmd/doctor.go`: a `--probe` flag; when set, run the classifier
       per configured tuber (key/agent + keyring-passphrase; skip password-auth
-      with an info line) under a per-host timeout (~5s), printing
-      `✓ forwarding` / `✗ forwarding  AllowTcpForwarding no on <host>` /
-      `✗ forwarding  GatewayPorts no: bound 127.0.0.1 instead of <requested>` /
-      `· forwarding  <connectivity/auth>`. Default `doctor` (no `--probe`) is
-      unchanged.
+      with an info line)       under a per-host timeout (~5s), printing `✓ forwarding` /
+      `✗ forwarding  AllowTcpForwarding no on <host>` /
+      `· forwarding  <connectivity/auth>`; for a `-R` non-loopback bind it
+      additionally notes `GatewayPorts not verifiable client-side`. Default
+      `doctor` (no `--probe`) is unchanged.
 - [ ] Tests: sshtest fixtures covered; the classifier unit-tested against all
       outcomes; `doctor --probe` integration against the sshtest fixtures
       (permission denied, silent loopback, healthy); runtime `-R`
@@ -88,8 +92,10 @@ passphrases, and skips password-auth tubers with an informational line.
       connectivity-or-auth), verified against `sshtest` fixtures.
 - [ ] Default `portato doctor` (no `--probe`) makes **no** SSH connections —
       unchanged behaviour and output.
-- [ ] A `-R` tunnel asked for a non-loopback bind under a `GatewayPorts no`
-      server produces a visible "bound loopback" warning (not a silent success).
+- [ ] `doctor --probe` prints an honest `GatewayPorts not verifiable
+      client-side` note for `-R` non-loopback binds (auto-detection is
+      impossible client-side — see Background); the silent-loopback case stays
+      covered by README docs.
 - [ ] `-L`/`-D` dial failures under `AllowTcpForwarding no` log a hint pointing
       at the server knob.
 - [ ] The remote listen-error hint stays consistent with the new detection
@@ -121,6 +127,9 @@ make fmt && make vet && make test && make lint
 - `internal/cmd/doctor.go`: `doctorCmd` gains `--probe`; `doctorRunE` runs
   `checkForwarding(d, cfg)` only when `--probe` is set. Per-host timeout via
   `context.WithTimeout`.
-- Administratively-prohibited detection: `errors.As(err, &ssh.OpenChannelError)`
-  with `Reason == ssh.OPEN_ADMINISTRATIVELY_PROHIBITED` for `-L`/`-D`; a
-  `client.Listen` error (request failed) for `-R`.
+- Administratively-prohibited detection: `errors.As(err, &oce)` where `oce` is
+  `*ssh.OpenChannelError` and `oce.Reason == ssh.Prohibited`. The probe opens a
+  `direct-tcpip` to a throwaway target (`127.0.0.1:1`) — `Prohibited` ⇒
+  `AllowTcpForwarding no`; any other outcome ⇒ forwarding permitted
+  (AllowTcpForwarding applies uniformly to direct-tcpip and tcpip-forward, so
+  one probe suffices).
