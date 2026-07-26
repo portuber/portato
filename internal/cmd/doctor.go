@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,6 +19,7 @@ import (
 	"github.com/portuber/portato/internal/config"
 	"github.com/portuber/portato/internal/daemon"
 	"github.com/portuber/portato/internal/daemon/transport"
+	"github.com/portuber/portato/internal/forward"
 	routelog "github.com/portuber/portato/internal/log"
 	"github.com/portuber/portato/internal/service"
 )
@@ -29,10 +31,24 @@ var doctorCmd = &cobra.Command{
 ssh-agent, known_hosts, daemon reachability over the local IPC socket (or named
 pipe on Windows) and its owner-only permissions, the autostart entry (launchd
 plist / systemd unit / Windows Run key), and (Linux) lingering. Prints a line
-per check and exits non-zero on any failure.`,
+per check and exits non-zero on any failure.
+
+Pass --probe to additionally dial each configured tuber's server over SSH and
+classify the server-side sshd gate (AllowTcpForwarding no / the GatewayPorts
+caveat for non-loopback -R / connectivity / auth). The default doctor makes no
+SSH connections; --probe is opt-in because it really connects to every host.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE:          doctorRunE,
+}
+
+// doctorProbeEnabled is set by the opt-in --probe flag (Phase 41): when true,
+// doctor also runs checkForwarding, which dials each configured tuber's server
+// and classifies whether SSH forwarding is permitted there.
+var doctorProbeEnabled bool
+
+func init() {
+	doctorCmd.Flags().BoolVar(&doctorProbeEnabled, "probe", false, "also dial each tuber's server over SSH to classify the server-side sshd gate (AllowTcpForwarding no / GatewayPorts caveat / connectivity / auth)")
 }
 
 const doctorProbeTimeout = 500 * time.Millisecond
@@ -98,6 +114,11 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 		checkLinger(d)
 	}
 
+	// 12. (opt-in, --probe) server-side forwarding permission per tuber.
+	if doctorProbeEnabled {
+		checkForwarding(d, cfg)
+	}
+
 	d.summary()
 	if d.failed > 0 {
 		return fmt.Errorf("doctor: %d check(s) failed", d.failed)
@@ -143,6 +164,38 @@ func checkIdentities(d *doctor, cfg *config.Config) {
 			d.ok("identity", "%s (%s)", id, t.Name)
 		} else {
 			d.fail("identity", "%s not found (tuber %s)", id, t.Name)
+		}
+	}
+}
+
+// checkForwarding runs the opt-in (--probe) server-side forwarding diagnostic
+// (Phase 41): for each configured tuber it dials the SSH host with key-only
+// auth and classifies whether SSH forwarding is permitted there — chiefly
+// detecting `AllowTcpForwarding no` (a direct-tcpip open rejected with
+// ssh.Prohibited). The probe is non-interactive, so a passphrase-protected
+// identity that is not in the agent surfaces as auth-unavailable/auth-failed
+// and a password-auth account is reported rather than prompted. A non-loopback
+// -R bind also prints the GatewayPorts caveat (not verifiable client-side).
+func checkForwarding(d *doctor, cfg *config.Config) {
+	if len(cfg.Tubers) == 0 {
+		d.info("forwarding", "no tubers configured")
+		return
+	}
+	// Silent logger: the probe reuses the forward dial path, which logs TOFU
+	// and identity-load warnings; doctor owns its own stdout formatting.
+	probeLog := slog.New(slog.NewTextHandler(io.Discard, nil))
+	for _, t := range cfg.Tubers {
+		ctx, cancel := context.WithTimeout(context.Background(), 6*time.Second)
+		res := forward.ProbeForwarding(ctx, t, cfg.Defaults, probeLog)
+		cancel()
+		name := "forward " + t.Name
+		switch res.Outcome {
+		case forward.ProbeHealthy:
+			d.ok(name, "%s", res.Detail)
+		case forward.ProbeForwardingDenied:
+			d.fail(name, "%s", res.Detail)
+		default:
+			d.info(name, "%s: %s", res.Outcome, res.Detail)
 		}
 	}
 }

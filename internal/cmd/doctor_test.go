@@ -2,12 +2,18 @@ package cmd
 
 import (
 	"bytes"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/pem"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/portuber/portato/internal/daemon"
+	"github.com/portuber/portato/internal/sshtest"
+	"golang.org/x/crypto/ssh"
 )
 
 func runDoctor(t *testing.T, cfgPath string) (string, error) {
@@ -319,5 +325,83 @@ func TestDoctor_IdleWhenMarkerPIDDead(t *testing.T) {
 	}
 	if !strings.Contains(out, "· daemon") {
 		t.Errorf("output should report the daemon as idle info\ngot:\n%s", out)
+	}
+}
+
+// writeProbeIdentity generates an unencrypted ed25519 client key under dir and
+// returns its path + parsed public key (for the sshtest server's authorized
+// set), used by the doctor --probe integration tests.
+func writeProbeIdentity(t *testing.T, dir string) (idPath string, pub ssh.PublicKey) {
+	t.Helper()
+	rawPub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen client key: %v", err)
+	}
+	pub, _ = ssh.NewPublicKey(rawPub)
+	block, err := ssh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		t.Fatalf("marshal client priv: %v", err)
+	}
+	idPath = filepath.Join(dir, "id_ed25519")
+	if err := os.WriteFile(idPath, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write identity: %v", err)
+	}
+	return idPath, pub
+}
+
+// withDoctorProbe enables the opt-in --probe flag for one test (restored on
+// cleanup), since runDoctor calls doctorRunE directly.
+func withDoctorProbe(t *testing.T) {
+	t.Helper()
+	saved := doctorProbeEnabled
+	doctorProbeEnabled = true
+	t.Cleanup(func() { doctorProbeEnabled = saved })
+}
+
+func TestDoctor_ProbeForwarding_Healthy(t *testing.T) {
+	dir := t.TempDir()
+	idPath, pub := writeProbeIdentity(t, dir)
+	srv := sshtest.NewSSHD(t, pub)
+	srv.Start()
+	defer srv.Stop()
+
+	cfgPath := filepath.Join(dir, "config.yaml")
+	body := fmt.Sprintf("defaults:\n  identity: %s\n  known_hosts: %s\n  accept_new_hosts: true\ntubers:\n  - name: db\n    type: local\n    local: \"1\"\n    remote: 127.0.0.1:1\n    ssh: u@%s\n",
+		idPath, filepath.Join(dir, "known_hosts"), srv.Addr())
+	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	withDoctorProbe(t)
+
+	out, err := runDoctor(t, cfgPath)
+	if err != nil {
+		t.Fatalf("doctor --probe should pass when forwarding is permitted\ngot err=%v\n%s", err, out)
+	}
+	if !strings.Contains(out, "✓ forward db") {
+		t.Errorf("output should report healthy forwarding\ngot:\n%s", out)
+	}
+}
+
+func TestDoctor_ProbeForwarding_AllowTcpForwardingNo(t *testing.T) {
+	dir := t.TempDir()
+	idPath, pub := writeProbeIdentity(t, dir)
+	srv := sshtest.NewSSHDNoForward(t, pub)
+	srv.Start()
+	defer srv.Stop()
+
+	cfgPath := filepath.Join(dir, "config.yaml")
+	body := fmt.Sprintf("defaults:\n  identity: %s\n  known_hosts: %s\n  accept_new_hosts: true\ntubers:\n  - name: db\n    type: local\n    local: \"1\"\n    remote: 127.0.0.1:1\n    ssh: u@%s\n",
+		idPath, filepath.Join(dir, "known_hosts"), srv.Addr())
+	if err := os.WriteFile(cfgPath, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	withDoctorProbe(t)
+
+	out, err := runDoctor(t, cfgPath)
+	if err == nil {
+		t.Fatalf("doctor --probe should fail when AllowTcpForwarding is no\ngot:\n%s", out)
+	}
+	if !strings.Contains(out, "✗ forward db") || !strings.Contains(out, "AllowTcpForwarding") {
+		t.Errorf("output should flag the AllowTcpForwarding denial\ngot:\n%s", out)
 	}
 }
