@@ -36,6 +36,13 @@ The single binary works in several modes:
 
 ## Install
 
+> **Prerequisites.** Portato forwards over SSH, so you need an SSH account on a
+> reachable host and a key (or a password). `local` (`-L`) and `dynamic` (`-D`)
+> tunnels work with default sshd settings; `remote` (`-R`) to a non-loopback
+> address also needs `GatewayPorts yes` (or `clientspecified`) in the server's
+> `sshd_config`. If a tunnel won't connect, run `portato doctor` first — see
+> [Troubleshooting](#troubleshooting).
+
 All channels are built from the same release for macOS, Linux, and Windows.
 
 **Homebrew** (macOS / Linuxbrew):
@@ -285,6 +292,10 @@ defaults:
 ```
 
 ## Troubleshooting
+
+If something doesn't work, run `portato doctor` first — it checks the config,
+identity keys and `ssh-agent`, the daemon, autostart, and (on macOS) a wedged
+daemon, and prints a `✓`/`✗` line per check.
 
 | Symptom | Check |
 |---------|-------|
