@@ -185,6 +185,14 @@ func (c *Config) Validate() error {
 		if t.Type != "dynamic" && strings.TrimSpace(t.Remote) == "" {
 			return fmt.Errorf("tuber %q: remote is empty", t.Name)
 		}
+		// For type: local, remote is the dial destination on the host, so it
+		// must be a complete host:port — a bare port is ambiguous and would
+		// otherwise fail later at dial time with an opaque net error.
+		if t.Type == "local" {
+			if err := validateHostPort(t.Remote); err != nil {
+				return fmt.Errorf("tuber %q: remote %q is not a valid host:port for type: local (e.g. 127.0.0.1:1234)", t.Name, t.Remote)
+			}
+		}
 		if strings.TrimSpace(t.Host) == "" {
 			return fmt.Errorf("tuber %q: ssh host is empty", t.Name)
 		}
@@ -311,6 +319,22 @@ func normalizeAddrPort(s, defaultH string) string {
 		return net.JoinHostPort(host, port)
 	}
 	return net.JoinHostPort(defaultH, s)
+}
+
+// validateHostPort reports whether s parses as a non-empty host and port,
+// the form required for a type: local remote (the dial destination).
+func validateHostPort(s string) error {
+	host, port, err := net.SplitHostPort(strings.TrimSpace(s))
+	if err != nil {
+		return err
+	}
+	if host == "" {
+		return fmt.Errorf("missing host")
+	}
+	if port == "" {
+		return fmt.Errorf("missing port")
+	}
+	return nil
 }
 
 func (t Tuber) ResolvedIdentity(d Defaults) string {

@@ -181,6 +181,11 @@ func TestValidateErrors(t *testing.T) {
 			wantSub: "remote is empty",
 		},
 		{
+			name:    "local remote not host:port",
+			cfg:     &Config{Tubers: []Tuber{{Name: "a", Type: "local", Local: "1", Remote: "1234", SSH: "h:22"}}},
+			wantSub: "is not a valid host:port for type: local",
+		},
+		{
 			name:    "empty ssh host",
 			cfg:     &Config{Tubers: []Tuber{{Name: "a", Type: "local", Local: "1", Remote: "r:1", SSH: "  "}}},
 			wantSub: "ssh host is empty",
@@ -305,6 +310,9 @@ func TestValidateAcceptsTypes(t *testing.T) {
 		{"remote without local is rejected", "remote", "", "127.0.0.1:5432", false},
 		{"local without remote is rejected", "local", "5432", "", false},
 		{"remote without remote is rejected", "remote", "5432", "", false},
+		{"local bare-port remote rejected", "local", "5432", "1234", false},
+		{"local host-without-port rejected", "local", "5432", "127.0.0.1", false},
+		{"remote bare-port remote still valid", "remote", "5432", "16379", true},
 		{"bogus type", "foo", "5432", "127.0.0.1:5432", false},
 	}
 	for _, tc := range cases {
