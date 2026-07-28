@@ -13,7 +13,7 @@ tubers:
   - name: db-stage                # unique, required
     type: local                   # "local" (-L), "remote" (-R), or "dynamic" (-D)
     local: 5432                   # port or host:port (defaults to 127.0.0.1)
-    remote: 10.0.0.5:5432         # destination address, relative to the ssh server
+    remote: 10.0.0.5:5432         # destination on the host; host:port (a bare port is rejected for type: local)
     ssh: user@bastion.example.com:22   # required; user and port optional
     identity: ~/.ssh/id_ed25519   # optional; overrides defaults
     enabled: false                # off by default; the daemon persists toggles here

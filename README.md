@@ -141,6 +141,24 @@ Each tunnel has a `type`:
 | `remote`  | `-R`     | listen **on the host**, forward back here (`←` in UI).         |
 | `dynamic` | `-D`     | a SOCKS5 proxy on `local`, all traffic via the host (`⇄ *`).  |
 
+### Local (-L) tunnels
+
+For a `local` tunnel, `local` is the address Portato listens on here, and
+`remote` is the destination dialed **on the SSH server** — so `remote` needs a
+`host:port` (a bare port is not enough; there is no host to dial). A bare
+`local` port expands to loopback (`127.0.0.1:port`):
+
+```yaml
+tubers:
+  - name: db
+    type: local            # ssh -L 5432:10.0.0.5:5432 user@bastion.example.com
+    local: 5432            # listen here (bare port -> 127.0.0.1:5432)
+    remote: 10.0.0.5:5432  # destination on the host (host:port, not a bare port)
+    ssh: user@bastion.example.com
+```
+
+### Remote (-R) tunnels
+
 For a `remote` tunnel, `remote` is the address listened on the SSH server, and
 `local` is the address connections are forwarded to on this machine. A bare
 port (or `:port`) binds **all interfaces** on the host (`*:port`) — the default,
@@ -302,6 +320,7 @@ daemon, and prints a `✓`/`✗` line per check.
 
 | Symptom | Check |
 |---------|-------|
+| `portato list` / daemon start: `remote "X" is not a valid host:port for type: local` | For `type: local`, `remote` is the destination on the host and needs `host:port` (e.g. `127.0.0.1:1234`); a bare port is only accepted for `local` and (as a bind) for `type: remote`. |
 | Tunnel stuck on `✗ host key not in known_hosts` | Accept the key in the TUI, or set `accept_new_hosts: true`. |
 | `✗ listen ...: address already in use` | A local port is busy — `lsof -i :<port>` to find and stop the holder. |
 | `portato list` errors with "daemon not running" | Start the daemon: `portato daemon`, or `portato install` to autostart it. |
