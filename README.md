@@ -108,6 +108,42 @@ go install github.com/portuber/portato/cmd/portato@latest
 
 The version baked into the binary comes from the git tag at build time.
 
+## Shell completion
+
+`portato` can TAB-complete subcommands, flags, and tuber names. Tubers are
+completed from `config.yaml`, so it works with no daemon running —
+`enable`/`disable`/`restart`/`forward <name>` and `logs --tuber <name>` all
+complete. Generate and source the script for your shell:
+
+**bash:**
+
+```sh
+echo 'eval "$(portato completion bash)"' >> ~/.bashrc
+```
+
+**zsh** (`compinit` must be enabled — it is by default on most setups):
+
+```sh
+echo 'source <(portato completion zsh)' >> ~/.zshrc
+# or, without process substitution:
+portato completion zsh > "${fpath[1]}/_portato"
+```
+
+**fish:**
+
+```sh
+portato completion fish > ~/.config/fish/completions/portato.fish
+```
+
+**PowerShell:**
+
+```pwsh
+portato completion powershell | Out-String | Invoke-Expression
+```
+
+Restart your shell (or re-`source` the file), then `portato enable <TAB>`
+lists your tubers.
+
 ## Build
 
 ```sh
