@@ -60,6 +60,7 @@
 | 42  | `portato logs` (tail/follow)      | `[x]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
 | 43  | ProxyJump (jump hosts)            | `[x]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
 | 44  | `~/.ssh/config` resolution        | `[x]` | [phase-44-ssh-config.md](./phases/phase-44-ssh-config.md) |
+| 45  | Shell completions                 | `[ ]` | [phase-45-shell-completions.md](./phases/phase-45-shell-completions.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -73,7 +74,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–44 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts) and `~/.ssh/config` alias resolution. The next work is the prioritised backlog in [Post-1.0 candidate features](#post-10-candidate-features). The stability
+**Phases 0–44 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts) and `~/.ssh/config` alias resolution. The next planned phase is **45 (Shell completions)** — dynamic TAB completion of tuber names; the prioritised backlog lives in [Post-1.0 candidate features](#post-10-candidate-features). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes; any future break goes through the deprecation
 cycle defined there. For the most recent batch see [Current work](#current-work);
@@ -117,32 +118,29 @@ time-based (not just size-based) log rotation.
 
 ## Post-1.0 candidate features
 
-Beyond Phase 44, the following are prioritised candidates — not yet formal
+Beyond Phase 45, the following are prioritised candidates — not yet formal
 phases; each is promoted to a numbered phase (with a `phase-N-*.md` file)
 when taken up. All are additive, so they ship as MINORs; patch releases are
 fixes only.
 
-1. **Shell completions** — cobra `completion` (bash/zsh/fish/powershell) +
-   dynamic tuber-name completion for `enable` / `disable` / `restart` /
-   `logs --tuber`.
-2. **Tunnel tags / groups** — `tags:` on a tuber, `portato enable --tag`,
+1. **Tunnel tags / groups** — `tags:` on a tuber, `portato enable --tag`,
    a TUI tag filter; and make the `a`/`x` enable/disable-all respect the
    active `/` filter (instant group ops without a new schema).
-3. **Per-tunnel stats** — bytes in/out, connection count, reconnect count
+2. **Per-tunnel stats** — bytes in/out, connection count, reconnect count
    (collected at the single `pipe()` chokepoint) shown in the TUI and
    `list --json`; folds in the deferred Phase-39 aggregate line
    (`n connected · n error · n off`).
-4. **Unix-socket forwarding** — `-L /var/run/docker.sock:…` to reach a
+3. **Unix-socket forwarding** — `-L /var/run/docker.sock:…` to reach a
    remote `docker.sock`; the forward direction is cheap via
    `client.Dial("unix", path)`, the reverse (`streamlocal-forward@openssh.com`)
    is harder.
-5. **Lazy tunnels** — dial SSH only on the first connection + an idle
+4. **Lazy tunnels** — dial SSH only on the first connection + an idle
    timeout to disconnect; fits the FD-hand-off listener/client separation
    (Phase 16). Solves the "laptop with 20 tunnels" pain.
-6. **State-change hooks / notifications** — `on_error:` / `on_connect:` cmd
+5. **State-change hooks / notifications** — `on_error:` / `on_connect:` cmd
    and/or a desktop notification when a tunnel drops or recovers; the daemon
    is headless, so this surfaces breaks without opening the TUI.
-7. **Shared SSH client pool** — reuse one `*ssh.Client` per
+6. **Shared SSH client pool** — reuse one `*ssh.Client` per
    `user@host:port` with refcounting (fewer handshakes / password prompts
    for many tunnels to one bastion). The riskiest — it reworks the
    per-tuber reconnect / backoff / keepalive state machine onto a shared
@@ -195,10 +193,11 @@ fixes only.
 - **Phase 42** — `portato logs` (done, `[x]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
 - **Phase 43** — ProxyJump (jump hosts) (done, `[x]`): a `jump:` field (single hop or a comma-chain) dials a target through one or more bastions — the OpenSSH `-J` equivalent. The dial already separates the TCP dial from the SSH handshake, so chaining reuses the handshake per hop: hop 0 via `net.Dialer`, each later hop via the previous hop's `ssh.Client.Dial` wrapped in `ssh.NewClientConn`; the final client runs the tuber's forward unchanged. Intermediate hops are key-only (the shared agent/identity — the bastion must accept the same key); the Phase 35 password fallback applies only to the final target. Per-hop host keys are verified against `known_hosts`; a leash goroutine closes the intermediates once the final client disconnects (no reconnect leak). `~/.ssh/config` resolution and per-hop identity are follow-ups. depends_on [].
 - **Phase 44** — `~/.ssh/config` resolution (done, `[x]`): `ssh: <alias>` resolves HostName/User/Port/IdentityFile/ProxyJump from the user's ssh config (via `kevinburke/ssh_config`, first-match-wins, patterns + `Include` honoured), so host definitions aren't duplicated in `config.yaml`; an alias's `ProxyJump` auto-populates Phase 43's `jump:` (resolved recursively, cycle-guarded), which Phase 43 then dials. Explicit tuber fields (`identity:` / `jump:` / `ssh: me@x:port`) override ssh-config; a missing alias is used literally (openssh-faithful), and only an unreadable `~/.ssh/config` or a ProxyJump cycle/depth is a clear load error. The dial path is unchanged — this is a config-layer resolution. depends_on [43].
+- **Phase 45** — Shell completions (todo, `[ ]`): dynamic TAB completion of tuber names for `enable` / `disable` / `restart` / `forward` and `logs --tuber` (via `ValidArgsFunction` / `RegisterFlagCompletionFunc`; source = `config.yaml` load, so it works with no daemon running). Cobra's `completion bash/zsh/fish/powershell` already generates the shell script; the README documents per-shell sourcing (`eval` / `source`, document-only — no packaging changes). Additive ⇒ MINOR. depends_on [].
 
 ## Current work
 
-**Phases 0–43 are all `[x]`.** The most recent batch:
+**Phases 0–44 are all `[x]`.** The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
