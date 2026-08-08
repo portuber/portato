@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/adrg/xdg"
+	ssh_config "github.com/kevinburke/ssh_config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -133,6 +134,13 @@ type Tuber struct {
 	// Jumps is the parsed ProxyJump chain (derived from Jump by prepare(),
 	// never persisted). Empty -> the single-hop dial path.
 	Jumps []Hop `yaml:"-" json:"-"`
+
+	// SSHIdentity (Phase 44) is an IdentityFile resolved from ~/.ssh/config
+	// (when the tuber's `ssh:` is an alias with an IdentityFile and no
+	// explicit `identity:`). Derived by prepare(), never persisted — it only
+	// fills the gap between an explicit tuber identity and the default one
+	// (see ResolvedIdentity). Already token-expanded (~ %h %u %d).
+	SSHIdentity string `yaml:"-" json:"-"`
 }
 
 // Hop is one address in a ProxyJump chain (Phase 43): a user/host/port triple
@@ -167,7 +175,9 @@ func Load(path string) (*Config, error) {
 	if err := yaml.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("parse config %s: %w", path, err)
 	}
-	c.prepare()
+	if err := c.prepare(); err != nil {
+		return nil, err
+	}
 	if err := c.Validate(); err != nil {
 		return nil, err
 	}
@@ -304,17 +314,140 @@ func exampleConfig() *Config {
 	}
 }
 
-func (c *Config) prepare() {
+// prepare derives the non-persisted fields (Type default, User/Host/Port from
+// `ssh:`, Jumps from `jump:`) and, since Phase 44, resolves `ssh:` against the
+// user's ~/.ssh/config (HostName/User/Port/IdentityFile/ProxyJump). The error
+// path is the ssh-config read: a missing file is fine (resolution is skipped,
+// behaviour unchanged), but an existing unreadable file is a hard load error
+// (see loadUserSSHConfig). prepareWith exists so tests inject an in-memory
+// config instead of touching the real ~/.ssh/config.
+func (c *Config) prepare() error {
+	return c.prepareWith(loadUserSSHConfig)
+}
+
+func (c *Config) prepareWith(load func() (*ssh_config.Config, error)) error {
+	sshCfg, err := load()
+	if err != nil {
+		return err
+	}
 	for i := range c.Tubers {
 		t := &c.Tubers[i]
 		if strings.TrimSpace(t.Type) == "" {
 			t.Type = "local"
 		}
-		if u, h, p, err := parseSSH(t.SSH); err == nil {
-			t.User, t.Host, t.Port = u, h, p
+		if err := resolveTuber(t, sshCfg); err != nil {
+			return err
 		}
-		t.Jumps = parseJumpChain(t.Jump)
 	}
+	return nil
+}
+
+// aliasValues holds the ssh-config keys Portato resolves for one alias.
+type aliasValues struct {
+	hostName, user, port, identity, proxyJump string
+}
+
+// matched reports whether a Host block contributed any resolvable key. A block
+// that sets none (e.g. only keepalive knobs) is treated as no-match — also
+// OpenSSH's effective result — so the host stays literal.
+func (v aliasValues) matched() bool {
+	return v.hostName != "" || v.user != "" || v.port != "" || v.identity != "" || v.proxyJump != ""
+}
+
+func lookupAlias(cfg *ssh_config.Config, alias string) aliasValues {
+	var v aliasValues
+	if cfg == nil {
+		return v
+	}
+	get := func(key string) string {
+		x, _ := cfg.Get(alias, key)
+		return strings.TrimSpace(x)
+	}
+	v.hostName = get("HostName")
+	v.user = get("User")
+	v.port = get("Port")
+	v.identity = get("IdentityFile")
+	v.proxyJump = get("ProxyJump")
+	return v
+}
+
+// applyAlias fills a tuber's gaps from ssh-config with openssh-faithful
+// precedence: explicit tuber values (the `me@x:2222` parts of `ssh:`, or a
+// tuber `identity:`) win; ssh-config only supplies what was left defaulted.
+func applyAlias(t *Tuber, v aliasValues, userExplicit, portExplicit bool) {
+	if v.hostName != "" {
+		t.Host = v.hostName
+	}
+	if !userExplicit && v.user != "" {
+		t.User = v.user
+	}
+	if !portExplicit && v.port != "" {
+		if n, err := strconv.Atoi(v.port); err == nil {
+			t.Port = n
+		}
+	}
+	if strings.TrimSpace(t.Identity) == "" && v.identity != "" {
+		t.SSHIdentity = expandIdentityTokens(v.identity, t.User, v.hostName)
+	}
+}
+
+// resolveTuber fills a tuber's derived fields. `ssh:` is parsed first (so a
+// literal user@host:port works with no ssh-config). When the parsed host matches
+// a Host block, ssh-config fills the gaps (applyAlias). No match ⇒ literal,
+// silently (OpenSSH). A ProxyJump from ssh-config populates Jumps only — Jump
+// stays empty so the derived chain is never written back to config.yaml by Save
+// (which marshals Tuber verbatim).
+func resolveTuber(t *Tuber, sshCfg *ssh_config.Config) error {
+	u, host, port, userExplicit, portExplicit, err := parseSSHExplicit(t.SSH)
+	if err == nil {
+		t.User, t.Host, t.Port = u, host, port
+	}
+	v := lookupAlias(sshCfg, t.Host)
+	matched := v.matched()
+	if matched {
+		applyAlias(t, v, userExplicit, portExplicit)
+	}
+	if strings.TrimSpace(t.Jump) != "" {
+		t.Jumps = parseJumpChain(t.Jump)
+		return nil
+	}
+	return nil
+}
+
+// expandIdentityTokens expands an IdentityFile from ssh-config the way ssh does:
+// %d → home dir, %h → the resolved target host, %u → the user, then a leading
+// ~ → home. kevinburke/ssh_config returns these tokens literally.
+func expandIdentityTokens(idf, sshUser, host string) string {
+	home, _ := os.UserHomeDir()
+	r := strings.NewReplacer("%d", home, "%h", host, "%u", sshUser)
+	return expandTilde(r.Replace(idf))
+}
+
+// loadUserSSHConfig reads ~/.ssh/config for ssh-config resolution. A missing
+// file is not an error (resolution is simply skipped → unchanged behaviour);
+// an existing but unreadable file is, so a permission/IO problem surfaces as a
+// clear load error rather than a silent dial failure. The lenient parser does
+// not reject odd but salvageable input (mirroring OpenSSH), so a "parse error"
+// in the strict sense is not produced; Include directives are followed.
+func loadUserSSHConfig() (*ssh_config.Config, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, nil
+	}
+	p := filepath.Join(home, ".ssh", "config")
+	f, err := os.Open(p)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read ssh config %s: %w", p, err)
+	}
+	defer f.Close()
+	cfg, err := ssh_config.Decode(f)
+	if err != nil {
+		return nil, fmt.Errorf("parse ssh config %s: %w", p, err)
+	}
+	return cfg, nil
 }
 
 // parseJumpChain splits a ProxyJump `jump:` value into its parsed hops. An empty
@@ -417,6 +550,12 @@ func (t Tuber) ResolvedIdentity(d Defaults) string {
 	if strings.TrimSpace(t.Identity) != "" {
 		return expandTilde(t.Identity)
 	}
+	// Phase 44: an IdentityFile resolved from ~/.ssh/config fills the gap
+	// between an explicit tuber identity and the default. SSHIdentity is
+	// already token-expanded by prepare(), so no expandTilde here.
+	if strings.TrimSpace(t.SSHIdentity) != "" {
+		return t.SSHIdentity
+	}
 	if strings.TrimSpace(d.Identity) != "" {
 		return expandTilde(d.Identity)
 	}
@@ -505,30 +644,45 @@ func (d Defaults) ResolvedKnownHosts() string {
 	return expandTilde(d.KnownHosts)
 }
 
+// parseSSH parses a `user@host[:port]` value, defaulting an absent user to the
+// current OS user and an absent port to 22. It is a thin wrapper over
+// parseSSHExplicit that drops the explicit-vs-defaulted flags (those matter
+// only for ssh-config precedence in prepare, see Phase 44).
 func parseSSH(s string) (usr, host string, port int, err error) {
+	usr, host, port, _, _, err = parseSSHExplicit(s)
+	return usr, host, port, err
+}
+
+// parseSSHExplicit is the core parser: it reports whether the user and port
+// were written explicitly (an `@` ⇒ user explicit; a numeric `:port` ⇒ port
+// explicit) so the ssh-config resolver can honour precedence — an explicit
+// `ssh: me@alias:2222` overrides the alias's User/Port, a defaulted one
+// inherits them. Absent values still default (user → current OS user, port →
+// 22) so the returned triple is always dial-ready.
+func parseSSHExplicit(s string) (usr, host string, port int, userExplicit, portExplicit bool, err error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
-		return "", "", 0, fmt.Errorf("ssh is empty")
+		return "", "", 0, false, false, fmt.Errorf("ssh is empty")
 	}
 	hostPart := s
-	usr = ""
 	if i := strings.LastIndex(s, "@"); i >= 0 {
 		usr = s[:i]
 		hostPart = s[i+1:]
+		userExplicit = true
 	}
 	host = hostPart
 	port = defaultSSHPort
 	if i := strings.LastIndex(hostPart, ":"); i >= 0 {
-		candidate := hostPart[i+1:]
-		if n, perr := strconv.Atoi(candidate); perr == nil {
+		if n, perr := strconv.Atoi(hostPart[i+1:]); perr == nil {
 			host = hostPart[:i]
 			port = n
+			portExplicit = true
 		}
 	}
-	if usr == "" {
+	if !userExplicit {
 		usr = currentUser()
 	}
-	return usr, host, port, nil
+	return usr, host, port, userExplicit, portExplicit, nil
 }
 
 func validName(s string) bool {

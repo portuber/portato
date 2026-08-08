@@ -11,6 +11,7 @@ require (
 	github.com/Microsoft/go-winio v0.6.2
 	github.com/adrg/xdg v0.5.3
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
+	github.com/kevinburke/ssh_config v1.6.0
 	github.com/lithammer/fuzzysearch v1.1.8
 	github.com/spf13/cobra v1.10.2
 	github.com/zalando/go-keyring v0.2.8

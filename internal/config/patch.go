@@ -165,7 +165,9 @@ func MoveTuberNode(path, name string, delta int) error {
 func (c *Config) WithTuberAdded(t Tuber) (*Config, error) {
 	out := c.clone()
 	out.Tubers = append(out.Tubers, t)
-	out.prepare()
+	if err := out.prepare(); err != nil {
+		return nil, err
+	}
 	if err := out.Validate(); err != nil {
 		return nil, err
 	}
@@ -187,7 +189,9 @@ func (c *Config) WithTuberReplaced(name string, t Tuber) (*Config, error) {
 		return nil, fmt.Errorf("tuber %q not found", name)
 	}
 	out.Tubers[idx] = t
-	out.prepare()
+	if err := out.prepare(); err != nil {
+		return nil, err
+	}
 	if err := out.Validate(); err != nil {
 		return nil, err
 	}
@@ -209,7 +213,9 @@ func (c *Config) WithTuberRemoved(name string) (*Config, error) {
 		return nil, fmt.Errorf("tuber %q not found", name)
 	}
 	out.Tubers = append(out.Tubers[:idx], out.Tubers[idx+1:]...)
-	out.prepare()
+	if err := out.prepare(); err != nil {
+		return nil, err
+	}
 	if err := out.Validate(); err != nil {
 		return nil, err
 	}
@@ -238,7 +244,9 @@ func (c *Config) WithTuberMoved(name string, delta int) (*Config, error) {
 		return out, nil
 	}
 	out.Tubers[idx], out.Tubers[target] = out.Tubers[target], out.Tubers[idx]
-	out.prepare()
+	if err := out.prepare(); err != nil {
+		return nil, err
+	}
 	if err := out.Validate(); err != nil {
 		return nil, err
 	}

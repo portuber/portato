@@ -198,7 +198,9 @@ func TestValidateErrors(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			tc.cfg.prepare()
+			if err := tc.cfg.prepare(); err != nil {
+				t.Fatalf("prepare: %v", err)
+			}
 			err := tc.cfg.Validate()
 			if err == nil {
 				t.Fatalf("expected error containing %q, got nil", tc.wantSub)
@@ -318,7 +320,9 @@ func TestValidateAcceptsTypes(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := &Config{Tubers: []Tuber{{Name: "a", Type: tc.typ, Local: tc.local, Remote: tc.remote, SSH: "u@h:22"}}}
-			cfg.prepare()
+			if err := cfg.prepare(); err != nil {
+				t.Fatalf("prepare: %v", err)
+			}
 			err := cfg.Validate()
 			if tc.ok && err != nil {
 				t.Fatalf("expected type %q to validate, got: %v", tc.typ, err)
@@ -339,7 +343,9 @@ func TestExpandTilde(t *testing.T) {
 			{Name: "a", Type: "local", Remote: "r:1", SSH: "h:22", Identity: "~/keys/tuber"},
 		},
 	}
-	c.prepare()
+	if err := c.prepare(); err != nil {
+		t.Fatalf("prepare: %v", err)
+	}
 	if got := c.Tubers[0].ResolvedIdentity(c.Defaults); got != filepath.Join(dir, "keys", "tuber") {
 		t.Errorf("tuber identity = %q, want %s", got, filepath.Join(dir, "keys", "tuber"))
 	}
