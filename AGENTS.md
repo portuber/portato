@@ -97,6 +97,10 @@ Non-trivial commits include a body: **what changed and why**.
   the spec and mention it in the commit. If unsure — ask.
 - Do not change global git config. Local repo config is fine when a task needs it.
 - Do not add comments to code unless asked.
+- Do not pin the current release version in docs (ROADMAP/README/SPEC) — it
+  churns every release. Reference `VERSIONING.md`'s policy or link
+  `/releases/latest`; an exact `vX.Y.Z` lives only in git tags and the per-phase
+  historical "shipped in vX.Y.Z" notes (which are facts, not the current version).
 
 ## Current focus
 

@@ -72,13 +72,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–43 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts). The next work is the prioritised v1.1.x backlog in [Post-1.0 candidate features](#post-10-candidate-features) (top of the list: `~/.ssh/config` resolution, which pairs with Phase 43's `jump:`). The stability
+**Phases 0–43 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts). The next work is the prioritised backlog in [Post-1.0 candidate features](#post-10-candidate-features) (top of the list: `~/.ssh/config` resolution, which pairs with Phase 43's `jump:`). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
-no planned breaking changes. **`v1.0.0`** is the latest release — subsequent
-breaks go through the deprecation cycle. Phase 43 is additive (a new optional
-`jump:` field) and ships as a MINOR (`v1.1.0`). For the
-most recent batch see [Current work](#current-work); for per-phase status see
-the table above.
+no planned breaking changes; any future break goes through the deprecation
+cycle defined there. For the most recent batch see [Current work](#current-work);
+for per-phase status see the table above.
 
 The single binary runs the smart launcher (attaches to a running daemon or
 starts standalone), a background daemon with HTTP-over-unix-socket IPC, an
