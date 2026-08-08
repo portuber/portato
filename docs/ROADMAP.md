@@ -59,6 +59,7 @@
 | 41  | Forwarding-permission diagnostics | `[x]` | [phase-41-forwarding-permission-diagnostics.md](./phases/phase-41-forwarding-permission-diagnostics.md) |
 | 42  | `portato logs` (tail/follow)      | `[x]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
 | 43  | ProxyJump (jump hosts)            | `[x]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
+| 44  | `~/.ssh/config` resolution        | `[ ]` | [phase-44-ssh-config.md](./phases/phase-44-ssh-config.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -72,7 +73,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–43 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts). The next work is the prioritised backlog in [Post-1.0 candidate features](#post-10-candidate-features) (top of the list: `~/.ssh/config` resolution, which pairs with Phase 43's `jump:`). The stability
+**Phases 0–43 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts). The next planned phase is **44 (`~/.ssh/config` resolution)** — it pairs with Phase 43's `jump:` (an alias's `ProxyJump` auto-populates it); the prioritised backlog lives in [Post-1.0 candidate features](#post-10-candidate-features). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes; any future break goes through the deprecation
 cycle defined there. For the most recent batch see [Current work](#current-work);
@@ -83,7 +84,8 @@ starts standalone), a background daemon with HTTP-over-unix-socket IPC, an
 interactive TUI, the CLI commands, and system autostart (`install`/`uninstall`
 via launchd / systemd --user / Windows Run key). It supports `local` (`-L`),
 `remote` (`-R`) and `dynamic` (`-D`, SOCKS5) tunnels, `jump:` (ProxyJump /
-OpenSSH `-J` — reach a host through a bastion), push-based status events,
+OpenSSH `-J` — reach a host through a bastion), `~/.ssh/config` alias
+resolution for `ssh:`, push-based status events,
 an in-TUI editor (`e`/`n`/`d`) and tunnel duplication (`Shift+C`), a per-tunnel
 log screen (`l`), `portato logs`, `portato doctor` (incl. `--probe`),
 `portato license`, an interactive unknown-host (TOFU) prompt, automatic
@@ -115,36 +117,32 @@ time-based (not just size-based) log rotation.
 
 ## Post-1.0 candidate features
 
-Beyond Phase 43, the following are prioritised candidates — not yet formal
+Beyond Phase 44, the following are prioritised candidates — not yet formal
 phases; each is promoted to a numbered phase (with a `phase-N-*.md` file)
-when taken up. All are additive, so they ship as MINORs (`v1.1.x`); patch
-releases (`v1.0.x`) are fixes only.
+when taken up. All are additive, so they ship as MINORs; patch releases are
+fixes only.
 
-1. **`~/.ssh/config` resolution** — `ssh: <alias>` resolves
-   `HostName` / `User` / `Port` / `IdentityFile` / `ProxyJump` from the
-   user's ssh config, so host definitions aren't duplicated in `config.yaml`.
-   Pairs with Phase 43's `jump:` (an alias's `ProxyJump` can populate it).
-2. **Shell completions** — cobra `completion` (bash/zsh/fish/powershell) +
+1. **Shell completions** — cobra `completion` (bash/zsh/fish/powershell) +
    dynamic tuber-name completion for `enable` / `disable` / `restart` /
    `logs --tuber`.
-3. **Tunnel tags / groups** — `tags:` on a tuber, `portato enable --tag`,
+2. **Tunnel tags / groups** — `tags:` on a tuber, `portato enable --tag`,
    a TUI tag filter; and make the `a`/`x` enable/disable-all respect the
    active `/` filter (instant group ops without a new schema).
-4. **Per-tunnel stats** — bytes in/out, connection count, reconnect count
+3. **Per-tunnel stats** — bytes in/out, connection count, reconnect count
    (collected at the single `pipe()` chokepoint) shown in the TUI and
    `list --json`; folds in the deferred Phase-39 aggregate line
    (`n connected · n error · n off`).
-5. **Unix-socket forwarding** — `-L /var/run/docker.sock:…` to reach a
+4. **Unix-socket forwarding** — `-L /var/run/docker.sock:…` to reach a
    remote `docker.sock`; the forward direction is cheap via
    `client.Dial("unix", path)`, the reverse (`streamlocal-forward@openssh.com`)
    is harder.
-6. **Lazy tunnels** — dial SSH only on the first connection + an idle
+5. **Lazy tunnels** — dial SSH only on the first connection + an idle
    timeout to disconnect; fits the FD-hand-off listener/client separation
    (Phase 16). Solves the "laptop with 20 tunnels" pain.
-7. **State-change hooks / notifications** — `on_error:` / `on_connect:` cmd
+6. **State-change hooks / notifications** — `on_error:` / `on_connect:` cmd
    and/or a desktop notification when a tunnel drops or recovers; the daemon
    is headless, so this surfaces breaks without opening the TUI.
-8. **Shared SSH client pool** — reuse one `*ssh.Client` per
+7. **Shared SSH client pool** — reuse one `*ssh.Client` per
    `user@host:port` with refcounting (fewer handshakes / password prompts
    for many tunnels to one bastion). The riskiest — it reworks the
    per-tuber reconnect / backoff / keepalive state machine onto a shared
@@ -196,6 +194,7 @@ releases (`v1.0.x`) are fixes only.
 - **Phase 41** — forwarding-permission diagnostics (done, `[x]`): `portato doctor --probe` (opt-in) dials each configured host with key-only auth and classifies the server-side sshd gate — chiefly detecting `AllowTcpForwarding no` (a direct-tcpip open rejected with `ssh.Prohibited`), plus connectivity/auth; a non-loopback `-R` bind gets an honest "GatewayPorts not verifiable client-side" caveat (the silent-loopback downgrade is not client-detectable — RFC 4254 §7.1). The `-L`/`-D` runtime dial surfaces an `AllowTcpForwarding` hint on such a rejection. depends_on [11, 7, 8].
 - **Phase 42** — `portato logs` (done, `[x]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
 - **Phase 43** — ProxyJump (jump hosts) (done, `[x]`): a `jump:` field (single hop or a comma-chain) dials a target through one or more bastions — the OpenSSH `-J` equivalent. The dial already separates the TCP dial from the SSH handshake, so chaining reuses the handshake per hop: hop 0 via `net.Dialer`, each later hop via the previous hop's `ssh.Client.Dial` wrapped in `ssh.NewClientConn`; the final client runs the tuber's forward unchanged. Intermediate hops are key-only (the shared agent/identity — the bastion must accept the same key); the Phase 35 password fallback applies only to the final target. Per-hop host keys are verified against `known_hosts`; a leash goroutine closes the intermediates once the final client disconnects (no reconnect leak). `~/.ssh/config` resolution and per-hop identity are follow-ups. depends_on [].
+- **Phase 44** — `~/.ssh/config` resolution (todo, `[ ]`): `ssh: <alias>` resolves HostName/User/Port/IdentityFile/ProxyJump from the user's ssh config (via `kevinburke/ssh_config`, first-match-wins, patterns + `Include` honoured), so host definitions aren't duplicated in `config.yaml`; an alias's `ProxyJump` auto-populates Phase 43's `jump:` (resolved recursively, cycle-guarded), which Phase 43 then dials. Explicit tuber fields (`identity:` / `jump:` / `ssh: me@x:port`) override ssh-config; a missing alias is used literally (openssh-faithful), and only an unreadable `~/.ssh/config` or a ProxyJump cycle/depth is a clear load error. The dial path is unchanged — this is a config-layer resolution. depends_on [43].
 
 ## Current work
 
