@@ -58,7 +58,7 @@
 | 40  | Recover from / prevent the wedged daemon | `[x]` | [phase-40-wedged-daemon-recovery.md](./phases/phase-40-wedged-daemon-recovery.md) |
 | 41  | Forwarding-permission diagnostics | `[x]` | [phase-41-forwarding-permission-diagnostics.md](./phases/phase-41-forwarding-permission-diagnostics.md) |
 | 42  | `portato logs` (tail/follow)      | `[x]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
-| 43  | ProxyJump (jump hosts)            | `[~]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
+| 43  | ProxyJump (jump hosts)            | `[x]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -72,10 +72,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–42 are all `[x]`** — the roadmap's core is complete. The next planned phase is **43 (ProxyJump / jump hosts)**; the prioritised v1.1.x backlog lives in [Post-1.0 candidate features](#post-10-candidate-features). The stability
+**Phases 0–43 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts). The next work is the prioritised v1.1.x backlog in [Post-1.0 candidate features](#post-10-candidate-features) (top of the list: `~/.ssh/config` resolution, which pairs with Phase 43's `jump:`). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes. **`v1.0.0`** is the latest release — subsequent
-breaks go through the deprecation cycle. For the
+breaks go through the deprecation cycle. Phase 43 is additive (a new optional
+`jump:` field) and ships as a MINOR (`v1.1.0`). For the
 most recent batch see [Current work](#current-work); for per-phase status see
 the table above.
 
@@ -83,7 +84,8 @@ The single binary runs the smart launcher (attaches to a running daemon or
 starts standalone), a background daemon with HTTP-over-unix-socket IPC, an
 interactive TUI, the CLI commands, and system autostart (`install`/`uninstall`
 via launchd / systemd --user / Windows Run key). It supports `local` (`-L`),
-`remote` (`-R`) and `dynamic` (`-D`, SOCKS5) tunnels, push-based status events,
+`remote` (`-R`) and `dynamic` (`-D`, SOCKS5) tunnels, `jump:` (ProxyJump /
+OpenSSH `-J` — reach a host through a bastion), push-based status events,
 an in-TUI editor (`e`/`n`/`d`) and tunnel duplication (`Shift+C`), a per-tunnel
 log screen (`l`), `portato logs`, `portato doctor` (incl. `--probe`),
 `portato license`, an interactive unknown-host (TOFU) prompt, automatic
@@ -195,11 +197,11 @@ releases (`v1.0.x`) are fixes only.
 - **Phase 40** — recover from / prevent the wedged daemon (done, `[x]`): on macOS the IPC socket lived under the reaped `$TMPDIR`, so when macOS unlinked it a running daemon was wedged (alive, holding the flock + local ports, but unreachable); `portato daemon` then said "already running", `portato stop` said "no daemon running", and the standalone TUI hit "address already in use". Prevention moves the darwin socket into the stable `xdg.StateHome/portato/` dir; recovery makes `stop` SIGTERM the wedged PID from the marker (guarded against PID reuse) and `doctor` diagnose it. Shipped in v0.4.2. depends_on [].
 - **Phase 41** — forwarding-permission diagnostics (done, `[x]`): `portato doctor --probe` (opt-in) dials each configured host with key-only auth and classifies the server-side sshd gate — chiefly detecting `AllowTcpForwarding no` (a direct-tcpip open rejected with `ssh.Prohibited`), plus connectivity/auth; a non-loopback `-R` bind gets an honest "GatewayPorts not verifiable client-side" caveat (the silent-loopback downgrade is not client-detectable — RFC 4254 §7.1). The `-L`/`-D` runtime dial surfaces an `AllowTcpForwarding` hint on such a rejection. depends_on [11, 7, 8].
 - **Phase 42** — `portato logs` (done, `[x]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
-- **Phase 43** — ProxyJump (jump hosts) (todo, `[ ]`): a `jump:` field (single hop or a comma-chain) dials a target through one or more bastions — the OpenSSH `-J` equivalent; today `ssh:` is a single hop, so a host only reachable through a bastion cannot be forwarded to. depends_on [].
+- **Phase 43** — ProxyJump (jump hosts) (done, `[x]`): a `jump:` field (single hop or a comma-chain) dials a target through one or more bastions — the OpenSSH `-J` equivalent. The dial already separates the TCP dial from the SSH handshake, so chaining reuses the handshake per hop: hop 0 via `net.Dialer`, each later hop via the previous hop's `ssh.Client.Dial` wrapped in `ssh.NewClientConn`; the final client runs the tuber's forward unchanged. Intermediate hops are key-only (the shared agent/identity — the bastion must accept the same key); the Phase 35 password fallback applies only to the final target. Per-hop host keys are verified against `known_hosts`; a leash goroutine closes the intermediates once the final client disconnects (no reconnect leak). `~/.ssh/config` resolution and per-hop identity are follow-ups. depends_on [].
 
 ## Current work
 
-**Phases 0–42 are all `[x]`.** The most recent batch:
+**Phases 0–43 are all `[x]`.** The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
@@ -247,6 +249,18 @@ releases (`v1.0.x`) are fixes only.
   `journalctl` equivalent (the TUI `l` view is a live ring buffer only).
   Verified end-to-end against the real daemon log: `--tuber` filters on the
   current `tuber=` attr, and `--follow` streams live.
+
+- **Phase 43** — ProxyJump / jump hosts (done, `[x]`): a `jump:` field (single
+  hop or a comma-chain, OpenSSH `-J` equivalent) dials a target through one or
+  more bastions. The dial reuses the handshake per hop — hop 0 via `net.Dialer`,
+  each later hop via the previous hop's `ssh.Client.Dial` wrapped in
+  `ssh.NewClientConn` — so the final client runs the tuber's forward unchanged.
+  Intermediate hops are key-only (the shared agent/identity; the bastion must
+  accept the same key), the Phase 35 password fallback applies only to the
+  final target, and each hop verifies its own host key. A leash goroutine
+  closes the intermediates once the final client disconnects (proved by an
+  `ActiveConns()→0` leak guard). `~/.ssh/config` resolution and per-hop
+  identity are follow-ups. Additive → MINOR (`v1.1.0`).
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase

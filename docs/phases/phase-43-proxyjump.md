@@ -1,7 +1,7 @@
 ---
 phase: 43
 title: "ProxyJump (jump hosts)"
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -27,42 +27,59 @@ hops reuses the handshake primitive unchanged (see Technical details).
 
 ## Tasks
 
-- [ ] Config: a `jump:` field on `Tuber` — a single `user@host[:port]` or a
+- [x] Config: a `jump:` field on `Tuber` — a single `user@host[:port]` or a
       comma-separated chain (`user@edge,user@bastion`); validate each hop
       (reuse the existing `parseSSH` shape). Validate at load time.
-- [ ] Dial: when `jump:` is set, dial hop 1 via the existing `net.Dialer`
+- [x] Dial: when `jump:` is set, dial hop 1 via the existing `net.Dialer`
       path, then each subsequent hop via `prevClient.Dial("tcp", addr)`
       wrapped in `ssh.NewClientConn`; the final client runs the tuber's
       forward (`Listen` / direct-tcpip `Dial`) exactly as today.
-- [ ] Each hop honours its own `user` plus the tuber's identity / agent +
+- [x] Each hop honours its own `user` plus the tuber's identity / agent +
       host-key policy. Per-hop identity files are a later refinement — start
-      with a shared identity.
-- [ ] `docs/SPEC.md` + `config.example.yaml` + `README.md`: a `jump:`
+      with a shared identity. (Intermediate hops are key-only; the bastion
+      must accept the shared key — the documented limitation.)
+- [x] `docs/SPEC.md` + `config.example.yaml` + `README.md`: a `jump:`
       example + a short note (and a Troubleshooting pointer for bastion
       auth failures).
-- [ ] Tests: a two-hop end-to-end via the `sshtest` fixture (edge → target);
-      config validation of a malformed `jump:` value.
+- [x] Tests: a two-hop end-to-end via the `sshtest` fixture (edge → target);
+      config validation of a malformed `jump:` value. (Plus a 3-hop chain, a
+      no-jump zero-behaviour-change guard, a bastion-auth-failure case, an
+      intermediate-leak guard via `SSHD.ActiveConns()`, and a full-Tuber E2E.)
+- [x] Black-box E2E: `make e2e-proxyjump` builds the real `portato` binary and
+      asserts a `-L` forward carries traffic through a two-hop chain
+      (edge → target, in-process SSH servers) and self-heals when the bastion
+      drops. Plus a real-Linux `e2e/systemd-docker` jump case (`e2e.sh jump`):
+      two real OpenSSH instances (target :22, bastion :2222 with its own host
+      key) under systemd, proving ProxyJump against real OpenSSH on Linux.
 
 ## Definition of Done
 
-- [ ] A tuber with `jump: bastion` forwards to a target reachable only via
+- [x] A tuber with `jump: bastion` forwards to a target reachable only via
       that bastion (verified via an `sshtest` two-hop setup).
-- [ ] A chain of 2+ hops works.
-- [ ] A tuber **without** `jump:` is unchanged (zero behaviour change — the
+- [x] A chain of 2+ hops works.
+- [x] A tuber **without** `jump:` is unchanged (zero behaviour change — the
       default single-hop path is untouched).
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run
       ./...` are clean; new functions sit under gocyclo 15; the phase's
       tests are green.
-- [ ] SPEC + README + `config.example.yaml` updated.
+- [x] Black-box E2E (`make e2e-proxyjump` + `e2e/systemd-docker` `e2e.sh jump`)
+      pass — real binary / real OpenSSH, not just in-process unit calls.
+- [x] SPEC + README + `config.example.yaml` updated.
 
 ## Verification
 
 ```sh
 make fmt && make vet && make test && make lint
 
-# manual:
-#   two-hop dial through an sshtest bastion to a target host; confirm a
-#   -L forward through the chain carries traffic end to end.
+# black-box E2E (real binary + real SSH):
+make e2e-proxyjump                           # in-process two-hop chain + leak/reconnect
+
+# real-Linux E2E (Docker + real OpenSSH + systemd):
+make cross && cp bin/portato-linux-arm64 e2e/systemd-docker/portato
+docker build -t portato-test e2e/systemd-docker
+docker run -d --name portato-test --privileged --cgroupns=host portato-test
+sleep 6 && docker exec portato-test /e2e/e2e.sh jump
+docker rm -f portato-test
 ```
 
 ## Technical details (sketch)
