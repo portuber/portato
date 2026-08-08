@@ -59,19 +59,22 @@ type passwordSink func(account string)
 //     host-key rejection leaves PendingHost set for the TUI TOFU prompt);
 //   - (nil, nil): no key authenticated on a trusted host — fall through to the
 //     password loop.
+//
+// keyMethods is built once by dialWithPasswordPrompt and shared with the
+// password loop's dialConn, so the agent stays open across the probe and every
+// password attempt (a jump chain's intermediate hops sign with the same key).
 func probeBeforePassword(
 	ctx context.Context,
 	cfg config.Tuber,
 	def config.Defaults,
 	log *slog.Logger,
 	sink hostKeySink,
-	provider PassphraseProvider,
-	passSink passphraseSink,
+	keyMethods []ssh.AuthMethod,
 ) (*ssh.Client, error) {
-	keyMethods, closeAgent := authMethods(ctx, cfg, def, log, provider, passSink)
-	defer closeAgent()
 	if len(keyMethods) > 0 {
-		client, err := dialOnce(ctx, cfg, def, log, sink, keyMethods)
+		// Probe keys on every hop (intermed == final == keys). A working key
+		// on the final hop authenticates and never triggers a prompt.
+		client, err := dialConn(ctx, cfg, def, log, sink, keyMethods, keyMethods)
 		if err == nil {
 			return client, nil
 		}
@@ -80,10 +83,16 @@ func probeBeforePassword(
 		}
 		return nil, nil // keys rejected → password loop
 	}
-	// No key to try — verify the host key before prompting (TOFU must surface
-	// first, not a pointless password prompt). A nil-auth dial runs the host-key
+	// No key to try. A jump tuber's intermediates are key-only, so a bastion
+	// that needs auth is unreachable — bail with a clear message rather than
+	// a chain of nil-auth dials.
+	if len(cfg.Jumps) > 0 {
+		return nil, errors.New("bastion requires a key: configure an identity (or load it into ssh-agent); per-hop identity/password is not supported yet")
+	}
+	// No jump — verify the host key before prompting (TOFU must surface first,
+	// not a pointless password prompt). A nil-auth dial runs the host-key
 	// check then fails at auth; a host-key rejection returns here.
-	if c, err := dialOnce(ctx, cfg, def, log, sink, nil); err == nil {
+	if c, err := dialConn(ctx, cfg, def, log, sink, nil, nil); err == nil {
 		return c, nil // server accepted "none" auth (no auth required)
 	} else if !isAuthFailed(err) {
 		return nil, err
@@ -102,8 +111,14 @@ func dialWithPasswordPrompt(
 	pwProvider PasswordProvider,
 	pwSink passwordSink,
 ) (*ssh.Client, error) {
+	// Build the key methods once: they are a jump chain's intermediate-hop auth
+	// and stay valid across the probe + every password attempt. The agent is
+	// held open for the whole call so the lazy signers sign per hop.
+	keyMethods, closeAgent := authMethods(ctx, cfg, def, log, provider, passSink)
+	defer closeAgent()
+
 	// 1. Probe keys / verify the host key before prompting (see helper).
-	if c, err := probeBeforePassword(ctx, cfg, def, log, sink, provider, passSink); err != nil {
+	if c, err := probeBeforePassword(ctx, cfg, def, log, sink, keyMethods); err != nil {
 		return nil, err
 	} else if c != nil {
 		return c, nil
@@ -129,7 +144,7 @@ func dialWithPasswordPrompt(
 				return nil, ctx.Err()
 			}
 		}
-		client, err := dialOnce(ctx, cfg, def, log, sink, []ssh.AuthMethod{ssh.Password(pw)})
+		client, err := dialConn(ctx, cfg, def, log, sink, keyMethods, []ssh.AuthMethod{ssh.Password(pw)})
 		if err == nil {
 			if pwSink != nil {
 				pwSink("") // accepted — dismiss the prompt

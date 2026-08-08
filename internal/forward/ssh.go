@@ -51,24 +51,44 @@ func dialSSH(ctx context.Context, cfg config.Tuber, def config.Defaults, log *sl
 		if len(auths) == 0 {
 			return nil, errors.New("no ssh auth method available: start ssh-agent (SSH_AUTH_SOCK) or configure an identity key, or enable password_auth")
 		}
-		return dialOnce(ctx, cfg, def, log, sink, auths)
+		// intermedAuths == finalAuths == keys: the key-only path offers the
+		// same methods to every hop. When cfg has no jump, dialConn falls
+		// through to dialOnce unchanged (zero behaviour change).
+		return dialConn(ctx, cfg, def, log, sink, auths, auths)
 	}
 	return dialWithPasswordPrompt(ctx, cfg, def, log, sink, provider, passSink, pwProvider, pwSink)
 }
 
 // dialOnce performs a single SSH dial with the given auth methods. The TCP dial
 // is context-aware; the handshake is bounded by connectTimeout. sink receives a
-// rejected unknown host key. Extracted from dialSSH (Phase 35) so both the
-// key-only path and dialWithPasswordPrompt's password loop share one dial
-// primitive. mapDialError translates raw handshake errors into readable ones.
+// rejected unknown host key. It is the no-jump fast path (one hop = the tuber's
+// own host); dialConn delegates here when cfg.Jumps is empty so a tuber without
+// a jump is byte-for-byte unchanged. mapDialError translates raw handshake
+// errors into readable ones.
 func dialOnce(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, sink hostKeySink, auths []ssh.AuthMethod) (*ssh.Client, error) {
 	hostCb, err := hostKeyCallback(def, log, sink)
 	if err != nil {
 		return nil, err
 	}
 	addr := net.JoinHostPort(cfg.Host, fmt.Sprintf("%d", cfg.Port))
+	d := &net.Dialer{Timeout: connectTimeout}
+	conn, err := d.DialContext(ctx, "tcp", addr)
+	if err != nil {
+		return nil, mapDialError(err)
+	}
+	return handshake(def, config.Hop{User: cfg.User, Host: cfg.Host, Port: cfg.Port}, auths, hostCb, conn)
+}
+
+// handshake wraps an already-connected conn in an SSH client for one hop: the
+// per-hop ssh.ClientConfig (user, auths, host-key callback, per-addr algos) and
+// a handshake bounded by connectTimeout (via newClientConn). conn is closed on
+// error; on success the client owns it. Shared by dialOnce (single hop) and
+// dialConn (per hop) — including hops whose conn is an ssh channel (a previous
+// hop's direct-tcpip dial), which does not support net.Conn.SetDeadline.
+func handshake(def config.Defaults, hop config.Hop, auths []ssh.AuthMethod, hostCb ssh.HostKeyCallback, conn net.Conn) (*ssh.Client, error) {
+	addr := net.JoinHostPort(hop.Host, fmt.Sprintf("%d", hop.Port))
 	sshCfg := &ssh.ClientConfig{
-		User:            cfg.User,
+		User:            hop.User,
 		Auth:            auths,
 		HostKeyCallback: hostCb,
 		Timeout:         connectTimeout,
@@ -76,23 +96,117 @@ func dialOnce(ctx context.Context, cfg config.Tuber, def config.Defaults, log *s
 	if algos := hostKeyAlgos(def.ResolvedKnownHosts(), addr); len(algos) > 0 {
 		sshCfg.HostKeyAlgorithms = algos
 	}
+	client, err := newClientConn(conn, addr, sshCfg, connectTimeout)
+	if err != nil {
+		conn.Close()
+		return nil, mapDialError(err)
+	}
+	return client, nil
+}
 
-	d := &net.Dialer{Timeout: connectTimeout}
-	conn, err := d.DialContext(ctx, "tcp", addr)
+// newClientConn runs ssh.NewClientConn bounded by timeout. ssh.ClientConfig.Timeout
+// only bounds ssh.Dial's TCP dial — NewClientConn itself is unbounded, so without
+// this a handshake could hang (worst on a conn that does not support SetDeadline,
+// e.g. the ssh channel a ProxyJump hop's Client.Dial returns). On timeout the conn
+// is closed to abort the in-flight handshake, and any raced-in client is closed.
+// Unlike a manual SetDeadline this leaves no deadline on the live connection.
+func newClientConn(conn net.Conn, addr string, sshCfg *ssh.ClientConfig, timeout time.Duration) (*ssh.Client, error) {
+	type res struct {
+		sc    ssh.Conn
+		chans <-chan ssh.NewChannel
+		reqs  <-chan *ssh.Request
+		err   error
+	}
+	ch := make(chan res, 1)
+	go func() {
+		sc, chans, reqs, err := ssh.NewClientConn(conn, addr, sshCfg)
+		ch <- res{sc, chans, reqs, err}
+	}()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	select {
+	case r := <-ch:
+		if r.err != nil {
+			return nil, r.err
+		}
+		return ssh.NewClient(r.sc, r.chans, r.reqs), nil
+	case <-timer.C:
+		conn.Close() // aborts the in-flight NewClientConn goroutine
+		r := <-ch    // it now returns (with an error, or a raced success)
+		if r.sc != nil {
+			_ = r.sc.Close()
+		}
+		return nil, errors.New("ssh handshake timeout")
+	}
+}
+
+// dialConn dials the tuber's SSH server, optionally through a ProxyJump chain
+// (Phase 43). With no jumps it is exactly dialOnce (the unchanged single-hop
+// path). With jumps the chain is jumps ++ [target]: hop 0 via net.Dialer, each
+// later hop via the previous hop's ssh.Client.Dial wrapped in ssh.NewClientConn;
+// the final client runs the tuber's forward as today. Intermediates are key-only
+// (intermedAuths); the final hop uses finalAuths. A leash goroutine closes the
+// intermediates once the final client disconnects (no reconnect leak), and a
+// mid-chain failure closes the partial chain. See SPEC §9 for the full story.
+func dialConn(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, sink hostKeySink, intermedAuths, finalAuths []ssh.AuthMethod) (*ssh.Client, error) {
+	if len(cfg.Jumps) == 0 {
+		return dialOnce(ctx, cfg, def, log, sink, finalAuths)
+	}
+	hostCb, err := hostKeyCallback(def, log, sink)
 	if err != nil {
-		return nil, mapDialError(err)
+		return nil, err
 	}
-	if err := conn.SetDeadline(time.Now().Add(connectTimeout)); err != nil {
-		conn.Close()
-		return nil, fmt.Errorf("set handshake deadline: %w", err)
+
+	// Chain = intermediates (key-only) ++ target (caller's auths).
+	type hop struct {
+		target config.Hop
+		auths  []ssh.AuthMethod
 	}
-	sc, chans, reqs, err := ssh.NewClientConn(conn, addr, sshCfg)
-	if err != nil {
-		conn.Close()
-		return nil, mapDialError(err)
+	chain := make([]hop, 0, len(cfg.Jumps)+1)
+	for _, j := range cfg.Jumps {
+		chain = append(chain, hop{target: j, auths: intermedAuths})
 	}
-	_ = conn.SetDeadline(time.Time{})
-	return ssh.NewClient(sc, chans, reqs), nil
+	chain = append(chain, hop{target: config.Hop{User: cfg.User, Host: cfg.Host, Port: cfg.Port}, auths: finalAuths})
+
+	var dialed []*ssh.Client
+	closeAll := func(clients []*ssh.Client) {
+		for _, c := range clients {
+			_ = c.Close()
+		}
+	}
+	var prev *ssh.Client
+	for i, h := range chain {
+		addr := net.JoinHostPort(h.target.Host, fmt.Sprintf("%d", h.target.Port))
+		var conn net.Conn
+		if i == 0 {
+			d := &net.Dialer{Timeout: connectTimeout}
+			conn, err = d.DialContext(ctx, "tcp", addr)
+		} else {
+			conn, err = prev.Dial("tcp", addr)
+		}
+		if err != nil {
+			closeAll(dialed)
+			return nil, mapDialError(err)
+		}
+		client, herr := handshake(def, h.target, h.auths, hostCb, conn)
+		if herr != nil {
+			closeAll(dialed)
+			return nil, herr
+		}
+		dialed = append(dialed, client)
+		prev = client
+	}
+
+	// final = last client; intermediates = the rest (kept alive by the leash).
+	final := dialed[len(dialed)-1]
+	intermediates := dialed[:len(dialed)-1]
+	if len(intermediates) > 0 {
+		go func() {
+			_ = final.Wait()
+			closeAll(intermediates)
+		}()
+	}
+	return final, nil
 }
 
 // authMethods builds the public-key auth-method chain (ssh-agent then the

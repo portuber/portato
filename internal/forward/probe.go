@@ -84,7 +84,10 @@ func ProbeForwarding(ctx context.Context, cfg config.Tuber, def config.Defaults,
 		return ProbeResult{Outcome: ProbeAuthUnavailable, Detail: "no ssh-agent and no unencrypted identity; start ssh-agent/ssh-add, or cache the key passphrase via `portato add-identity`"}
 	}
 
-	client, err := dialOnce(ctx, cfg, def, log, nil, auths)
+	// dialConn so a jump tuber is probed through its chain (intermediates +
+	// target both key-only here); a no-jump tuber takes the unchanged
+	// single-hop path.
+	client, err := dialConn(ctx, cfg, def, log, nil, auths, auths)
 	if err != nil {
 		return classifyProbeDialErr(err)
 	}
