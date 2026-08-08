@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff third-party-licenses optimize-assets release release-patch release-minor release-major
+.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff e2e-proxyjump third-party-licenses optimize-assets release release-patch release-minor release-major
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -64,6 +64,13 @@ reload:
 # the close+rebind fallback. Slower than unit tests, hence a separate target.
 e2e-handoff:
 	go test -tags e2e ./internal/tui/... -run TestHandoffE2E -v -count=1
+
+# e2e-proxyjump runs the Phase 43 black-box ProxyJump E2E: builds the real
+# binary, spins up two in-process SSH servers (bastion + target), and asserts a
+# -L forward carries traffic through the chain (edge -> target) plus self-heals
+# when the bastion drops. Real binary + real SSH servers + real traffic.
+e2e-proxyjump:
+	go test -tags e2e ./internal/daemon/... -run TestProxyJumpE2E -v -count=1
 
 # third-party-licenses regenerates the bundled THIRD_PARTY_LICENSES.txt: each
 # runtime dependency's license text under a module-path header. Packed into
