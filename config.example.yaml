@@ -51,3 +51,15 @@ tubers:
     ssh: deploy@10.0.0.5:22     # the target — reachable only via the bastion
     jump: user@bastion.example.com:22   # bastion; or a chain user@h1,user@h2
     enabled: false
+
+  # ~/.ssh/config aliases: `ssh:` may be a Host alias from your ssh config.
+  # HostName/User/Port/IdentityFile/ProxyJump are resolved from it — so a host
+  # defined once in ~/.ssh/config isn't repeated here. Explicit fields still win
+  # (e.g. `identity:` / `jump:` override the alias's). An alias with a ProxyJump
+  # reaches its target through the bastion with no `jump:` here at all.
+  - name: db-alias
+    type: local
+    local: 5434
+    remote: 127.0.0.1:5432
+    ssh: db-stage            # an ~/.ssh/config alias (HostName/User/Port/…)
+    enabled: false

@@ -228,8 +228,40 @@ Each hop verifies its own host key against `known_hosts` (so the bastion key and
 the target key are both checked). The bastion must accept **the same key** as the
 target (ssh-agent / `identity:`) — intermediate hops are key-only; the Phase 35
 password fallback applies only to the final target. Per-hop identity/password is
-a later refinement. `~/.ssh/config` resolution (reading an alias's `ProxyJump`)
-is tracked as a follow-up.
+a later refinement.
+
+### `~/.ssh/config` aliases
+
+`ssh:` may be a Host alias from your `~/.ssh/config`. HostName / User / Port /
+IdentityFile / ProxyJump are resolved from it, so a host defined once in your ssh
+config doesn't have to be repeated in `config.yaml`. Explicit tuber fields still
+win — `ssh: me@alias:2222`, `identity:`, or `jump:` override the alias's values;
+ssh-config only fills the gaps. An alias with a `ProxyJump` reaches its target
+through the bastion with **no `jump:` in `config.yaml` at all** (Phase 43 dials
+the resolved chain):
+
+```yaml
+# ~/.ssh/config:
+#   Host db-stage
+#     HostName 10.0.0.5
+#     User deploy
+#     Port 2222
+#     IdentityFile ~/.ssh/deploy_key
+#     ProxyJump bastion
+
+tubers:
+  - name: db
+    type: local
+    local: 5434
+    remote: 127.0.0.1:5432
+    ssh: db-stage        # alias — HostName/User/Port/IdentityFile/ProxyJump resolved
+```
+
+A host with no matching `Host` block is used literally (matching OpenSSH), so
+existing `user@host:port` values keep working unchanged. Only an unreadable
+`~/.ssh/config` or a circular `ProxyJump` is a load error. `Match exec/host`
+conditional blocks and `UserKnownHostsFile` are not resolved (Portato keeps its
+own `known_hosts`).
 
 ## Autostart
 

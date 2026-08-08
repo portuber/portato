@@ -46,28 +46,28 @@ User/Host/Port/Identity/Jump *before* any dial, so the forward/dial path
 
 ## Tasks
 
-- [ ] Add `github.com/kevinburke/ssh_config`; `go mod tidy`.
-- [ ] `prepare()`: resolve the host against ssh-config (first-match-wins);
+- [x] Add `github.com/kevinburke/ssh_config`; `go mod tidy`.
+- [x] `prepare()`: resolve the host against ssh-config (first-match-wins);
       extend `parseSSH` (or a thin wrapper) to surface explicit-vs-defaulted
       user/port so precedence is honoured.
-- [ ] ProxyJump recursion: the alias's ProxyJump → `jump:` chain, expanding
+- [x] ProxyJump recursion: the alias's ProxyJump → `jump:` chain, expanding
       alias hops, with a visited-set + depth cap (cycle guard).
-- [ ] IdentityFile token expansion: `~`, `%h` / `%u` / `%d` (openssh-style).
-- [ ] Validate (openssh-faithful): error only if `~/.ssh/config` exists but is
+- [x] IdentityFile token expansion: `~`, `%h` / `%u` / `%d` (openssh-style).
+- [x] Validate (openssh-faithful): error only if `~/.ssh/config` exists but is
       unreadable/unparseable, or a ProxyJump cycle/depth cap is hit; no-config
       or no Host match ⇒ the host is used literally, silently (matching OpenSSH).
-- [ ] `known_hosts`: keep Portato's `ResolvedKnownHosts` (ssh-config
+- [x] `known_hosts`: keep Portato's `ResolvedKnownHosts` (ssh-config
       `UserKnownHostsFile` out of scope for v1).
-- [ ] Out of scope v1: `Match exec/host` conditional blocks (document the
+- [x] Out of scope v1: `Match exec/host` conditional blocks (document the
       limitation).
-- [ ] `docs/SPEC.md` (update the `:404` "out of scope" note → done; add a
+- [x] `docs/SPEC.md` (update the `:404` "out of scope" note → done; add a
       section on ssh-config resolution + the precedence model) +
       `config.example.yaml` + `README.md` (a `ssh: myalias` example).
-- [ ] Tests: alias resolution (HostName/User/Port/IdentityFile);
+- [x] Tests: alias resolution (HostName/User/Port/IdentityFile);
       ProxyJump-from-config (recursive chain → Phase 43 dial carries traffic);
       precedence (tuber overrides); alias-not-found error; no-config graceful;
       cycle guard; IdentityFile token expansion.
-- [ ] E2E: a black-box Go E2E (`make e2e-sshconfig`) — real binary, a temp
+- [x] E2E: a black-box Go E2E (`make e2e-sshconfig`) — real binary, a temp
       `~/.ssh/config` whose alias carries a ProxyJump, `ssh: <alias>` dials
       through the chain and a `-L` forward carries traffic (macOS-verifiable);
       and a real-Linux systemd-docker case (`e2e.sh sshconfig`) against real
