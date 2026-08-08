@@ -58,6 +58,7 @@
 | 40  | Recover from / prevent the wedged daemon | `[x]` | [phase-40-wedged-daemon-recovery.md](./phases/phase-40-wedged-daemon-recovery.md) |
 | 41  | Forwarding-permission diagnostics | `[x]` | [phase-41-forwarding-permission-diagnostics.md](./phases/phase-41-forwarding-permission-diagnostics.md) |
 | 42  | `portato logs` (tail/follow)      | `[x]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
+| 43  | ProxyJump (jump hosts)            | `[ ]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -71,7 +72,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–42 are all `[x]`** — the roadmap's core is complete. The stability
+**Phases 0–42 are all `[x]`** — the roadmap's core is complete. The next planned phase is **43 (ProxyJump / jump hosts)**; the prioritised v1.1.x backlog lives in [Post-1.0 candidate features](#post-10-candidate-features). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes. **`v1.0.0`** is the latest release — subsequent
 breaks go through the deprecation cycle. For the
@@ -111,6 +112,43 @@ Phase 16 (seamless hand-off via FD-passing) is done and proved by
 `make e2e-handoff`. Items not yet covered anywhere: seamless hand-off FD-passing
 on Windows (Phase 17 will need a Windows-specific mechanism or skip), and
 time-based (not just size-based) log rotation.
+
+## Post-1.0 candidate features
+
+Beyond Phase 43, the following are prioritised candidates — not yet formal
+phases; each is promoted to a numbered phase (with a `phase-N-*.md` file)
+when taken up. All are additive, so they ship as MINORs (`v1.1.x`); patch
+releases (`v1.0.x`) are fixes only.
+
+1. **`~/.ssh/config` resolution** — `ssh: <alias>` resolves
+   `HostName` / `User` / `Port` / `IdentityFile` / `ProxyJump` from the
+   user's ssh config, so host definitions aren't duplicated in `config.yaml`.
+   Pairs with Phase 43's `jump:` (an alias's `ProxyJump` can populate it).
+2. **Shell completions** — cobra `completion` (bash/zsh/fish/powershell) +
+   dynamic tuber-name completion for `enable` / `disable` / `restart` /
+   `logs --tuber`.
+3. **Tunnel tags / groups** — `tags:` on a tuber, `portato enable --tag`,
+   a TUI tag filter; and make the `a`/`x` enable/disable-all respect the
+   active `/` filter (instant group ops without a new schema).
+4. **Per-tunnel stats** — bytes in/out, connection count, reconnect count
+   (collected at the single `pipe()` chokepoint) shown in the TUI and
+   `list --json`; folds in the deferred Phase-39 aggregate line
+   (`n connected · n error · n off`).
+5. **Unix-socket forwarding** — `-L /var/run/docker.sock:…` to reach a
+   remote `docker.sock`; the forward direction is cheap via
+   `client.Dial("unix", path)`, the reverse (`streamlocal-forward@openssh.com`)
+   is harder.
+6. **Lazy tunnels** — dial SSH only on the first connection + an idle
+   timeout to disconnect; fits the FD-hand-off listener/client separation
+   (Phase 16). Solves the "laptop with 20 tunnels" pain.
+7. **State-change hooks / notifications** — `on_error:` / `on_connect:` cmd
+   and/or a desktop notification when a tunnel drops or recovers; the daemon
+   is headless, so this surfaces breaks without opening the TUI.
+8. **Shared SSH client pool** — reuse one `*ssh.Client` per
+   `user@host:port` with refcounting (fewer handshakes / password prompts
+   for many tunnels to one bastion). The riskiest — it reworks the
+   per-tuber reconnect / backoff / keepalive state machine onto a shared
+   client — so it lands last.
 
 ## Phase summary
 
@@ -157,6 +195,7 @@ time-based (not just size-based) log rotation.
 - **Phase 40** — recover from / prevent the wedged daemon (done, `[x]`): on macOS the IPC socket lived under the reaped `$TMPDIR`, so when macOS unlinked it a running daemon was wedged (alive, holding the flock + local ports, but unreachable); `portato daemon` then said "already running", `portato stop` said "no daemon running", and the standalone TUI hit "address already in use". Prevention moves the darwin socket into the stable `xdg.StateHome/portato/` dir; recovery makes `stop` SIGTERM the wedged PID from the marker (guarded against PID reuse) and `doctor` diagnose it. Shipped in v0.4.2. depends_on [].
 - **Phase 41** — forwarding-permission diagnostics (done, `[x]`): `portato doctor --probe` (opt-in) dials each configured host with key-only auth and classifies the server-side sshd gate — chiefly detecting `AllowTcpForwarding no` (a direct-tcpip open rejected with `ssh.Prohibited`), plus connectivity/auth; a non-loopback `-R` bind gets an honest "GatewayPorts not verifiable client-side" caveat (the silent-loopback downgrade is not client-detectable — RFC 4254 §7.1). The `-L`/`-D` runtime dial surfaces an `AllowTcpForwarding` hint on such a rejection. depends_on [11, 7, 8].
 - **Phase 42** — `portato logs` (done, `[x]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
+- **Phase 43** — ProxyJump (jump hosts) (todo, `[ ]`): a `jump:` field (single hop or a comma-chain) dials a target through one or more bastions — the OpenSSH `-J` equivalent; today `ssh:` is a single hop, so a host only reachable through a bastion cannot be forwarded to. depends_on [].
 
 ## Current work
 
