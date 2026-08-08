@@ -18,6 +18,7 @@
 - When quitting standalone mode with live tunnels — a "leave running in the background?" modal with a seamless hand-off to the daemon.
 - Cross-platform: **macOS + Linux** (MVP); **Windows** (Phase 17 — named-pipe IPC + registry Run-key autostart).
 - Autostart at system boot (launchd / systemd --user); tunnels are **off** by default.
+- Shell TAB completion of subcommands and tuber names (`bash`/`zsh`/`fish`/`powershell`).
 
 ## 2. Stack
 
@@ -71,6 +72,9 @@ portato --version       -> print the logo banner + version/commit/date and exit 
 portato license         -> print license info: MIT + source URL + pointer to bundled THIRD_PARTY_LICENSES.txt
 portato license --full  -> also print the full MIT License text (embedded in the binary)
 portato --license       -> print the license summary and exit (pipe-safe; parallel to --version)
+portato completion <shell> -> emit a TAB-completion script (bash|zsh|fish|powershell); source it so
+                           enable/disable/restart/forward <name> and logs --tuber complete tuber
+                           names from config.yaml (no daemon needed)
 ```
 
 For `portato` (smart): the daemon's presence is detected by reading the discovery marker (§6) for its socket path and PID, then probing the socket.
