@@ -64,6 +64,15 @@ func (c *connTracker) closeAll() {
 	}
 }
 
+// count returns the number of currently-open server connections. Exposed via
+// SSHD.ActiveConns so tests can assert a chain's intermediate connections are
+// torn down (e.g. a ProxyJump leak guard — Phase 43).
+func (c *connTracker) count() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.conns)
+}
+
 // SSHD is an in-process test SSH server. It serves direct-tcpip (-L) and
 // tcpip-forward (-R) channels, authorizing only the public key passed to
 // NewSSHD. The server offers BOTH an ECDSA and an ED25519 host key:
@@ -209,6 +218,19 @@ func (s *SSHD) accept() {
 // Addr returns the "127.0.0.1:port" the server listens on.
 func (s *SSHD) Addr() string {
 	return fmt.Sprintf("127.0.0.1:%d", s.Port)
+}
+
+// ActiveConns returns the number of currently-open SSH connections the server
+// has accepted. It is the hook for leak-detection assertions: a client that
+// fully tears down drives the count back to 0 (Phase 43 uses it to prove a
+// ProxyJump chain's intermediate connections are closed once the final client
+// disconnects). It reads the live tracker, so it reflects connections that
+// arrive/depart after the call.
+func (s *SSHD) ActiveConns() int {
+	if s.tracker == nil {
+		return 0
+	}
+	return s.tracker.count()
 }
 
 // Stop closes the listener and every active server connection.
