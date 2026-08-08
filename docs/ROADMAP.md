@@ -58,7 +58,7 @@
 | 40  | Recover from / prevent the wedged daemon | `[x]` | [phase-40-wedged-daemon-recovery.md](./phases/phase-40-wedged-daemon-recovery.md) |
 | 41  | Forwarding-permission diagnostics | `[x]` | [phase-41-forwarding-permission-diagnostics.md](./phases/phase-41-forwarding-permission-diagnostics.md) |
 | 42  | `portato logs` (tail/follow)      | `[x]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
-| 43  | ProxyJump (jump hosts)            | `[ ]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
+| 43  | ProxyJump (jump hosts)            | `[~]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
