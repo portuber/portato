@@ -60,7 +60,7 @@
 | 42  | `portato logs` (tail/follow)      | `[x]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
 | 43  | ProxyJump (jump hosts)            | `[x]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
 | 44  | `~/.ssh/config` resolution        | `[x]` | [phase-44-ssh-config.md](./phases/phase-44-ssh-config.md) |
-| 45  | Shell completions                 | `[~]` | [phase-45-shell-completions.md](./phases/phase-45-shell-completions.md) |
+| 45  | Shell completions                 | `[x]` | [phase-45-shell-completions.md](./phases/phase-45-shell-completions.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -74,7 +74,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–44 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts) and `~/.ssh/config` alias resolution. Phase **45 (Shell completions)** is in progress — dynamic TAB completion of tuber names; the prioritised backlog lives in [Post-1.0 candidate features](#post-10-candidate-features). The stability
+**Phases 0–45 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts), `~/.ssh/config` alias resolution, and shell completion. The next work is the prioritised backlog in [Post-1.0 candidate features](#post-10-candidate-features). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes; any future break goes through the deprecation
 cycle defined there. For the most recent batch see [Current work](#current-work);
@@ -193,11 +193,11 @@ fixes only.
 - **Phase 42** — `portato logs` (done, `[x]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
 - **Phase 43** — ProxyJump (jump hosts) (done, `[x]`): a `jump:` field (single hop or a comma-chain) dials a target through one or more bastions — the OpenSSH `-J` equivalent. The dial already separates the TCP dial from the SSH handshake, so chaining reuses the handshake per hop: hop 0 via `net.Dialer`, each later hop via the previous hop's `ssh.Client.Dial` wrapped in `ssh.NewClientConn`; the final client runs the tuber's forward unchanged. Intermediate hops are key-only (the shared agent/identity — the bastion must accept the same key); the Phase 35 password fallback applies only to the final target. Per-hop host keys are verified against `known_hosts`; a leash goroutine closes the intermediates once the final client disconnects (no reconnect leak). `~/.ssh/config` resolution and per-hop identity are follow-ups. depends_on [].
 - **Phase 44** — `~/.ssh/config` resolution (done, `[x]`): `ssh: <alias>` resolves HostName/User/Port/IdentityFile/ProxyJump from the user's ssh config (via `kevinburke/ssh_config`, first-match-wins, patterns + `Include` honoured), so host definitions aren't duplicated in `config.yaml`; an alias's `ProxyJump` auto-populates Phase 43's `jump:` (resolved recursively, cycle-guarded), which Phase 43 then dials. Explicit tuber fields (`identity:` / `jump:` / `ssh: me@x:port`) override ssh-config; a missing alias is used literally (openssh-faithful), and only an unreadable `~/.ssh/config` or a ProxyJump cycle/depth is a clear load error. The dial path is unchanged — this is a config-layer resolution. depends_on [43].
-- **Phase 45** — Shell completions (in progress, `[~]`): dynamic TAB completion of tuber names for `enable` / `disable` / `restart` / `forward` and `logs --tuber` (via `ValidArgsFunction` / `RegisterFlagCompletionFunc`; source = `config.yaml` load, so it works with no daemon running). Cobra's `completion bash/zsh/fish/powershell` already generates the shell script; the README documents per-shell sourcing (`eval` / `source`, document-only — no packaging changes). Additive ⇒ MINOR. depends_on [].
+- **Phase 45** — Shell completions (done, `[x]`): dynamic TAB completion of tuber names for `enable` / `disable` / `restart` / `forward` and `logs --tuber` (via `ValidArgsFunction` / `RegisterFlagCompletionFunc`; source = `config.yaml` load, so it works with no daemon running). Cobra's `completion bash/zsh/fish/powershell` already generates the shell script; the README documents per-shell sourcing (`eval` / `source`, document-only — no packaging changes). Additive ⇒ MINOR. depends_on [].
 
 ## Current work
 
-**Phases 0–44 are all `[x]`.** The most recent batch:
+**Phases 0–45 are all `[x]`.** The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
@@ -270,6 +270,15 @@ fixes only.
   unreadable config or a ProxyJump cycle ⇒ a clear load error. Proved by a Go
   black-box E2E (`make e2e-sshconfig`) and a real-Linux systemd-docker case
   (`make e2e-docker E2E_CASE=sshconfig`). Additive → MINOR (`v1.2.0`).
+
+- **Phase 45** — Shell completions (done, `[x]`): `portato completion
+  bash|zsh|fish|powershell` (cobra default) emits the script, and
+  `enable`/`disable`/`restart`/`forward <name>` + `logs --tuber <name>` now
+  TAB-complete tuber names from `config.yaml` via a `ValidArgsFunction` /
+  `RegisterFlagCompletionFunc`. The completion helper reads the file directly
+  (not `config.Load`), so it never creates a config as a TAB side effect and
+  works with no daemon running. The README documents per-shell sourcing
+  (document-only — no packaging changes). Additive → MINOR.
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase

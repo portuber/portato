@@ -1,7 +1,7 @@
 ---
 phase: 45
 title: "Shell completions"
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -26,32 +26,32 @@ of them tab-complete the user's tubers today. Standard cobra-app pattern
 
 ## Tasks
 
-- [ ] A `tuberNameCompletion(cmd, args, toComplete)` helper that loads
+- [x] A `tuberNameCompletion(cmd, args, toComplete)` helper that loads
       `config.yaml` via the same path resolution the other commands use and
       returns the tuber names whose prefix matches `toComplete`, with
       `cobra.ShellCompDirectiveNoFileComp`. Config missing/unreadable ⇒ no
       completions (silent, not an error).
-- [ ] Register `ValidArgsFunction` on `enable` / `disable` / `restart` /
+- [x] Register `ValidArgsFunction` on `enable` / `disable` / `restart` /
       `forward`.
-- [ ] Register `RegisterFlagCompletionFunc` for `logs --tuber`.
-- [ ] README install section: per-shell sourcing snippets — bash
+- [x] Register `RegisterFlagCompletionFunc` for `logs --tuber`.
+- [x] README install section: per-shell sourcing snippets — bash
       (`eval "$(portato completion bash)"`), zsh (`source <(portato completion
       zsh)` + a `compinit` note), fish (`portato completion fish >
       ~/.config/fish/completions/portato.fish`), powershell.
-- [ ] Tests: the helper returns prefix-filtered names; empty/no-config ⇒ empty
+- [x] Tests: the helper returns prefix-filtered names; empty/no-config ⇒ empty
       list (no error, `ShellCompDirectiveNoFileComp`).
 
 ## Definition of Done
 
-- [ ] `portato enable` / `disable` / `restart` / `forward <TAB>` complete tuber
+- [x] `portato enable` / `disable` / `restart` / `forward <TAB>` complete tuber
       names from `config.yaml`, with no daemon running.
-- [ ] `portato logs --tuber <TAB>` completes tuber names.
-- [ ] `portato completion bash|zsh|fish|powershell` emits a valid script
+- [x] `portato logs --tuber <TAB>` completes tuber names.
+- [x] `portato completion bash|zsh|fish|powershell` emits a valid script
       (cobra default — verify it is present and not disabled).
-- [ ] README documents the per-shell sourcing one-liners.
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run ./...`
+- [x] README documents the per-shell sourcing one-liners.
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run ./...`
       clean; new functions under gocyclo 15; the phase's tests green.
-- [ ] No packaging changes (Approach A — document only); no new dependencies.
+- [x] No packaging changes (Approach A — document only); no new dependencies.
 
 ## Verification
 
@@ -67,8 +67,15 @@ make fmt && make vet && make test && make lint
 ## Technical details (sketch)
 
 - Completion source = **config-file load** (not the daemon) — works with no
-  daemon running, fast, deterministic. A live-daemon source is a possible later
-  refinement, deliberately out of scope.
+      daemon running, fast, deterministic. A live-daemon source is a possible later
+      refinement, deliberately out of scope.
+- The helper reads `config.yaml` directly (`os.ReadFile` + `yaml.Unmarshal`),
+      **not** `config.Load`: `config.Load` runs `EnsureExample` (which would
+      create a `config.yaml` as a side effect of pressing TAB), `prepare()`
+      (`~/.ssh/config` resolution — slow, can error) and `Validate()`. A
+      missing/unreadable/malformed config yields no completions silently.
+- An `args > 0` guard suppresses a second positional (these commands take one
+      name); it is a no-op for the `logs --tuber` flag (no positionals).
 - Cobra's `completion` command and the hidden `__complete` driver are already
   wired (cobra default); this phase only adds `ValidArgsFunction` /
   `RegisterFlagCompletionFunc`.
