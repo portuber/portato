@@ -15,6 +15,13 @@ the only way to verify ProxyJump against real OpenSSH on Linux without a native
 Linux host (the dev is on macOS; `make e2e-proxyjump` covers the dial logic with
 in-process SSH servers, this run covers real OpenSSH + systemd).
 
+The `sshconfig` run is the Phase 44 `~/.ssh/config` real-Linux proof: a `Host
+target-alias` block (→ `127.0.0.1:22`, `ProxyJump appuser@127.0.0.1:2222`) lives
+in appuser's `~/.ssh/config`, and an `ssh: target-alias` tuber
+(`echo-via-alias`, no `jump:`) reaches the target through the bastion — the
+chain comes entirely from ssh-config resolution. Same two sshd, so it reuses
+the `jump` image; `make e2e-sshconfig` covers the in-process path on macOS.
+
 ## Build (from repo root)
 
     make cross
@@ -27,6 +34,7 @@ in-process SSH servers, this run covers real OpenSSH + systemd).
     sleep 6
     docker exec portato-test /e2e/e2e.sh check      # -> block of PASS, exit 0
     docker exec portato-test /e2e/e2e.sh jump       # Phase 43: two-hop forward + reconnect
+    docker exec portato-test /e2e/e2e.sh sshconfig  # Phase 44: ssh-config alias forward + reconnect
 
 ## [115] reboot survival
 

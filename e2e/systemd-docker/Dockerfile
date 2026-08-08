@@ -17,6 +17,14 @@ RUN ssh-keygen -A \
     && chown -R appuser:appuser /home/appuser/.ssh \
     && chmod 600 /home/appuser/.ssh/id_ed25519 /home/appuser/.ssh/authorized_keys /home/appuser/.ssh/known_hosts
 
+# A ~/.ssh/config alias for the Phase 44 ssh-config-resolution E2E: `ssh:
+# target-alias` resolves to the target sshd (:22) and ProxyJumps through the
+# bastion sshd (:2222). The literal-host tubers (echo, echo-via-bastion) don't
+# match `Host target-alias`, so this file leaves their cases untouched.
+RUN printf 'Host target-alias\n  HostName 127.0.0.1\n  Port 22\n  User appuser\n  ProxyJump appuser@127.0.0.1:2222\n' \
+        > /home/appuser/.ssh/config \
+    && chown appuser:appuser /home/appuser/.ssh/config && chmod 600 /home/appuser/.ssh/config
+
 # A SEPARATE host key for the bastion sshd (Phase 43 ProxyJump E2E), so the
 # bastion (:2222) and the target (:22) present different host keys — exercising
 # per-hop host-key verification rather than one shared key.

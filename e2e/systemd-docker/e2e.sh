@@ -2,6 +2,7 @@
 # portato Linux/systemd E2E. Run INSIDE the container as root.
 #   e2e.sh check     -> install + [116] lingering + [119] live-traffic + auto-reconnect
 #   e2e.sh jump      -> [Phase 43] two-hop proxyjump forward + auto-reconnect
+#   e2e.sh sshconfig -> [Phase 44] ~/.ssh/config alias (ProxyJump) forward + auto-reconnect
 #   e2e.sh status    -> is portato active? (run after `docker restart`)
 #   e2e.sh uninstall -> portato uninstall as appuser
 set -u
@@ -56,6 +57,41 @@ jump)
   as_app portato disable echo-via-bastion
   sleep 1
   if nc -w2 -z 127.0.0.1 19090; then fail "19090 still open after disable"; else pass "19090 closed after disable"; fi
+  as_app portato list
+  echo "== summary: exit $RC =="
+  exit $RC
+  ;;
+sshconfig)
+  echo "== [Phase 44 ssh-config] waiting for user manager bus =="
+  loginctl enable-linger "$APP" 2>/dev/null || true
+  for i in $(seq 1 40); do [ -S "$RT/bus" ] && break; sleep 0.5; done
+  [ -S "$RT/bus" ] && pass "user manager bus up" || fail "no user manager bus at $RT/bus"
+
+  nc -z 127.0.0.1 22   && pass "target sshd:22 up"    || fail "target sshd:22 not reachable"
+  nc -z 127.0.0.1 2222 && pass "bastion sshd:2222 up" || fail "bastion sshd:2222 not reachable"
+  nc -z 127.0.0.1 28080 && pass "echo:28080 up" || fail "echo:28080 not reachable"
+
+  echo "== [Phase 44] portato install (start the daemon) =="
+  as_app portato install
+  for i in $(seq 1 40); do [ "$(as_app systemctl --user is-active portato 2>/dev/null)" = active ] && break; sleep 0.5; done
+  [ "$(as_app systemctl --user is-active portato 2>/dev/null)" = active ] && pass "portato.service active" || fail "portato.service not active"
+
+  echo "== [Phase 44] ssh-config alias tunnel connects (ProxyJump from ~/.ssh/config) =="
+  as_app portato enable echo-via-alias
+  c=no; for i in $(seq 1 40); do as_app portato list 2>/dev/null | awk '/echo-via-alias/ && /connected/ {f=1} END{exit !f}' && { c=yes; break; }; sleep 0.5; done
+  [ "$c" = yes ] && pass "echo-via-alias Connected via the ssh-config alias" || fail "echo-via-alias not connected"
+
+  nc -w2 -z 127.0.0.1 19091 && pass "nc -z 127.0.0.1 19091 (alias forward works)" || fail "alias forward 19091 unreachable"
+
+  echo "== [Phase 44] auto-reconnect after the bastion drops =="
+  pkill -KILL -f 'sshd: appuser' 2>/dev/null || true
+  r=no; for i in $(seq 1 60); do as_app portato list 2>/dev/null | awk '/echo-via-alias/ && /connected/ {f=1} END{exit !f}' && { r=yes; break; }; sleep 0.5; done
+  [ "$r" = yes ] && pass "auto-reconnect after bastion drop" || fail "no auto-reconnect through the alias"
+  nc -w2 -z 127.0.0.1 19091 && pass "alias forward works after reconnect" || fail "alias forward 19091 unreachable after reconnect"
+
+  as_app portato disable echo-via-alias
+  sleep 1
+  if nc -w2 -z 127.0.0.1 19091; then fail "19091 still open after disable"; else pass "19091 closed after disable"; fi
   as_app portato list
   echo "== summary: exit $RC =="
   exit $RC
@@ -128,5 +164,5 @@ uninstall)
   as_app portato uninstall
   ;;
 *)
-  echo "usage: e2e.sh check|jump|status|uninstall" >&2; exit 2 ;;
+  echo "usage: e2e.sh check|jump|sshconfig|status|uninstall" >&2; exit 2 ;;
 esac

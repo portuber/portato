@@ -20,3 +20,14 @@ tubers:
     ssh: "appuser@127.0.0.1:22"
     jump: "appuser@127.0.0.1:2222"
     enabled: false
+  # ~/.ssh/config resolution (Phase 44): `ssh:` is a Host alias from
+  # ~/.ssh/config (target-alias → 127.0.0.1:22, ProxyJump appuser@127.0.0.1:2222).
+  # No `jump:` here — the chain comes from the alias, dialed by Phase 43. Same
+  # two sshd + echo backend, proving the config-layer resolution plugs into the
+  # real dial path end to end.
+  - name: echo-via-alias
+    type: local
+    local: "19091"
+    remote: "127.0.0.1:28080"
+    ssh: "target-alias"
+    enabled: false
