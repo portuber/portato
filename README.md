@@ -207,6 +207,30 @@ For a browser, set the SOCKS5 host to `127.0.0.1` and port `1080` (enable "Proxy
 DNS when using SOCKS v5" so names resolve on the bastion too). The proxy
 reconnects automatically if the SSH session drops.
 
+### Jump hosts (ProxyJump / `-J`)
+
+When the target is only reachable through a bastion, set `jump:` to the
+intermediate host (OpenSSH's `-J` / `ProxyJump`). `ssh:` is the final target;
+`jump:` dials it through the bastion. A comma-separated chain
+(`user@edge,user@bastion`) dials through each hop in order:
+
+```yaml
+tubers:
+  - name: db-vpn
+    type: local
+    local: 5433
+    remote: 10.0.0.5:5432          # destination on the TARGET host
+    ssh: deploy@10.0.0.5:22        # target — reachable only via the bastion
+    jump: user@bastion.example.com:22   # ssh -J user@bastion deploy@10.0.0.5
+```
+
+Each hop verifies its own host key against `known_hosts` (so the bastion key and
+the target key are both checked). The bastion must accept **the same key** as the
+target (ssh-agent / `identity:`) — intermediate hops are key-only; the Phase 35
+password fallback applies only to the final target. Per-hop identity/password is
+a later refinement. `~/.ssh/config` resolution (reading an alias's `ProxyJump`)
+is tracked as a follow-up.
+
 ## Autostart
 
 `portato install` registers the daemon with your OS's service manager so it
@@ -325,6 +349,7 @@ daemon, and prints a `✓`/`✗` line per check.
 | `✗ listen ...: address already in use` | A local port is busy — `lsof -i :<port>` to find and stop the holder. |
 | `portato list` errors with "daemon not running" | Start the daemon: `portato daemon`, or `portato install` to autostart it. |
 | `✗ auth failed` | Start `ssh-agent` / `ssh-add`, or set an `identity:` key. Run `portato doctor`. |
+| `✗ bastion requires a key` (a `jump:` tunnel) | Intermediate hops are key-only — load the key into `ssh-agent` (`ssh-add`) or set `identity:`. The bastion must accept the same key as the target; per-hop identity is not supported yet. |
 | Tunnels die after logout (Linux) | Enable lingering: `loginctl enable-linger "$USER"`. |
 | `✗ listen <addr> on server` (remote tunnel won't bind on the host) | `AllowTcpForwarding no` on the server, or the port is in use there. `AllowTcpForwarding yes` is the default — ask the admin to re-enable it. Run `portato doctor --probe` to confirm. |
 | `remote` (`-R`) to a public address isn't reachable | `GatewayPorts no` on the server silently binds loopback. Set `GatewayPorts yes` (or `clientspecified`), or use `remote: 127.0.0.1:port` for server-internal only. (Not auto-detected client-side; `portato doctor --probe` covers the rest.) |

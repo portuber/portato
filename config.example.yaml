@@ -39,3 +39,15 @@ tubers:
     local: 1080                 # SOCKS5 listen address -> 127.0.0.1:1080
     ssh: user@bastion.example.com:22
     enabled: false
+
+  # ProxyJump / jump hosts (OpenSSH `-J`): reach a target only accessible
+  # through a bastion. `ssh:` is the final target; `jump:` is the intermediate
+  # (or a comma-separated chain — `user@edge,user@bastion`). The bastion must
+  # accept the same key as the target (ssh-agent / identity).
+  - name: db-vpn
+    type: local
+    local: 5433
+    remote: 10.0.0.5:5432       # destination dialed on the TARGET host
+    ssh: deploy@10.0.0.5:22     # the target — reachable only via the bastion
+    jump: user@bastion.example.com:22   # bastion; or a chain user@h1,user@h2
+    enabled: false

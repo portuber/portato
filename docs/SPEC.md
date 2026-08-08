@@ -8,6 +8,7 @@
 ## 1. Goal and scope
 
 - Manage a set of SSH port forwards from a single place (the TUI), like the MCP screen in opencode.
+- Reach hosts behind a bastion via `jump:` (ProxyJump / OpenSSH `-J`).
 - Turn tunnels on/off interactively (space).
 - **Three modes** for a single binary:
   - **smart-launcher** (`portato` with no args): automatically picks attach or standalone;
@@ -326,6 +327,10 @@ tubers:
     password_auth: false          # opt-OUT (Phase 35): keep this tunnel key-only (password fallback is on by default)
     # socks5_user / socks5_password (Phase 20): per-tunnel override of defaults,
     # honoured only by type=dynamic. Both empty (after fallback) -> NoAuth.
+    jump: user@bastion.example.com   # optional (Phase 43): ProxyJump / OpenSSH `-J` — a single
+                                     # `user@host[:port]` hop or a comma-separated chain
+                                     # (`user@edge,user@bastion`); the target in `ssh:` is reached
+                                     # through these intermediates in order.
 ```
 
 The meaning of `local`/`remote` depends on `type`:
@@ -396,6 +401,7 @@ otherwise sshd silently binds loopback and the public address stays unreachable
   - **Password auth (Phase 35, on by default — opt-out):** when no usable key authenticates, the dial falls back to an interactive password prompt (OpenSSH-style). It is **on by default** so existing password-only hosts and servers that switch key→password just work with no config change; `password_auth: false` (per-tuber or in `defaults`) opts out — useful for deployments that only ever use keys and never want a prompt (including avoiding a premature prompt while an agent finishes starting at boot). Unlike a passphrase (validated locally), a password is only checked by the server, so the re-prompt loop is **dial-level**: it probes keys first (a working key never prompts), then for each password does a single dial with `ssh.Password(pw)` — on a wrong password it invalidates the value and re-prompts with no backoff, staying in `Connecting` with `Status.PendingPassword` set; a server that does not offer the `password` method at all bails out rather than looping. The password comes from the password store (in-memory cache, plus the OS keyring when `defaults.ssh_password_store` is on), keyed by server account `password:<user>@<host>:<port>`, and is supplied via the TUI modal / `POST /tubers/{name}/password` / the controller's `AcceptPassword`. **The password is never stored in config** (only the opt-out bool), preserving the §9 plaintext invariant.
   - **HostKeyCallback:** `knownhosts.New(hostsFile)`; with `accept_new_hosts: true` — a wrapper that appends a new key (TOFU).
   - **Timeout:** an explicit connect timeout (5s).
+  - **ProxyJump / jump hosts (Phase 43):** a `jump:` field (single `user@host[:port]` or a comma-separated chain) dials the `ssh:` target through one or more intermediates — the OpenSSH `-J` equivalent. The dial already separates the TCP dial from the SSH handshake, so chaining reuses the handshake per hop: hop 0 is TCP-dialed via `net.Dialer`, each later hop via the previous hop's `ssh.Client.Dial` (a direct-tcpip channel), each wrapped in `ssh.NewClientConn`. The final client runs the tuber's forward (`Listen` / direct-tcpip `Dial`) exactly as today. Each hop verifies its own host key against known_hosts (with its own `HostKeyAlgorithms`), so a bastion key and the target key are both checked; TOFU/accept prompts fire per hop. **Auth split:** intermediate hops are key-only (the shared agent/identity), while the final hop uses whatever auth a no-jump tuber would (keys, or the Phase 35 password fallback). This deliberately avoids a chain of interactive password prompts across bastions — **a bastion that requires a key must accept the same key the target uses** (load it into `ssh-agent` or set `identity:`). Per-hop identity/password is a later refinement; a jump tuber with no usable key bails with a clear "bastion requires a key" error rather than prompting. The intermediate `ssh.Client`s are kept alive for the final client's lifetime and torn down by a leash goroutine once the final client disconnects (server drop, Stop, or a reconnect cycle), so a reconnect rebuilds the whole chain without leaking connections. `~/.ssh/config` resolution (populating `jump:` from an alias's `ProxyJump` directive) is out of scope and tracked as a follow-up.
 - Readable errors: `host key not in known_hosts` / `auth failed` / `connect refused` / `connect timeout`.
 
 ## 10. Reconnect and keepalive
