@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff e2e-proxyjump e2e-sshconfig third-party-licenses optimize-assets release release-patch release-minor release-major
+.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff e2e-proxyjump e2e-sshconfig e2e-docker third-party-licenses optimize-assets release release-patch release-minor release-major
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -79,6 +79,34 @@ e2e-proxyjump:
 # drops. Real binary + real SSH servers + real traffic; runs on macOS.
 e2e-sshconfig:
 	go test -tags e2e ./internal/daemon/... -run TestSSHConfigE2E -v -count=1
+
+# e2e-docker runs a real-Linux/systemd E2E case in Docker — the only way to
+# verify against real OpenSSH + systemd on Linux without a native host (the dev
+# is on macOS; the make e2e-* targets above cover the dial logic in-process on
+# the host). E2E_CASE selects the e2e.sh case (check|jump|sshconfig); default
+# check. It cross-builds the linux binary if missing, (re)builds the image, and
+# recreates the container fresh each run so image changes always take effect.
+# Heavy (Docker + a privileged container); NOT part of CI. The container is
+# removed at the end by default; set E2E_KEEP=1 to leave it running and iterate
+# with `docker exec portato-test /e2e/e2e.sh <case>` between cases (then
+# `docker rm -f` it yourself).
+E2E_DOCKER_IMG ?= portato-test
+E2E_DOCKER_CTR ?= portato-test
+E2E_LINUX_BIN  ?= bin/portato-linux-arm64
+E2E_CASE       ?= check
+E2E_KEEP       ?=
+e2e-docker:
+	@test -f $(E2E_LINUX_BIN) || $(MAKE) cross
+	cp $(E2E_LINUX_BIN) e2e/systemd-docker/portato
+	docker build -t $(E2E_DOCKER_IMG) e2e/systemd-docker
+	-docker rm -f $(E2E_DOCKER_CTR) >/dev/null 2>&1
+	docker run -d --name $(E2E_DOCKER_CTR) --privileged --cgroupns=host $(E2E_DOCKER_IMG) >/dev/null
+	@sleep 6
+	docker exec $(E2E_DOCKER_CTR) /e2e/e2e.sh $(E2E_CASE)
+	@if [ -z "$(E2E_KEEP)" ]; then \
+		docker rm -f $(E2E_DOCKER_CTR) >/dev/null; \
+		echo "container removed (set E2E_KEEP=1 to leave it running for docker-exec iteration)"; \
+	fi
 
 # third-party-licenses regenerates the bundled THIRD_PARTY_LICENSES.txt: each
 # runtime dependency's license text under a module-path header. Packed into
