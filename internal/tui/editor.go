@@ -23,6 +23,7 @@ type tuberEditor struct {
 	mode     editorMode
 	original string  // name being edited ("" for new); used for rename + uniqueness
 	enabled  bool    // preserved from the edited tuber
+	jump     string  // preserved from the edited tuber (Phase 43: not exposed as a field)
 	pal      palette // resolved styles (Phase 37); Model overrides at open time
 
 	name     textinput.Model
@@ -73,6 +74,7 @@ func newTuberEditor(mode editorMode, t config.Tuber, existing []string, ctrl con
 		mode:     mode,
 		original: t.Name,
 		enabled:  t.Enabled,
+		jump:     t.Jump,
 		existing: existing,
 		ctrl:     ctrl,
 		focus:    fName,
@@ -242,6 +244,7 @@ func (e *tuberEditor) tuber() config.Tuber {
 		Remote:   e.remote.Value(),
 		Identity: e.identity.Value(),
 		Enabled:  e.enabled,
+		Jump:     e.jump,
 	}
 }
 
