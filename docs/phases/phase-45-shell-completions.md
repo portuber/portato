@@ -1,7 +1,7 @@
 ---
 phase: 45
 title: "Shell completions"
-status: todo
+status: in-progress
 depends_on: []
 ---
 
