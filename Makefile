@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff e2e-proxyjump third-party-licenses optimize-assets release release-patch release-minor release-major
+.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff e2e-proxyjump e2e-sshconfig third-party-licenses optimize-assets release release-patch release-minor release-major
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -71,6 +71,14 @@ e2e-handoff:
 # when the bastion drops. Real binary + real SSH servers + real traffic.
 e2e-proxyjump:
 	go test -tags e2e ./internal/daemon/... -run TestProxyJumpE2E -v -count=1
+
+# e2e-sshconfig runs the Phase 44 black-box ~/.ssh/config E2E: builds the real
+# binary, writes a temp ~/.ssh/config whose alias carries a ProxyJump, and
+# asserts a `ssh: <alias>` (no `jump:`) tuber resolves + dials through the
+# chain and a -L forward carries traffic, plus self-heals when the bastion
+# drops. Real binary + real SSH servers + real traffic; runs on macOS.
+e2e-sshconfig:
+	go test -tags e2e ./internal/daemon/... -run TestSSHConfigE2E -v -count=1
 
 # third-party-licenses regenerates the bundled THIRD_PARTY_LICENSES.txt: each
 # runtime dependency's license text under a module-path header. Packed into
