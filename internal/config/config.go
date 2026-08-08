@@ -27,6 +27,10 @@ const (
 	remoteWildcard = "*"
 	configDir      = "portato"
 	configFile     = "config.yaml"
+	// maxJumpDepth bounds the recursion of a ssh-config ProxyJump chain
+	// (Phase 44). OpenSSH's -J is flat, so this is purely defensive against a
+	// pathological self-referential Host block.
+	maxJumpDepth = 8
 )
 
 type Config struct {
@@ -411,7 +415,74 @@ func resolveTuber(t *Tuber, sshCfg *ssh_config.Config) error {
 		t.Jumps = parseJumpChain(t.Jump)
 		return nil
 	}
+	proxyJump := ""
+	if matched {
+		proxyJump = v.proxyJump
+	}
+	if proxyJump == "" {
+		return nil
+	}
+	resolved, err := resolveJumpChain(proxyJump, sshCfg, map[string]bool{}, 0)
+	if err != nil {
+		return fmt.Errorf("tuber %q: proxyjump from ssh config: %w", t.Name, err)
+	}
+	if err := validateJump(t.Name, resolved); err != nil {
+		return err
+	}
+	t.Jumps = parseJumpChain(resolved)
 	return nil
+}
+
+// expandJumpHop resolves one comma-separated hop of a ssh-config ProxyJump into
+// `user@host:port`, expanding the hop's own HostName/User/Port when it is an
+// alias (single-pass, OpenSSH `-J` semantics — a jump host's own ProxyJump is
+// NOT applied). visited guards against a self-referential Host block.
+func expandJumpHop(tok string, cfg *ssh_config.Config, visited map[string]bool) (string, error) {
+	u, host, port, userExplicit, portExplicit, err := parseSSHExplicit(tok)
+	if err != nil {
+		return "", fmt.Errorf("hop %q: %w", tok, err)
+	}
+	v := lookupAlias(cfg, host)
+	if !v.matched() {
+		return fmt.Sprintf("%s@%s:%d", u, host, port), nil
+	}
+	if visited[host] {
+		return "", fmt.Errorf("cycle through %q", host)
+	}
+	visited[host] = true
+	if v.hostName != "" {
+		host = v.hostName
+	}
+	if !userExplicit && v.user != "" {
+		u = v.user
+	}
+	if !portExplicit && v.port != "" {
+		if n, e := strconv.Atoi(v.port); e == nil {
+			port = n
+		}
+	}
+	return fmt.Sprintf("%s@%s:%d", u, host, port), nil
+}
+
+// resolveJumpChain expands a ProxyJump value (from ssh-config) into a resolved
+// comma-chain. The depth cap is purely defensive (OpenSSH's -J is flat).
+func resolveJumpChain(pj string, sshCfg *ssh_config.Config, visited map[string]bool, depth int) (string, error) {
+	if depth > maxJumpDepth {
+		return "", fmt.Errorf("chain too deep (>%d hops)", maxJumpDepth)
+	}
+	out := make([]string, 0, len(strings.Split(pj, ",")))
+	for _, tok := range strings.Split(pj, ",") {
+		tok = strings.TrimSpace(tok)
+		if tok == "" {
+			return "", fmt.Errorf("empty hop (stray comma)")
+		}
+		hop, err := expandJumpHop(tok, sshCfg, visited)
+		if err != nil {
+			return "", err
+		}
+		out = append(out, hop)
+	}
+	return strings.Join(out, ","), nil
 }
 
 // expandIdentityTokens expands an IdentityFile from ssh-config the way ssh does:
