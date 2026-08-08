@@ -73,7 +73,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–43 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts). The next planned phase is **44 (`~/.ssh/config` resolution)** — it pairs with Phase 43's `jump:` (an alias's `ProxyJump` auto-populates it); the prioritised backlog lives in [Post-1.0 candidate features](#post-10-candidate-features). The stability
+**Phases 0–44 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts) and `~/.ssh/config` alias resolution. The next work is the prioritised backlog in [Post-1.0 candidate features](#post-10-candidate-features). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes; any future break goes through the deprecation
 cycle defined there. For the most recent batch see [Current work](#current-work);
@@ -270,7 +270,7 @@ fixes only.
   `Save` never writes them back. No config / no match ⇒ literal silent; an
   unreadable config or a ProxyJump cycle ⇒ a clear load error. Proved by a Go
   black-box E2E (`make e2e-sshconfig`) and a real-Linux systemd-docker case
-  (`make e2e-docker E2E_CASE=sshconfig`). Additive → MINOR.
+  (`make e2e-docker E2E_CASE=sshconfig`). Additive → MINOR (`v1.2.0`).
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase
