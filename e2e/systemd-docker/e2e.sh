@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # portato Linux/systemd E2E. Run INSIDE the container as root.
 #   e2e.sh check     -> install + [116] lingering + [119] live-traffic + auto-reconnect
+#   e2e.sh jump      -> [Phase 43] two-hop proxyjump forward + auto-reconnect
 #   e2e.sh status    -> is portato active? (run after `docker restart`)
 #   e2e.sh uninstall -> portato uninstall as appuser
 set -u
@@ -19,9 +20,48 @@ fail(){ echo "FAIL: $*"; RC=1; }
 RC=0
 
 case "${1:-}" in
+jump)
+  echo "== [Phase 43 proxyjump] waiting for user manager bus =="
+  loginctl enable-linger "$APP" 2>/dev/null || true
+  for i in $(seq 1 40); do [ -S "$RT/bus" ] && break; sleep 0.5; done
+  [ -S "$RT/bus" ] && pass "user manager bus up" || fail "no user manager bus at $RT/bus"
+
+  nc -z 127.0.0.1 22   && pass "target sshd:22 up"    || fail "target sshd:22 not reachable"
+  nc -z 127.0.0.1 2222 && pass "bastion sshd:2222 up" || fail "bastion sshd:2222 not reachable"
+  nc -z 127.0.0.1 28080 && pass "echo:28080 up" || fail "echo:28080 not reachable"
+
+  echo "== [Phase 43] portato install (start the daemon) =="
+  as_app portato install
+  for i in $(seq 1 40); do [ "$(as_app systemctl --user is-active portato 2>/dev/null)" = active ] && break; sleep 0.5; done
+  [ "$(as_app systemctl --user is-active portato 2>/dev/null)" = active ] && pass "portato.service active" || fail "portato.service not active"
+
+  echo "== [Phase 43] jump tunnel connects through the bastion =="
+  as_app portato enable echo-via-bastion
+  # list prints one tabwriter row per tuber (NAME ... STATUS); match the row
+  # where echo-via-bastion is connected. (There are now two tubers, so a bare
+  # 'grep connected' could match the wrong one.)
+  c=no; for i in $(seq 1 40); do as_app portato list 2>/dev/null | awk '/echo-via-bastion/ && /connected/ {f=1} END{exit !f}' && { c=yes; break; }; sleep 0.5; done
+  [ "$c" = yes ] && pass "echo-via-bastion Connected through the bastion" || fail "echo-via-bastion not connected"
+
+  nc -w2 -z 127.0.0.1 19090 && pass "nc -z 127.0.0.1 19090 (jump forward works)" || fail "jump forward 19090 unreachable"
+
+  echo "== [Phase 43] auto-reconnect after the bastion drops =="
+  # Kill the active SSH sessions (per-connection privsep procs) on BOTH sshd;
+  # the listeners stay up (Restart=always), so portato rebuilds the chain.
+  pkill -KILL -f 'sshd: appuser' 2>/dev/null || true
+  r=no; for i in $(seq 1 60); do as_app portato list 2>/dev/null | awk '/echo-via-bastion/ && /connected/ {f=1} END{exit !f}' && { r=yes; break; }; sleep 0.5; done
+  [ "$r" = yes ] && pass "auto-reconnect after bastion drop" || fail "no auto-reconnect through the bastion"
+  nc -w2 -z 127.0.0.1 19090 && pass "jump forward works after reconnect" || fail "jump forward 19090 unreachable after reconnect"
+
+  as_app portato disable echo-via-bastion
+  sleep 1
+  if nc -w2 -z 127.0.0.1 19090; then fail "19090 still open after disable"; else pass "19090 closed after disable"; fi
+  as_app portato list
+  echo "== summary: exit $RC =="
+  exit $RC
+  ;;
 check)
   echo "== waiting for user manager bus =="
-  loginctl enable-linger "$APP" 2>/dev/null || true
   for i in $(seq 1 40); do [ -S "$RT/bus" ] && break; sleep 0.5; done
   [ -S "$RT/bus" ] && pass "user manager bus up" || fail "no user manager bus at $RT/bus"
 
@@ -88,5 +128,5 @@ uninstall)
   as_app portato uninstall
   ;;
 *)
-  echo "usage: e2e.sh check|status|uninstall" >&2; exit 2 ;;
+  echo "usage: e2e.sh check|jump|status|uninstall" >&2; exit 2 ;;
 esac

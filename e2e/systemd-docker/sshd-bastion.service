@@ -1,0 +1,11 @@
+[Unit]
+Description=test bastion sshd on :2222 (portato proxyjump E2E)
+After=network.target
+
+[Service]
+ExecStartPre=/bin/mkdir -p /run/sshd
+ExecStart=/usr/sbin/sshd -D -p 2222 -h /etc/ssh/ssh_host_ed25519_bastion_key -o PasswordAuthentication=no -o PubkeyAuthentication=yes -o AllowTcpForwarding=yes -o AllowAgentForwarding=yes
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

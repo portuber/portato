@@ -17,6 +17,11 @@ RUN ssh-keygen -A \
     && chown -R appuser:appuser /home/appuser/.ssh \
     && chmod 600 /home/appuser/.ssh/id_ed25519 /home/appuser/.ssh/authorized_keys /home/appuser/.ssh/known_hosts
 
+# A SEPARATE host key for the bastion sshd (Phase 43 ProxyJump E2E), so the
+# bastion (:2222) and the target (:22) present different host keys — exercising
+# per-hop host-key verification rather than one shared key.
+RUN ssh-keygen -t ed25519 -N '' -f /etc/ssh/ssh_host_ed25519_bastion_key -C portato-bastion
+
 RUN install -d -o appuser -g appuser -m 700 /home/appuser/.config/portato
 COPY portato-config.yaml /home/appuser/.config/portato/config.yaml
 RUN chown -R appuser:appuser /home/appuser/.config
@@ -31,10 +36,12 @@ RUN chmod 0755 /e2e/e2e.sh
 RUN ln -sf /dev/null /etc/systemd/system/ssh.socket \
     && ln -sf /dev/null /etc/systemd/system/ssh.service
 COPY sshd-test.service /etc/systemd/system/sshd-test.service
+COPY sshd-bastion.service /etc/systemd/system/sshd-bastion.service
 COPY echo.service       /etc/systemd/system/echo.service
 COPY enable-linger.service /etc/systemd/system/enable-linger.service
 RUN mkdir -p /etc/systemd/system/multi-user.target.wants \
     && ln -sf /etc/systemd/system/sshd-test.service    /etc/systemd/system/multi-user.target.wants/sshd-test.service \
+    && ln -sf /etc/systemd/system/sshd-bastion.service /etc/systemd/system/multi-user.target.wants/sshd-bastion.service \
     && ln -sf /etc/systemd/system/echo.service          /etc/systemd/system/multi-user.target.wants/echo.service \
     && ln -sf /etc/systemd/system/enable-linger.service /etc/systemd/system/multi-user.target.wants/enable-linger.service
 

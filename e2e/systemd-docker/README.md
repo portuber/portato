@@ -7,6 +7,14 @@ live-traffic + auto-reconnect MVP E2E [119]. launchd parts are macOS-only. The
 leaving only `portato.socket` holding the IPC socket, and confirms `portato list`
 is served (the connection socket-activates the daemon).
 
+The `jump` run is the Phase 43 ProxyJump real-Linux proof: the image runs TWO
+sshd instances — a target on `:22` and a bastion on `:2222` (with its own host
+key) — and a `jump:` tuber (`echo-via-bastion`) reaches the target through the
+bastion. Both authorize the one appuser key (the shared-identity model). This is
+the only way to verify ProxyJump against real OpenSSH on Linux without a native
+Linux host (the dev is on macOS; `make e2e-proxyjump` covers the dial logic with
+in-process SSH servers, this run covers real OpenSSH + systemd).
+
 ## Build (from repo root)
 
     make cross
@@ -18,6 +26,7 @@ is served (the connection socket-activates the daemon).
     docker run -d --name portato-test --privileged --cgroupns=host portato-test
     sleep 6
     docker exec portato-test /e2e/e2e.sh check      # -> block of PASS, exit 0
+    docker exec portato-test /e2e/e2e.sh jump       # Phase 43: two-hop forward + reconnect
 
 ## [115] reboot survival
 
