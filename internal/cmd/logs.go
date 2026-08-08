@@ -51,6 +51,7 @@ func init() {
 	logsCmd.Flags().StringVar(&logsSince, "since", "", "only records newer than this (e.g. 10m, 1h30m, or an RFC3339 timestamp)")
 	logsCmd.Flags().StringVar(&logsTuber, "tuber", "", "only records for this tuber (matches the tuber=<name> attribute)")
 	logsCmd.Flags().BoolVar(&logsAll, "all", false, "include rotated archives (.1/.2/.3), oldest-first")
+	_ = logsCmd.RegisterFlagCompletionFunc("tuber", tuberNameCompletion)
 }
 
 // logArchiveSuffixes is the RotatingWriter's archive chain, oldest-first: .3
