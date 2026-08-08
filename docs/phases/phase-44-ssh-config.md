@@ -1,7 +1,7 @@
 ---
 phase: 44
 title: "~/.ssh/config resolution"
-status: in-progress
+status: done
 depends_on: [43]
 ---
 
@@ -75,18 +75,18 @@ User/Host/Port/Identity/Jump *before* any dial, so the forward/dial path
 
 ## Definition of Done
 
-- [ ] `ssh: myalias` resolves HostName/User/Port/IdentityFile from
+- [x] `ssh: myalias` resolves HostName/User/Port/IdentityFile from
       `~/.ssh/config`.
-- [ ] An alias with ProxyJump populates `jump:` and dials via Phase 43's chain
+- [x] An alias with ProxyJump populates `jump:` and dials via Phase 43's chain
       (multi-hop, zero duplication).
-- [ ] Explicit tuber `identity:` / `jump:` / `ssh: me@x:port` override
+- [x] Explicit tuber `identity:` / `jump:` / `ssh: me@x:port` override
       ssh-config.
-- [ ] `~/.ssh/config` exists but unreadable/unparseable, or a ProxyJump
+- [x] `~/.ssh/config` exists but unreadable/unparseable, or a ProxyJump
       cycle/depth cap ⇒ clear load error; no `~/.ssh/config` or no Host match ⇒
       unchanged/literal behaviour (openssh-faithful).
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run ./...`
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run ./...`
       clean; new functions under gocyclo 15; the phase's tests green.
-- [ ] SPEC + README + `config.example.yaml` updated; the new dep is
+- [x] SPEC + README + `config.example.yaml` updated; the new dep is
       auto-bundled in `THIRD_PARTY_LICENSES.txt` (verified at release time).
 
 ## Verification

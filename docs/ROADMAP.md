@@ -59,7 +59,7 @@
 | 41  | Forwarding-permission diagnostics | `[x]` | [phase-41-forwarding-permission-diagnostics.md](./phases/phase-41-forwarding-permission-diagnostics.md) |
 | 42  | `portato logs` (tail/follow)      | `[x]` | [phase-42-portato-logs.md](./phases/phase-42-portato-logs.md) |
 | 43  | ProxyJump (jump hosts)            | `[x]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
-| 44  | `~/.ssh/config` resolution        | `[~]` | [phase-44-ssh-config.md](./phases/phase-44-ssh-config.md) |
+| 44  | `~/.ssh/config` resolution        | `[x]` | [phase-44-ssh-config.md](./phases/phase-44-ssh-config.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -194,7 +194,7 @@ fixes only.
 - **Phase 41** — forwarding-permission diagnostics (done, `[x]`): `portato doctor --probe` (opt-in) dials each configured host with key-only auth and classifies the server-side sshd gate — chiefly detecting `AllowTcpForwarding no` (a direct-tcpip open rejected with `ssh.Prohibited`), plus connectivity/auth; a non-loopback `-R` bind gets an honest "GatewayPorts not verifiable client-side" caveat (the silent-loopback downgrade is not client-detectable — RFC 4254 §7.1). The `-L`/`-D` runtime dial surfaces an `AllowTcpForwarding` hint on such a rejection. depends_on [11, 7, 8].
 - **Phase 42** — `portato logs` (done, `[x]`): a CLI command to read the persisted daemon log (`daemon.log`, fallback `portato.log`) with `-f/--follow`, `-n/--lines`, `--since`, `--tuber`, `--all` — the missing `docker logs` / `journalctl` equivalent (the TUI `l` view is a live ring buffer only). depends_on [13].
 - **Phase 43** — ProxyJump (jump hosts) (done, `[x]`): a `jump:` field (single hop or a comma-chain) dials a target through one or more bastions — the OpenSSH `-J` equivalent. The dial already separates the TCP dial from the SSH handshake, so chaining reuses the handshake per hop: hop 0 via `net.Dialer`, each later hop via the previous hop's `ssh.Client.Dial` wrapped in `ssh.NewClientConn`; the final client runs the tuber's forward unchanged. Intermediate hops are key-only (the shared agent/identity — the bastion must accept the same key); the Phase 35 password fallback applies only to the final target. Per-hop host keys are verified against `known_hosts`; a leash goroutine closes the intermediates once the final client disconnects (no reconnect leak). `~/.ssh/config` resolution and per-hop identity are follow-ups. depends_on [].
-- **Phase 44** — `~/.ssh/config` resolution (in progress, `[~]`): `ssh: <alias>` resolves HostName/User/Port/IdentityFile/ProxyJump from the user's ssh config (via `kevinburke/ssh_config`, first-match-wins, patterns + `Include` honoured), so host definitions aren't duplicated in `config.yaml`; an alias's `ProxyJump` auto-populates Phase 43's `jump:` (resolved recursively, cycle-guarded), which Phase 43 then dials. Explicit tuber fields (`identity:` / `jump:` / `ssh: me@x:port`) override ssh-config; a missing alias is used literally (openssh-faithful), and only an unreadable `~/.ssh/config` or a ProxyJump cycle/depth is a clear load error. The dial path is unchanged — this is a config-layer resolution. depends_on [43].
+- **Phase 44** — `~/.ssh/config` resolution (done, `[x]`): `ssh: <alias>` resolves HostName/User/Port/IdentityFile/ProxyJump from the user's ssh config (via `kevinburke/ssh_config`, first-match-wins, patterns + `Include` honoured), so host definitions aren't duplicated in `config.yaml`; an alias's `ProxyJump` auto-populates Phase 43's `jump:` (resolved recursively, cycle-guarded), which Phase 43 then dials. Explicit tuber fields (`identity:` / `jump:` / `ssh: me@x:port`) override ssh-config; a missing alias is used literally (openssh-faithful), and only an unreadable `~/.ssh/config` or a ProxyJump cycle/depth is a clear load error. The dial path is unchanged — this is a config-layer resolution. depends_on [43].
 
 ## Current work
 
@@ -258,6 +258,19 @@ fixes only.
   closes the intermediates once the final client disconnects (proved by an
   `ActiveConns()→0` leak guard). `~/.ssh/config` resolution and per-hop
   identity are follow-ups. Additive → MINOR (`v1.1.0`).
+
+- **Phase 44** — `~/.ssh/config` resolution (done, `[x]`): `ssh: <alias>`
+  resolves HostName/User/Port/IdentityFile/ProxyJump from the user's ssh config
+  (`kevinburke/ssh_config`, first-match-wins, patterns + `Include`), so host
+  definitions aren't duplicated between ssh-config and `config.yaml`; an alias's
+  ProxyJump auto-populates Phase 43's chain (resolved recursively, cycle-guarded).
+  It's a pure config-layer resolution — the forward/dial path is unchanged.
+  Precedence is openssh-faithful (explicit tuber fields win, ssh-config fills
+  gaps); a derived IdentityFile/ProxyJump lives only on non-persisted fields, so
+  `Save` never writes them back. No config / no match ⇒ literal silent; an
+  unreadable config or a ProxyJump cycle ⇒ a clear load error. Proved by a Go
+  black-box E2E (`make e2e-sshconfig`) and a real-Linux systemd-docker case
+  (`make e2e-docker E2E_CASE=sshconfig`). Additive → MINOR.
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase
