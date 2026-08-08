@@ -104,6 +104,12 @@ type Tuber struct {
 	Identity string `yaml:"identity" json:"identity"`
 	Enabled  bool   `yaml:"enabled" json:"enabled"`
 
+	// Jump (Phase 43) is a ProxyJump / OpenSSH `-J` value: a single
+	// `user@host[:port]` hop or a comma-separated chain. The tuber dials its
+	// `ssh:` target through these intermediates in order. Empty keeps the
+	// single-hop path. Parsed into Jumps by prepare().
+	Jump string `yaml:"jump,omitempty" json:"jump,omitempty"`
+
 	// PasswordAuth (Phase 35) controls this tuber's SSH password-auth fallback
 	// (see Defaults.PasswordAuth). nil (absent) → inherit the on-by-default
 	// behaviour; password_auth: false → opt this tunnel out of the prompt and
@@ -123,6 +129,19 @@ type Tuber struct {
 	User string `yaml:"-" json:"-"`
 	Host string `yaml:"-" json:"-"`
 	Port int    `yaml:"-" json:"-"`
+
+	// Jumps is the parsed ProxyJump chain (derived from Jump by prepare(),
+	// never persisted). Empty -> the single-hop dial path.
+	Jumps []Hop `yaml:"-" json:"-"`
+}
+
+// Hop is one address in a ProxyJump chain (Phase 43): a user/host/port triple
+// parsed from a single `user@host[:port]` token by parseSSH. The final hop of
+// a dial is the tuber's own SSH target; Jumps holds only the intermediates.
+type Hop struct {
+	User string
+	Host string
+	Port int
 }
 
 func DefaultPath() string {
@@ -199,6 +218,38 @@ func (c *Config) Validate() error {
 		if t.Port < 1 || t.Port > 65535 {
 			return fmt.Errorf("tuber %q: ssh port %d out of range (1-65535)", t.Name, t.Port)
 		}
+		if err := validateJump(t.Name, t.Jump); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateJump enforces the `jump:` field's shape: each hop is a
+// `user@host[:port]` that parses via parseSSH (like `ssh:`) with a non-empty
+// host and in-range port. Empty tokens (a stray comma like "a,,b") are rejected
+// — parseJumpChain skips them leniently for the dial, but load must fail
+// loudly. An empty jump is always valid.
+func validateJump(name, jump string) error {
+	jump = strings.TrimSpace(jump)
+	if jump == "" {
+		return nil
+	}
+	for n, tok := range strings.Split(jump, ",") {
+		tok = strings.TrimSpace(tok)
+		if tok == "" {
+			return fmt.Errorf("tuber %q: jump hop #%d is empty (check for a stray comma)", name, n+1)
+		}
+		_, host, port, err := parseSSH(tok)
+		if err != nil {
+			return fmt.Errorf("tuber %q: jump hop #%d %q: %w", name, n+1, tok, err)
+		}
+		if host == "" {
+			return fmt.Errorf("tuber %q: jump hop #%d %q: host is empty", name, n+1, tok)
+		}
+		if port < 1 || port > 65535 {
+			return fmt.Errorf("tuber %q: jump hop #%d %q: port %d out of range (1-65535)", name, n+1, tok, port)
+		}
 	}
 	return nil
 }
@@ -262,7 +313,32 @@ func (c *Config) prepare() {
 		if u, h, p, err := parseSSH(t.SSH); err == nil {
 			t.User, t.Host, t.Port = u, h, p
 		}
+		t.Jumps = parseJumpChain(t.Jump)
 	}
+}
+
+// parseJumpChain splits a ProxyJump `jump:` value into its parsed hops. An empty
+// (or whitespace-only) value yields nil so the dial takes its single-hop path.
+// The empty check is load-critical: strings.Split("", ",") returns [""] (one
+// empty token), parseSSH("") errors, and without this guard every tuber would
+// fail to load. Empty tokens in a non-empty chain (e.g. "a,,b") are skipped
+// here; Validate rejects them. See validateJump for the strict checks.
+func parseJumpChain(jump string) []Hop {
+	if strings.TrimSpace(jump) == "" {
+		return nil
+	}
+	var hops []Hop
+	for _, tok := range strings.Split(jump, ",") {
+		if strings.TrimSpace(tok) == "" {
+			continue
+		}
+		u, h, p, err := parseSSH(tok)
+		if err != nil {
+			continue
+		}
+		hops = append(hops, Hop{User: u, Host: h, Port: p})
+	}
+	return hops
 }
 
 func (t Tuber) ListenAddr() string {
@@ -520,6 +596,7 @@ type tuberRaw struct {
 	PasswordAuth   *bool  `yaml:"password_auth"`
 	Socks5User     string `yaml:"socks5_user"`
 	Socks5Password string `yaml:"socks5_password"`
+	Jump           string `yaml:"jump"`
 }
 
 func (t *Tuber) UnmarshalYAML(value *yaml.Node) error {
@@ -536,6 +613,7 @@ func (t *Tuber) UnmarshalYAML(value *yaml.Node) error {
 	t.PasswordAuth = raw.PasswordAuth
 	t.Socks5User = raw.Socks5User
 	t.Socks5Password = raw.Socks5Password
+	t.Jump = raw.Jump
 	switch v := raw.Local.(type) {
 	case nil:
 		t.Local = ""
