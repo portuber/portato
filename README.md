@@ -302,6 +302,33 @@ existing `user@host:port` values keep working unchanged. Only an unreadable
 conditional blocks and `UserKnownHostsFile` are not resolved (Portato keeps its
 own `known_hosts`).
 
+### Tags (grouping)
+
+A tuber may carry `tags:` for ad-hoc grouping — by environment (`prod`,
+`staging`), role (`db`, `web`), or owner:
+
+```yaml
+- name: db-prod
+  tags: [prod, db]
+```
+
+Each tag is alphanumeric / `-` / `_` (the same alphabet as tuber names), ≤16
+tags per tuber, ≤32 chars each. Tags are pure metadata — they don't affect the
+dial.
+
+```sh
+portato enable --tag prod     # enable every prod tuber (one line per tuber)
+portato disable --tag prod
+portato restart --tag db
+portato enable --tag pr<TAB>  # completes distinct tag values from config.yaml
+```
+
+`--tag` is mutually exclusive with a `<name>` positional (exactly one is
+required). In the TUI, a `/` filter with a leading `#` is an exact tag selector
+— `#db` matches a tuber *tagged* `db`, not one merely *named* `db-stage`. `a`
+(enable-all) and `x` (disable-all) respect the active filter, so `/ #prod` then
+`a` enables exactly the prod tubers.
+
 ## Autostart
 
 `portato install` registers the daemon with your OS's service manager so it

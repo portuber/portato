@@ -16,6 +16,7 @@ tubers:
     remote: 10.0.0.5:5432         # destination on the host; host:port (a bare port is rejected for type: local)
     ssh: user@bastion.example.com:22   # required; user and port optional
     identity: ~/.ssh/id_ed25519   # optional; overrides defaults
+    tags: [staging, db]           # optional; group tubers for --tag / the #tag TUI filter
     enabled: false                # off by default; the daemon persists toggles here
 
   # Remote (-R): listen on the ssh server, forward back to this machine.

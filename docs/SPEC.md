@@ -10,6 +10,7 @@
 - Manage a set of SSH port forwards from a single place (the TUI), like the MCP screen in opencode.
 - Reach hosts behind a bastion via `jump:` (ProxyJump / OpenSSH `-J`).
 - Reuse a `~/.ssh/config` Host alias as `ssh:` (HostName/User/Port/IdentityFile/ProxyJump resolved).
+- Organise tubers with `tags:` — `enable|disable|restart --tag X`, a `#tag` filter in the TUI, and `a` / `x` over a filtered view.
 - Turn tunnels on/off interactively (space).
 - **Three modes** for a single binary:
   - **smart-launcher** (`portato` with no args): automatically picks attach or standalone;
@@ -339,6 +340,8 @@ tubers:
                                      # `user@host[:port]` hop or a comma-separated chain
                                      # (`user@edge,user@bastion`); the target in `ssh:` is reached
                                      # through these intermediates in order.
+    tags: [prod, db]                 # optional (Phase 46): grouping tags for --tag / #tag / a/x-over-
+                                     # filter. Each tag is alphanumeric/-/_ (≤16 tags, ≤32 chars each).
 ```
 
 The meaning of `local`/`remote` depends on `type`:
@@ -364,6 +367,34 @@ The meaning of `local`/`remote` depends on `type`:
 - **Only**: SSH agent (when `SSH_AUTH_SOCK` is set) and/or `identity` files.
 - Passwords and passphrases are **never stored in the config**.
 - A passphrase for an identity goes through the agent or an interactive prompt (post-MVP).
+
+### Tags (Phase 46)
+
+- A tuber may carry a `tags:` list (`tags: [prod, db]`). Each tag reuses the
+  `validName` alphabet (`[a-zA-Z0-9-_]`, the same rules as tuber names) so tags
+  are shell-safe and completion-friendly; load validates non-empty, ≤32 chars
+  per tag, ≤16 tags per tuber, and case-sensitive dedup.
+- Tags are pure grouping metadata — they do not touch the dial path. They flow
+  config → `forward.Status.Tags` → IPC, so `list` / `list --json` report them
+  and the TUI filters on the live state rather than re-reading config.
+- **`--tag` group op:** `enable` / `disable` / `restart` accept `--tag X` (and
+  `--tag` TAB-completes the distinct values from `config.yaml`); it resolves
+  every tuber whose `Tags` contain `X` (case-insensitive exact) and acts on
+  each, printing one line per tuber. Exactly one of `--tag` / `<name>` is
+  required. `forward` is intentionally excluded (ad-hoc, not daemon state).
+- **`#tag` TUI filter:** a leading `#` in the `/` filter is an exact tag
+  selector (case-insensitive) — `#db` matches a tuber tagged `db`, not one
+  merely named `db-stage`. Plain queries keep the fuzzy-over-name/type/endpoint
+  behaviour and never match on tags, so the two modes stay distinct.
+- **`a` / `x` respect the filter:** enable-all / disable-all gate each
+  candidate on the active filter; with no filter every tuber matches
+  (unchanged), with a filter (incl. `#tag`) only the visible tubers toggle —
+  turning any filtered view into an ad-hoc group.
+- Tags render as `#tag` tokens (no space after `#`), byte-identical to the
+  `#tag` filter token, in the CLI `list` (inline in the NAME cell) and the TUI
+  detail strip (Phase 39: ≤1 line above the footer; an error wins, tags surface
+  only when the selected row has no error — the strip never jitters between one
+  and two lines). A width-aware TAGS column is a possible later refinement.
 
 ## 8. Tunnel types
 
