@@ -109,6 +109,11 @@ type Tuber struct {
 	Identity string `yaml:"identity" json:"identity"`
 	Enabled  bool   `yaml:"enabled" json:"enabled"`
 
+	// Tags (Phase 46) is the tuber's tag list for grouping: `enable|disable|restart
+	// --tag X`, the TUI `#tag` filter, and `a` / `x` over a filtered view. Each tag
+	// reuses the validName alphabet; validated and deduped in Validate().
+	Tags []string `yaml:"tags,omitempty" json:"tags,omitempty"`
+
 	// Jump (Phase 43) is a ProxyJump / OpenSSH `-J` value: a single
 	// `user@host[:port]` hop or a comma-separated chain. The tuber dials its
 	// `ssh:` target through these intermediates in order. Empty keeps the
@@ -192,49 +197,91 @@ func (c *Config) Validate() error {
 	seen := make(map[string]struct{})
 	for i := range c.Tubers {
 		t := &c.Tubers[i]
-		if strings.TrimSpace(t.Name) == "" {
-			return fmt.Errorf("tuber #%d: name is empty", i+1)
-		}
-		if !validName(t.Name) {
-			return fmt.Errorf("tuber %q: name must be alphanumeric, dashes or underscores", t.Name)
-		}
-		if _, ok := seen[t.Name]; ok {
-			return fmt.Errorf("tuber %q: duplicate name", t.Name)
-		}
-		seen[t.Name] = struct{}{}
-		switch t.Type {
-		case "local", "remote", "dynamic":
-		default:
-			return fmt.Errorf("tuber %q: type %q not supported (supported: local, remote, dynamic)", t.Name, t.Type)
-		}
-		// local is required for every type: for local/dynamic it is the listen
-		// address (a bare port expands to 127.0.0.1:port); for remote it is the
-		// address server-side connections are forwarded to here.
-		if strings.TrimSpace(t.Local) == "" {
-			return fmt.Errorf("tuber %q: local is empty", t.Name)
-		}
-		// remote is the destination dialed on the host (local) or the address
-		// listened on the host (remote). A dynamic (-D) tuber has no remote.
-		if t.Type != "dynamic" && strings.TrimSpace(t.Remote) == "" {
-			return fmt.Errorf("tuber %q: remote is empty", t.Name)
-		}
-		// For type: local, remote is the dial destination on the host, so it
-		// must be a complete host:port — a bare port is ambiguous and would
-		// otherwise fail later at dial time with an opaque net error.
-		if t.Type == "local" {
-			if err := validateHostPort(t.Remote); err != nil {
-				return fmt.Errorf("tuber %q: remote %q is not a valid host:port for type: local (e.g. 127.0.0.1:1234)", t.Name, t.Remote)
-			}
-		}
-		if strings.TrimSpace(t.Host) == "" {
-			return fmt.Errorf("tuber %q: ssh host is empty", t.Name)
-		}
-		if t.Port < 1 || t.Port > 65535 {
-			return fmt.Errorf("tuber %q: ssh port %d out of range (1-65535)", t.Name, t.Port)
-		}
-		if err := validateJump(t.Name, t.Jump); err != nil {
+		if err := validateTuber(t, seen); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func validateTuber(t *Tuber, seen map[string]struct{}) error {
+	if strings.TrimSpace(t.Name) == "" {
+		return fmt.Errorf("tuber %q: name is empty", t.Name)
+	}
+	if !validName(t.Name) {
+		return fmt.Errorf("tuber %q: name must be alphanumeric, dashes or underscores", t.Name)
+	}
+	if _, ok := seen[t.Name]; ok {
+		return fmt.Errorf("tuber %q: duplicate name", t.Name)
+	}
+	seen[t.Name] = struct{}{}
+	switch t.Type {
+	case "local", "remote", "dynamic":
+	default:
+		return fmt.Errorf("tuber %q: type %q not supported (supported: local, remote, dynamic)", t.Name, t.Type)
+	}
+	// local is required for every type: for local/dynamic it is the listen
+	// address (a bare port expands to 127.0.0.1:port); for remote it is the
+	// address server-side connections are forwarded to here.
+	if strings.TrimSpace(t.Local) == "" {
+		return fmt.Errorf("tuber %q: local is empty", t.Name)
+	}
+	// remote is the destination dialed on the host (local) or the address
+	// listened on the host (remote). A dynamic (-D) tuber has no remote.
+	if t.Type != "dynamic" && strings.TrimSpace(t.Remote) == "" {
+		return fmt.Errorf("tuber %q: remote is empty", t.Name)
+	}
+	// For type: local, remote is the dial destination on the host, so it
+	// must be a complete host:port — a bare port is ambiguous and would
+	// otherwise fail later at dial time with an opaque net error.
+	if t.Type == "local" {
+		if err := validateHostPort(t.Remote); err != nil {
+			return fmt.Errorf("tuber %q: remote %q is not a valid host:port for type: local (e.g. 127.0.0.1:1234)", t.Name, t.Remote)
+		}
+	}
+	if strings.TrimSpace(t.Host) == "" {
+		return fmt.Errorf("tuber %q: ssh host is empty", t.Name)
+	}
+	if t.Port < 1 || t.Port > 65535 {
+		return fmt.Errorf("tuber %q: ssh port %d out of range (1-65535)", t.Name, t.Port)
+	}
+	if err := validateJump(t.Name, t.Jump); err != nil {
+		return err
+	}
+	if err := validateTags(t.Name, t.Tags); err != nil {
+		return err
+	}
+	return nil
+}
+
+const (
+	maxTagsPerTuber = 16
+	maxTagLen       = 32
+)
+
+// validateTags enforces the `tags:` field: each tag is non-empty, validName
+// (shell-safe), ≤maxTagLen chars; ≤maxTagsPerTuber per tuber; case-sensitive
+// dedup. Empty list is always valid.
+func validateTags(name string, tags []string) error {
+	if len(tags) > maxTagsPerTuber {
+		return fmt.Errorf("tuber %q: too many tags (%d > %d)", name, len(tags), maxTagsPerTuber)
+	}
+	seen := make(map[string]struct{}, len(tags))
+	for i, tag := range tags {
+		tag = strings.TrimSpace(tag)
+		if tag == "" {
+			return fmt.Errorf("tuber %q: tag #%d is empty", name, i+1)
+		}
+		if !validName(tag) {
+			return fmt.Errorf("tuber %q: tag %q must be alphanumeric, dashes or underscores", name, tag)
+		}
+		if len(tag) > maxTagLen {
+			return fmt.Errorf("tuber %q: tag %q too long (%d > %d)", name, tag, len(tag), maxTagLen)
+		}
+		if _, ok := seen[tag]; ok {
+			return fmt.Errorf("tuber %q: duplicate tag %q", name, tag)
+		}
+		seen[tag] = struct{}{}
 	}
 	return nil
 }
@@ -313,6 +360,7 @@ func exampleConfig() *Config {
 				Remote:  "10.0.0.5:5432",
 				SSH:     "user@bastion.example.com:22",
 				Enabled: false,
+				Tags:    []string{"staging", "db"},
 			},
 		},
 	}
@@ -811,17 +859,18 @@ func expandTilde(p string) string {
 func ExpandTilde(p string) string { return expandTilde(p) }
 
 type tuberRaw struct {
-	Name           string `yaml:"name"`
-	Type           string `yaml:"type"`
-	Local          any    `yaml:"local"`
-	Remote         string `yaml:"remote"`
-	SSH            string `yaml:"ssh"`
-	Identity       string `yaml:"identity"`
-	Enabled        bool   `yaml:"enabled"`
-	PasswordAuth   *bool  `yaml:"password_auth"`
-	Socks5User     string `yaml:"socks5_user"`
-	Socks5Password string `yaml:"socks5_password"`
-	Jump           string `yaml:"jump"`
+	Name           string   `yaml:"name"`
+	Type           string   `yaml:"type"`
+	Local          any      `yaml:"local"`
+	Remote         string   `yaml:"remote"`
+	SSH            string   `yaml:"ssh"`
+	Identity       string   `yaml:"identity"`
+	Enabled        bool     `yaml:"enabled"`
+	PasswordAuth   *bool    `yaml:"password_auth"`
+	Socks5User     string   `yaml:"socks5_user"`
+	Socks5Password string   `yaml:"socks5_password"`
+	Jump           string   `yaml:"jump"`
+	Tags           []string `yaml:"tags"`
 }
 
 func (t *Tuber) UnmarshalYAML(value *yaml.Node) error {
@@ -839,6 +888,7 @@ func (t *Tuber) UnmarshalYAML(value *yaml.Node) error {
 	t.Socks5User = raw.Socks5User
 	t.Socks5Password = raw.Socks5Password
 	t.Jump = raw.Jump
+	t.Tags = raw.Tags
 	switch v := raw.Local.(type) {
 	case nil:
 		t.Local = ""
