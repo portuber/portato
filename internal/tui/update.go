@@ -849,10 +849,24 @@ func (m Model) hasLiveTubers() bool {
 // type and endpoint; an exact substring still hits as a fallback so an
 // unfuzzy-but-contiguous token keeps matching (Phase 20). An empty query
 // matches everything.
+//
+// A leading `#` (Phase 46) switches to an exact tag selector: the query after
+// `#` must equal one of the tuber's tags (case-insensitive). So `#db` matches a
+// tuber tagged db, not one merely named db-stage. Plain queries never match on
+// tags, keeping the two modes distinct.
 func (m Model) matches(s controller.Status) bool {
 	q := strings.ToLower(m.filter.Value())
 	if q == "" {
 		return true
+	}
+	if strings.HasPrefix(q, "#") {
+		want := q[1:]
+		for _, tag := range s.Tags {
+			if strings.ToLower(tag) == want {
+				return true
+			}
+		}
+		return false
 	}
 	if fuzzy.MatchFold(q, s.Name) || fuzzy.MatchFold(q, s.Type) || fuzzy.MatchFold(q, s.Endpoint()) {
 		return true
@@ -960,7 +974,7 @@ func (m *Model) restartCurrent() {
 
 func (m *Model) enableAll() {
 	for _, s := range m.ctrl.List() {
-		if s.State == controller.Off {
+		if s.State == controller.Off && m.matches(s) {
 			_ = m.ctrl.Enable(s.Name)
 		}
 	}
@@ -969,7 +983,7 @@ func (m *Model) enableAll() {
 
 func (m *Model) disableAll() {
 	for _, s := range m.ctrl.List() {
-		if s.State != controller.Off {
+		if s.State != controller.Off && m.matches(s) {
 			_ = m.ctrl.Disable(s.Name)
 		}
 	}

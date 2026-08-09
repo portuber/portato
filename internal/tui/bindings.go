@@ -76,7 +76,7 @@ func tuberBindings(attach bool) []binding {
 			"l            view the selected tuber's logs",
 		}},
 		{foot: "/ filter", needsList: true, help: []string{
-			"/            filter the list (name/type/endpoint; esc clears)",
+			"/            filter the list (name/type/endpoint; #tag for tags; esc clears)",
 		}},
 		{foot: "R reload", help: []string{
 			"R            reload config from disk",
