@@ -1,7 +1,7 @@
 ---
 phase: 46
 title: "Tunnel tags / groups"
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -32,17 +32,17 @@ shell-safe, completion-friendly, and consistent with the rest of the config.
 
 ## Tasks
 
-- [ ] **Config** (`internal/config`): add `Tags []string
+- [x] **Config** (`internal/config`): add `Tags []string
       \`yaml:"tags,omitempty" json:"tags,omitempty"\`` to `Tuber`.
       `Validate()` — every tag must pass `validName`, be non-empty, and
       unique within the tuber (dedup, case-sensitive); cap at ≤16 tags per
       tuber and ≤32 chars per tag. Add a tagged tuber to `exampleConfig()`
       and `config.example.yaml`.
-- [ ] **State carries tags** (`internal/forward/state.go` + controller):
+- [x] **State carries tags** (`internal/forward/state.go` + controller):
       add `Tags []string \`json:"tags,omitempty"\`` to the State struct,
       populated from `config.Tuber.Tags`, so the TUI, `list`, and
       `list --json` can show and filter on tags over IPC.
-- [ ] **CLI `--tag`** on `enable` / `disable` / `restart`
+- [x] **CLI `--tag`** on `enable` / `disable` / `restart`
       (`internal/cmd`): change `Args: cobra.ExactArgs(1)` →
       `cobra.MaximumNArgs(1)` and add a `--tag string` flag. `--tag X`
       resolves every tuber whose `Tags` contain `X` and calls
@@ -50,34 +50,34 @@ shell-safe, completion-friendly, and consistent with the rest of the config.
       positional keeps the current single-tuber behaviour. Exactly one of
       `--tag` / `<name>` is required (both or neither ⇒ error). `forward`
       is intentionally excluded (it is ad-hoc, not daemon state).
-- [ ] **`--tag` completion**: `RegisterFlagCompletionFunc("tag", ...)`
+- [x] **`--tag` completion**: `RegisterFlagCompletionFunc("tag", ...)`
       returning the distinct tag values from `config.yaml` (reusing the
       Phase-45 file-read helper pattern — not `config.Load`).
-- [ ] **TUI `#tag` filter** (`internal/tui`): extend `matches()` so a
+- [x] **TUI `#tag` filter** (`internal/tui`): extend `matches()` so a
       filter query with a leading `#` matches tubers whose `Tags` contain
       the value after `#` (exact, case-insensitive). Non-`#` queries keep
       the current fuzzy-over-name/type/endpoint behaviour. Update
       `bindings.go` help + footer hint to mention `#tag`.
-- [ ] **`a` / `x` respect the filter** (`internal/tui/update.go`:
+- [x] **`a` / `x` respect the filter** (`internal/tui/update.go`:
       `enableAll` / `disableAll`): gate each candidate on `m.matches(s)`
       instead of iterating all tubers unconditionally. With no active
       filter every tuber matches (behaviour unchanged); with a filter only
       the visible tubers toggle — turning any filtered view (incl. `#tag`)
       into a group operation.
-- [ ] **Editor** (`internal/tui/editor.go`): add a comma-separated `tags`
+- [x] **Editor** (`internal/tui/editor.go`): add a comma-separated `tags`
       input, parse to `[]string` (trim, validate each via the same rules,
       dedup), and carry it through the `Tuber` rebuild on save — the same
       per-field carry-through added for `jump` / `identity` in Phase 43 (no
       silent wipe of advanced fields).
-- [ ] **Display**: `list` shows tags compactly; `list --json` includes the
+- [x] **Display**: `list` shows tags compactly; `list --json` includes the
       `tags` array. In the TUI, v1 shows tags in the selected row's detail
       strip (Phase 39) rather than a new column — keeps the Phase-38
       responsive layout intact; a width-aware TAGS column is a possible
       later refinement.
-- [ ] **Docs**: README (a tags example + `--tag` + the `#tag` filter note),
+- [x] **Docs**: README (a tags example + `--tag` + the `#tag` filter note),
       SPEC (the `tags:` field + semantics + precedence/limits),
       `config.example.yaml`, and command help text.
-- [ ] **Tests**: config validation (valid/invalid tags, dedup, length +
+- [x] **Tests**: config validation (valid/invalid tags, dedup, length +
       count caps); `--tag` CLI (multi-tuber enable/disable/restart, both
       and neither ⇒ error, one line per tuber); `--tag` completion returns
       distinct values; TUI `#tag` filter narrows correctly (`#db` matches a
@@ -88,24 +88,24 @@ shell-safe, completion-friendly, and consistent with the rest of the config.
 
 ## Definition of Done
 
-- [ ] `tags:` parses and validates (`validName` per tag, dedup, ≤16/≤32
+- [x] `tags:` parses and validates (`validName` per tag, dedup, ≤16/≤32
       caps); the example config demonstrates it.
-- [ ] `portato enable|disable|restart --tag X` operates on every matching
+- [x] `portato enable|disable|restart --tag X` operates on every matching
       tuber; `<name>` still works; both/neither is rejected. `forward` is
       unchanged.
-- [ ] `portato enable|disable|restart --tag <TAB>` completes distinct tag
+- [x] `portato enable|disable|restart --tag <TAB>` completes distinct tag
       values from `config.yaml`.
-- [ ] The TUI `#tag` filter narrows to tagged tubers; `a` / `x` respect the
+- [x] The TUI `#tag` filter narrows to tagged tubers; `a` / `x` respect the
       active `/` filter (no filter ⇒ unchanged behaviour).
-- [ ] The editor edits/creates tags and carries them through (no silent
+- [x] The editor edits/creates tags and carries them through (no silent
       wipe of tags on save).
-- [ ] `list` and `list --json` show tags; `controller.State` carries tags
+- [x] `list` and `list --json` show tags; `controller.State` carries tags
       over IPC.
-- [ ] README + SPEC + `config.example.yaml` document tags, `--tag`, and
+- [x] README + SPEC + `config.example.yaml` document tags, `--tag`, and
       `#tag`.
-- [ ] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run
+- [x] `go build ./...`, `gofmt -l .`, `go vet ./...`, `golangci-lint run
       ./...` clean; new functions under gocyclo 15; the phase's tests green.
-- [ ] ROADMAP row + status mirrored (phase file frontmatter + table).
+- [x] ROADMAP row + status mirrored (phase file frontmatter + table).
 
 ## Verification
 
@@ -155,3 +155,27 @@ make fmt && make vet && make test && make lint
   behaviour and narrow-terminal footprints are untouched.
 - **No breaking change.** `tags:` is optional (`omitempty`); existing
   configs and CLI invocations behave identically. Additive ⇒ MINOR.
+
+### Notes from implementation
+
+- **`tuberRaw` / `UnmarshalYAML` carry-through.** `Tuber` has a custom
+  `UnmarshalYAML` that decodes into a private `tuberRaw` and copies fields
+  explicitly. `Tags` had to be added to `tuberRaw` *and* the copy, or it would
+  be silently dropped on load — the same pitfall Phase 43 hit with `jump:`.
+  Covered by a load round-trip test (`TestLoadWithTags`).
+- **IPC without a new method.** Tags ride the existing `forward.Status`
+  (populated in `Tuber.Status()`), so `daemon.handleList` → `Engine.List` →
+  `Tuber.Status()` carries them to `list` / `list --json` / the TUI with no
+  daemon or client change. `--tag` resolution reuses `Client().List()` (the
+  authoritative roster) rather than re-reading config.
+- **Display invariant.** Every tag renders as `#tag` (no space after `#`),
+  space-separated, everywhere — the TUI detail strip *and* the CLI `list`
+  table (inline in the NAME cell). The display token is byte-identical to the
+  `#tag` filter token, so the displayed value teaches the filter syntax.
+- **Strip stays ≤1 line.** In the TUI, an error wins the Phase-39 detail strip
+  (error is actionable, tags are identity); tags surface only when the
+  selected row has tags *and* no error. The strip never toggles between one
+  and two lines, so the table height is stable (no layout jitter).
+- **`Validate` split.** Adding `validateTags` pushed `Config.Validate` to
+  gocyclo 16 (>15 repo limit); the per-tuber body was extracted into
+  `validateTuber` to bring both under the cap.

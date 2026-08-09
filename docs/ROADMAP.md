@@ -61,7 +61,7 @@
 | 43  | ProxyJump (jump hosts)            | `[x]` | [phase-43-proxyjump.md](./phases/phase-43-proxyjump.md) |
 | 44  | `~/.ssh/config` resolution        | `[x]` | [phase-44-ssh-config.md](./phases/phase-44-ssh-config.md) |
 | 45  | Shell completions                 | `[x]` | [phase-45-shell-completions.md](./phases/phase-45-shell-completions.md) |
-| 46  | Tunnel tags / groups              | `[~]` | [phase-46-tunnel-tags.md](./phases/phase-46-tunnel-tags.md) |
+| 46  | Tunnel tags / groups              | `[x]` | [phase-46-tunnel-tags.md](./phases/phase-46-tunnel-tags.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -75,7 +75,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–45 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts), `~/.ssh/config` alias resolution, and shell completion. **Phase 46 (Tunnel tags / groups) is in progress**; the rest of the backlog is in [Post-1.0 candidate features](#post-10-candidate-features). The stability
+**Phases 0–46 are all `[x]`** — the roadmap's core is complete, including ProxyJump (jump hosts), `~/.ssh/config` alias resolution, shell completion, and tunnel tags/groups. The rest of the backlog is in [Post-1.0 candidate features](#post-10-candidate-features). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes; any future break goes through the deprecation
 cycle defined there. For the most recent batch see [Current work](#current-work);
@@ -119,29 +119,26 @@ time-based (not just size-based) log rotation.
 
 ## Post-1.0 candidate features
 
-Beyond Phase 45, the following are prioritised candidates — not yet formal
+Beyond Phase 46, the following are prioritised candidates — not yet formal
 phases; each is promoted to a numbered phase (with a `phase-N-*.md` file)
 when taken up. All are additive, so they ship as MINORs; patch releases are
 fixes only.
 
-1. **Tunnel tags / groups** — `tags:` on a tuber, `portato enable --tag`,
-   a TUI tag filter; and make the `a`/`x` enable/disable-all respect the
-   active `/` filter (instant group ops without a new schema).
-2. **Per-tunnel stats** — bytes in/out, connection count, reconnect count
+1. **Per-tunnel stats** — bytes in/out, connection count, reconnect count
    (collected at the single `pipe()` chokepoint) shown in the TUI and
    `list --json`; folds in the deferred Phase-39 aggregate line
    (`n connected · n error · n off`).
-3. **Unix-socket forwarding** — `-L /var/run/docker.sock:…` to reach a
+2. **Unix-socket forwarding** — `-L /var/run/docker.sock:…` to reach a
    remote `docker.sock`; the forward direction is cheap via
    `client.Dial("unix", path)`, the reverse (`streamlocal-forward@openssh.com`)
    is harder.
-4. **Lazy tunnels** — dial SSH only on the first connection + an idle
+3. **Lazy tunnels** — dial SSH only on the first connection + an idle
    timeout to disconnect; fits the FD-hand-off listener/client separation
    (Phase 16). Solves the "laptop with 20 tunnels" pain.
-5. **State-change hooks / notifications** — `on_error:` / `on_connect:` cmd
+4. **State-change hooks / notifications** — `on_error:` / `on_connect:` cmd
    and/or a desktop notification when a tunnel drops or recovers; the daemon
    is headless, so this surfaces breaks without opening the TUI.
-6. **Shared SSH client pool** — reuse one `*ssh.Client` per
+5. **Shared SSH client pool** — reuse one `*ssh.Client` per
    `user@host:port` with refcounting (fewer handshakes / password prompts
    for many tunnels to one bastion). The riskiest — it reworks the
    per-tuber reconnect / backoff / keepalive state machine onto a shared
@@ -195,11 +192,11 @@ fixes only.
 - **Phase 43** — ProxyJump (jump hosts) (done, `[x]`): a `jump:` field (single hop or a comma-chain) dials a target through one or more bastions — the OpenSSH `-J` equivalent. The dial already separates the TCP dial from the SSH handshake, so chaining reuses the handshake per hop: hop 0 via `net.Dialer`, each later hop via the previous hop's `ssh.Client.Dial` wrapped in `ssh.NewClientConn`; the final client runs the tuber's forward unchanged. Intermediate hops are key-only (the shared agent/identity — the bastion must accept the same key); the Phase 35 password fallback applies only to the final target. Per-hop host keys are verified against `known_hosts`; a leash goroutine closes the intermediates once the final client disconnects (no reconnect leak). `~/.ssh/config` resolution and per-hop identity are follow-ups. depends_on [].
 - **Phase 44** — `~/.ssh/config` resolution (done, `[x]`): `ssh: <alias>` resolves HostName/User/Port/IdentityFile/ProxyJump from the user's ssh config (via `kevinburke/ssh_config`, first-match-wins, patterns + `Include` honoured), so host definitions aren't duplicated in `config.yaml`; an alias's `ProxyJump` auto-populates Phase 43's `jump:` (resolved recursively, cycle-guarded), which Phase 43 then dials. Explicit tuber fields (`identity:` / `jump:` / `ssh: me@x:port`) override ssh-config; a missing alias is used literally (openssh-faithful), and only an unreadable `~/.ssh/config` or a ProxyJump cycle/depth is a clear load error. The dial path is unchanged — this is a config-layer resolution. depends_on [43].
 - **Phase 45** — Shell completions (done, `[x]`): dynamic TAB completion of tuber names for `enable` / `disable` / `restart` / `forward` and `logs --tuber` (via `ValidArgsFunction` / `RegisterFlagCompletionFunc`; source = `config.yaml` load, so it works with no daemon running). Cobra's `completion bash/zsh/fish/powershell` already generates the shell script; the README documents per-shell sourcing (`eval` / `source`, document-only — no packaging changes). Additive ⇒ MINOR (`v1.3.0`). depends_on [].
-- **Phase 46** — Tunnel tags / groups (in progress, `[~]`): `tags:` on a tuber; `enable` / `disable` / `restart --tag X` operate on every tuber with that tag (with `--tag` TAB-completion); a precise `#tag` filter in the TUI; and `a` / `x` (enable/disable-all) respect the active `/` filter for instant group ops. `controller.State` carries tags so `list` / `list --json` and the TUI show and filter on them; the editor gains a tags field. Additive ⇒ MINOR. depends_on [].
+- **Phase 46** — Tunnel tags / groups (done, `[x]`): `tags:` on a tuber; `enable` / `disable` / `restart --tag X` operate on every tuber with that tag (with `--tag` TAB-completion of the distinct values from `config.yaml`); a precise `#tag` filter in the TUI (a leading `#` is an exact tag selector — `#db` matches a tuber *tagged* `db`, not one merely *named* `db-stage`); and `a` / `x` (enable/disable-all) respect the active `/` filter for instant group ops (no filter ⇒ byte-identical to before). `forward.Status` carries tags so `list` / `list --json` and the TUI show and filter on them over IPC (no new IPC method); the editor gains a tags field. Tags render as `#tag` tokens everywhere (byte-identical to the filter syntax); in the TUI they live in the Phase-39 detail strip (≤1 line, an error wins) rather than a new column, keeping the Phase-38 responsive layout intact. Additive ⇒ MINOR. depends_on [].
 
 ## Current work
 
-**Phases 0–45 are all `[x]`.** The most recent batch:
+**Phases 0–46 are all `[x]`.** The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
@@ -281,6 +278,21 @@ fixes only.
   (not `config.Load`), so it never creates a config as a TAB side effect and
   works with no daemon running. The README documents per-shell sourcing
   (document-only — no packaging changes). Additive → MINOR (`v1.3.0`).
+
+- **Phase 46** — Tunnel tags / groups (done, `[x]`): a `tags:` field on a
+  tuber; `enable` / `disable` / `restart --tag X` operate on every tuber with
+  that tag (one line per tuber; exactly one of `--tag` / `<name>` required;
+  `--tag` TAB-completes the distinct values from `config.yaml`); a precise
+  `#tag` filter in the TUI (leading `#` = exact tag match — `#db` matches a
+  tuber *tagged* `db`, not one *named* `db-stage`); `a` / `x` respect the
+  active `/` filter so any filtered view is an instant group op (no filter ⇒
+  byte-identical to before). Tags flow config → `forward.Status.Tags` → IPC,
+  so `list` / `list --json` and the TUI show and filter on them with no new
+  IPC method; the editor gains a comma-separated tags field with carry-through
+  (Phase-43 jump/identity pattern). Tags render as `#tag` tokens everywhere;
+  in the TUI they live in the Phase-39 detail strip (≤1 line, an error wins)
+  rather than a new column, keeping the Phase-38 responsive layout intact.
+  Additive ⇒ MINOR.
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase
