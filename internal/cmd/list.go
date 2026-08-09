@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"text/tabwriter"
 	"time"
 
@@ -70,10 +71,24 @@ func printTable(out io.Writer, statuses []forward.Status) {
 		if s.Error != "" {
 			status += " " + s.Error
 		}
-		fmt.Fprintf(w, "  %s %s\t%s\t%s\t%s\t%s\n",
-			indicator, s.Name, s.Type, endpoint, status, formatUptimeCLI(s))
+		fmt.Fprintf(w, "  %s %s%s\t%s\t%s\t%s\t%s\n",
+			indicator, s.Name, tagsSuffix(s.Tags), s.Type, endpoint, status, formatUptimeCLI(s))
 	}
 	_ = w.Flush()
+}
+
+// tagsSuffix renders a tuber's tags as "#tag" tokens (space-separated, no space
+// after #) so the display matches the #tag filter syntax byte-for-byte. Appended
+// to the NAME cell so the 5-column table layout is unchanged.
+func tagsSuffix(tags []string) string {
+	if len(tags) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		parts = append(parts, "#"+tag)
+	}
+	return " " + strings.Join(parts, " ")
 }
 
 func formatUptimeCLI(s forward.Status) string {
