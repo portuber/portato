@@ -20,13 +20,19 @@ fmt:
 vet:
 	go vet ./...
 
-# lint runs golangci-lint with .golangci.yml: predeclared (no builtin
-# shadowing, e.g. max/min/len) and gocyclo (cyclomatic complexity < 15),
-# the local gate for the codefactor.io issue classes (Phase 33). Tests are
-# excluded from gocyclo only.
+# lint runs two golangci-lint passes:
+#   1. .golangci.yml — predeclared (no builtin shadowing, e.g. max/min/len) and
+#      gocyclo (cyclomatic complexity < 15) on production code; _test.go is
+#      exempt from gocyclo (legit table-driven tests run high). The local gate
+#      for the codefactor.io issue classes (Phase 33).
+#   2. .golangci-tests.yml — gocyclo at codefactor.io's ~18 threshold on test
+#      files too, so a too-complex test is caught locally before CodeFactor
+#      flags it on the public repo (Phase 46 regression). Looser than pass 1
+#      for production, so it adds catches only on _test.go.
 # Requires golangci-lint v1.x: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 lint:
 	golangci-lint run ./...
+	golangci-lint run ./... -c .golangci-tests.yml
 
 # build-all cross-compiles the binary for the MVP target matrix (SPEC §15).
 # cross is a back-compat alias.

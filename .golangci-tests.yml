@@ -1,0 +1,26 @@
+# golangci-lint config — the test-complexity gate that mirrors codefactor.io.
+#
+# The main .golangci.yml exempts _test.go from gocyclo (legit table-driven /
+# E2E tests run high), so `make lint` would not flag a too-complex test until
+# CodeFactor reported it on the public repo (Phase 46's TestEnableDisableRestart_Tag
+# at ~20 was caught this way). This second pass runs gocyclo at codefactor.io's
+# ~18 threshold on every file. For production it is strictly looser than the
+# main pass's @15, so it flags nothing new there; the only NEW catches are
+# _test.go functions >18 — shifted left from CodeFactor to `make lint`.
+#
+# Install:  go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+# Run:      make lint   (runs both .golangci.yml and this file)
+# Note: this is a v1-schema config; it must run under golangci-lint v1.x
+# (v2.0+ uses a different config format), like .golangci.yml.
+
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+    - gocyclo # cyclomatic complexity (CodeFactor "Complex Method") on tests too
+
+linters-settings:
+  gocyclo:
+    min-complexity: 18 # codefactor.io's threshold; the main pass stays stricter at 15 for production
