@@ -305,6 +305,7 @@ func (t *Tuber) Status() Status {
 		State:              t.state,
 		Error:              t.errMsg,
 		ConnectedAt:        t.connectedAt,
+		Tags:               t.cfg.Tags,
 		PendingHost:        t.pendingHost,
 		PendingFingerprint: t.pendingFingerprint,
 		PendingHostLine:    t.pendingHostLine,

@@ -69,6 +69,10 @@ type Status struct {
 	Error       string    `json:"error,omitempty"`
 	ConnectedAt time.Time `json:"connected_at"`
 
+	// Tags (Phase 46) is the tuber's tag list, populated from config.Tuber.Tags
+	// so list / list --json / the TUI can show and filter on tags over IPC.
+	Tags []string `json:"tags,omitempty"`
+
 	// TOFU (Phase 11): when the tuber is blocked by an unknown SSH host key
 	// (accept_new_hosts: false), these carry the offending host, its
 	// fingerprint and a ready-to-append known_hosts line so the TUI can offer
