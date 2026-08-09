@@ -179,3 +179,13 @@ make fmt && make vet && make test && make lint
 - **`Validate` split.** Adding `validateTags` pushed `Config.Validate` to
   gocyclo 16 (>15 repo limit); the per-tuber body was extracted into
   `validateTuber` to bring both under the cap.
+- **`tuberChanged` carry-through (fixed in v1.4.1).** `Engine.Reload`
+  reconfigures a tuber only when `tuberChanged` reports a field change, and
+  that comparison predated the `Tags` field — so editing *only* a tuber's tags
+  (via the editor) was not detected, `Reconfigure` was skipped, and the
+  running tuber's `cfg.Tags` stayed empty: `Status().Tags` was empty, so the
+  `#tag` filter and `list` missed the live-edited tag (the file was correct,
+  the running engine was not). `Tags` — plus `Jump` and
+  `Socks5User`/`Socks5Password`, which had the same gap from their phases —
+  were added to `tuberChanged` in v1.4.1. The same explicit-field-enumeration
+  pitfall as the `tuberRaw` note above.
