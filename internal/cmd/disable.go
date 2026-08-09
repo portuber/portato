@@ -8,11 +8,16 @@ import (
 
 var disableCmd = &cobra.Command{
 	Use:           "disable <name>",
-	Short:         "Disable a tuber on the daemon",
-	Args:          cobra.ExactArgs(1),
+	Short:         "Disable a tuber on the daemon (or every tuber with --tag)",
+	Args:          cobra.MaximumNArgs(1),
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE:          disableRunE,
+}
+
+func init() {
+	registerTagFlag(disableCmd, &disableTag)
+	_ = disableCmd.RegisterFlagCompletionFunc(tagFlagName, tagValueCompletion)
 }
 
 func disableRunE(cmd *cobra.Command, args []string) error {
@@ -20,11 +25,16 @@ func disableRunE(cmd *cobra.Command, args []string) error {
 	if !ok {
 		return errDaemonDown
 	}
-	name := args[0]
-	if err := c.Disable(name); err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
+	names, err := resolveTagOrName(args, disableTag, c.List)
+	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "disabled: %s\n", name)
+	for _, name := range names {
+		if err := c.Disable(name); err != nil {
+			fmt.Fprintln(cmd.ErrOrStderr(), err)
+			return err
+		}
+		fmt.Fprintf(cmd.OutOrStdout(), "disabled: %s\n", name)
+	}
 	return nil
 }
