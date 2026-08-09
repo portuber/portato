@@ -306,3 +306,68 @@ type errSentinel string
 func (e errSentinel) Error() string { return string(e) }
 
 func assertErr(s string) error { return errSentinel(s) }
+
+// TestEditor_TagsPrefillAndCarryThrough pins the Phase 46 carry-through: the
+// tags input is prefilled from the edited tuber, and editing ANOTHER field
+// never wipes tags on save (the same per-field carry-through as jump/identity).
+func TestEditor_TagsPrefillAndCarryThrough(t *testing.T) {
+	f := newFake()
+	f.cfg = &config.Config{
+		Tubers: []config.Tuber{
+			{Name: "db", Type: "local", Local: "5432", Remote: "db:5432", SSH: "u@h:22", Tags: []string{"prod", "db"}},
+		},
+	}
+	e := newTuberEditor(modeEdit, f.cfg.Tubers[0], []string{"db"}, f)
+	if got := e.tags.Value(); got != "prod, db" {
+		t.Errorf("tags prefill = %q, want %q", got, "prod, db")
+	}
+
+	// Change the NAME only, then rebuild the Tuber — tags must survive.
+	e.name.SetValue("db-renamed")
+	got := e.tuber()
+	if len(got.Tags) != 2 || got.Tags[0] != "prod" || got.Tags[1] != "db" {
+		t.Errorf("tags wiped on rebuild: got %v, want [prod db]", got.Tags)
+	}
+	if got.Name != "db-renamed" {
+		t.Errorf("name not picked up: got %q", got.Name)
+	}
+}
+
+func TestEditor_TagsParseDedupAndTrim(t *testing.T) {
+	cases := []struct {
+		in   string
+		want []string
+	}{
+		{"", nil},
+		{"prod", []string{"prod"}},
+		{"prod, db", []string{"prod", "db"}},
+		{"  prod  , , db ", []string{"prod", "db"}},
+		{"prod, prod, db", []string{"prod", "db"}}, // dedup case-sensitive
+		{"Prod, prod", []string{"Prod", "prod"}},   // case-sensitive dedup keeps both
+	}
+	for _, tc := range cases {
+		got := parseEditorTags(tc.in)
+		if len(got) != len(tc.want) {
+			t.Errorf("parseEditorTags(%q) = %v, want %v", tc.in, got, tc.want)
+			continue
+		}
+		for i := range got {
+			if got[i] != tc.want[i] {
+				t.Errorf("parseEditorTags(%q)[%d] = %q, want %q", tc.in, i, got[i], tc.want[i])
+			}
+		}
+	}
+}
+
+func TestEditor_Validate_BadTag(t *testing.T) {
+	f := newEditorFake()
+	e := editorForNew(f)
+	e.name.SetValue("x")
+	e.ssh.SetValue("u@h:22")
+	e.local.SetValue("5432")
+	e.remote.SetValue("db:5432")
+	e.tags.SetValue("good, bad tag")
+	if errs := e.validate(); errs["tags"] == "" {
+		t.Error("a tag with a space should be flagged invalid")
+	}
+}

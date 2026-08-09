@@ -31,6 +31,7 @@ type tuberEditor struct {
 	local    textinput.Model
 	remote   textinput.Model
 	identity textinput.Model
+	tags     textinput.Model
 
 	typeIdx int // index into tuberTypes
 
@@ -64,6 +65,7 @@ const (
 	fLocal
 	fRemote
 	fIdentity
+	fTags
 	fieldCount
 )
 
@@ -86,6 +88,7 @@ func newTuberEditor(mode editorMode, t config.Tuber, existing []string, ctrl con
 	e.local = newInput(t.Local, "5432 or 127.0.0.1:5432", e.pal.body)
 	e.remote = newInput(t.Remote, "db:5432", e.pal.body)
 	e.identity = newInput(t.Identity, "~/.ssh/id_ed25519 (optional)", e.pal.body)
+	e.tags = newInput(strings.Join(t.Tags, ", "), "prod, db (optional, comma-separated)", e.pal.body)
 
 	e.typeIdx = 0
 	for i, ty := range tuberTypes {
@@ -215,6 +218,8 @@ func (e *tuberEditor) textInputFor(idx int) *textinput.Model {
 		return &e.remote
 	case fIdentity:
 		return &e.identity
+	case fTags:
+		return &e.tags
 	}
 	return nil
 }
@@ -245,7 +250,30 @@ func (e *tuberEditor) tuber() config.Tuber {
 		Identity: e.identity.Value(),
 		Enabled:  e.enabled,
 		Jump:     e.jump,
+		Tags:     parseEditorTags(e.tags.Value()),
 	}
+}
+
+// parseEditorTags splits the comma-separated tags input into a clean []string:
+// each token is trimmed, empties dropped, and duplicates removed (case-
+// sensitive). Validation (validName, length/count caps) happens in config.Validate
+// on save; the editor surfaces per-tag errors in validate().
+func parseEditorTags(s string) []string {
+	parts := strings.Split(s, ",")
+	seen := make(map[string]struct{}, len(parts))
+	var out []string
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if _, ok := seen[p]; ok {
+			continue
+		}
+		seen[p] = struct{}{}
+		out = append(out, p)
+	}
+	return out
 }
 
 // validate mirrors config.Validate per field so the form can highlight invalid
@@ -278,6 +306,12 @@ func (e *tuberEditor) validate() map[string]string {
 	}
 	if t.Type != "dynamic" && strings.TrimSpace(t.Remote) == "" {
 		errs["remote"] = "required for " + t.Type
+	}
+	for _, tag := range parseEditorTags(e.tags.Value()) {
+		if !validEditorName(tag) {
+			errs["tags"] = "letters, digits, - or _ only (comma-separated)"
+			break
+		}
 	}
 	return errs
 }
@@ -320,6 +354,7 @@ func (e *tuberEditor) view() string {
 	b.WriteString(e.renderText("Local", &e.local, fLocal, "local"))
 	b.WriteString(e.renderText("Remote", &e.remote, fRemote, "remote"))
 	b.WriteString(e.renderText("Identity", &e.identity, fIdentity, "identity"))
+	b.WriteString(e.renderText("Tags", &e.tags, fTags, "tags"))
 	b.WriteString("\n")
 
 	if e.status != "" {
