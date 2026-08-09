@@ -163,14 +163,23 @@ func (m Model) mainView() string {
 	showFilter := m.filtering || m.filter.Value() != ""
 	bottom := m.footerZone()
 
-	// Error detail strip (Phase 39, F13): the selected row's full error, one
-	// line directly above the footer. Only with the plain footer — a modal is
-	// the focus when one is open — and only when the selected row actually has
-	// an error. It is bundled into the pinned bottom block so the table shrinks
-	// to make room and the footer stays on the last row.
+	// Detail strip (Phase 39, F13 / Phase 46): one line directly above the
+	// footer. The strip is for actionable / identity detail of the selected
+	// row — an error wins (it is actionable), and when there is none the row's
+	// tags surface as "#tag" tokens. Only with the plain footer (a modal is the
+	// focus when one is open) and only when the selected row has something to
+	// show. It is bundled into the pinned bottom block so the table shrinks to
+	// make room and the footer stays on the last row. The strip is ≤1 line in
+	// every case (no error+no tags ⇒ 0), so the layout never jitters between
+	// one and two lines.
 	var detail string
-	if !m.hasPrompt() && m.hasCurrent() && m.list[m.cursor].Error != "" {
-		detail = m.errorDetail(m.list[m.cursor].Error)
+	if !m.hasPrompt() && m.hasCurrent() {
+		s := m.list[m.cursor]
+		if s.Error != "" {
+			detail = m.errorDetail(s.Error)
+		} else if len(s.Tags) > 0 {
+			detail = m.tagsDetail(s.Tags)
+		}
 	}
 	bottomBlock := bottom
 	if detail != "" {
@@ -230,6 +239,24 @@ func (m Model) errorDetail(err string) string {
 		body = truncateTail(err, avail)
 	}
 	return m.pal.err.Render(prefix) + m.pal.body.Render(body)
+}
+
+// tagsDetail renders the one-line tag strip shown above the footer for the
+// selected row's tags (Phase 46). Each tag is a "#tag" token (byte-identical to
+// the #tag filter syntax); the leading arrow links it to the row above. Only
+// shown when the row has no error (errorDetail wins — error is actionable).
+func (m Model) tagsDetail(tags []string) string {
+	const prefix = "↳ "
+	parts := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		parts = append(parts, "#"+tag)
+	}
+	body := strings.Join(parts, " ")
+	avail := m.width - 2*sideMargin - lipgloss.Width(prefix)
+	if avail >= 4 {
+		body = truncate(body, avail)
+	}
+	return m.pal.dim.Render(prefix) + m.pal.body.Render(body)
 }
 
 // sectionSep is the inter-section separator and the number of extra blank
