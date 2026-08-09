@@ -143,6 +143,12 @@ fixes only.
    for many tunnels to one bastion). The riskiest — it reworks the
    per-tuber reconnect / backoff / keepalive state machine onto a shared
    client — so it lands last.
+6. **Metadata-only refresh (no reconnect)** — editing *only* a tuber's
+   `tags:` currently triggers a full `Reconfigure` (SSH reconnect) because
+   `tuberChanged` lumps Tags with connection-affecting fields (the v1.4.1
+   fix). Tags are pure metadata; split a metadata-refresh path in
+   `Engine.Reload` (`UpdateMetadata`: `t.cfg = cfg` + notify, no `Restart`)
+   for tags-only changes so live-tag-edit doesn't blip a connected tunnel.
 
 ## Phase summary
 
