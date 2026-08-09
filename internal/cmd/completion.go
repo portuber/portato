@@ -50,3 +50,40 @@ func init() {
 	restartCmd.ValidArgsFunction = tuberNameCompletion
 	forwardCmd.ValidArgsFunction = tuberNameCompletion
 }
+
+// tagValueCompletion is the --tag flag completer for enable/disable/restart. It
+// returns the distinct tag values across all tubers in config.yaml, read
+// directly (not via config.Load — see tuberNameCompletion for the reasons). A
+// missing/unreadable/malformed config yields no completions.
+func tagValueCompletion(_ *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+	path := cfgFile
+	if path == "" {
+		path = config.DefaultPath()
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	var cfg config.Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+	seen := make(map[string]struct{})
+	var values []string
+	for _, t := range cfg.Tubers {
+		for _, tag := range t.Tags {
+			tag = strings.TrimSpace(tag)
+			if tag == "" {
+				continue
+			}
+			if _, ok := seen[tag]; ok {
+				continue
+			}
+			seen[tag] = struct{}{}
+			if strings.HasPrefix(tag, toComplete) {
+				values = append(values, tag)
+			}
+		}
+	}
+	return values, cobra.ShellCompDirectiveNoFileComp
+}
