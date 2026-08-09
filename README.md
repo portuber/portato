@@ -121,12 +121,15 @@ complete. Generate and source the script for your shell:
 echo 'eval "$(portato completion bash)"' >> ~/.bashrc
 ```
 
-**zsh** (`compinit` must be enabled — it is by default on most setups):
+**zsh** — `compinit` is required, and a bare macOS zsh does **not** load it:
 
 ```sh
-echo 'source <(portato completion zsh)' >> ~/.zshrc
-# or, without process substitution:
-portato completion zsh > "${fpath[1]}/_portato"
+# ~/.zshrc — if compinit isn't already run (oh-my-zsh / a framework runs it),
+# add the autoload line; otherwise just the source line:
+autoload -Uz compinit && compinit
+source <(portato completion zsh)
+# or, without process substitution (faster shell start, but regenerate after
+# each portato upgrade):  portato completion zsh > "${fpath[1]}/_portato"
 ```
 
 **fish:**
