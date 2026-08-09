@@ -377,6 +377,15 @@ func tuberChanged(a, b config.Tuber) bool {
 	if !sameBoolPtr(a.PasswordAuth, b.PasswordAuth) {
 		return true
 	}
+	if a.Jump != b.Jump {
+		return true
+	}
+	if a.Socks5User != b.Socks5User || a.Socks5Password != b.Socks5Password {
+		return true
+	}
+	if !sameStrings(a.Tags, b.Tags) {
+		return true
+	}
 	return false
 }
 
@@ -388,4 +397,20 @@ func sameBoolPtr(a, b *bool) bool {
 		return a == nil && b == nil
 	}
 	return *a == *b
+}
+
+// sameStrings reports slice equality (nil and an empty slice are equal). Used
+// by tuberChanged for the Tags field: an edit that only changes tags must be
+// detected so Reload reconfigures the running tuber (Status().Tags otherwise
+// stays stale).
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }

@@ -509,3 +509,47 @@ func TestEngineStartEnabledWith_Adopts(t *testing.T) {
 		t.Error("ln2 Accept still blocking; listener was not closed")
 	}
 }
+
+// TestTuberChanged covers the field-by-field comparison engine.Reload uses to
+// decide whether to Reconfigure a tuber. The previously-missing fields (Tags,
+// Jump, Socks5User/Socks5Password) are the load-bearing cases: an edit that
+// changes ONLY one of them must be detected, or the running tuber's cfg (and
+// so Status()) stays stale — the live-tag-edit regression.
+func TestTuberChanged(t *testing.T) {
+	base := config.Tuber{
+		Name: "db", Type: "local", Local: "1", Remote: "r",
+		SSH: "u@h:22", Identity: "/k", Jump: "user@bastion",
+		Tags: []string{"prod"}, Socks5User: "s", Socks5Password: "p",
+	}
+	changed := func(mod func(*config.Tuber)) bool {
+		b := base
+		mod(&b)
+		return tuberChanged(base, b)
+	}
+	cases := []struct {
+		name string
+		mod  func(*config.Tuber)
+		want bool
+	}{
+		{"identical", func(*config.Tuber) {}, false},
+		{"Name", func(t *config.Tuber) { t.Name = "other" }, true},
+		{"Type", func(t *config.Tuber) { t.Type = "remote" }, true},
+		{"Local", func(t *config.Tuber) { t.Local = "2" }, true},
+		{"Remote", func(t *config.Tuber) { t.Remote = "r2" }, true},
+		{"SSH", func(t *config.Tuber) { t.SSH = "u@h:23" }, true},
+		{"Identity", func(t *config.Tuber) { t.Identity = "/k2" }, true},
+		{"Jump", func(t *config.Tuber) { t.Jump = "user@edge" }, true},
+		{"Tags add", func(t *config.Tuber) { t.Tags = []string{"prod", "db"} }, true},
+		{"Tags remove", func(t *config.Tuber) { t.Tags = nil }, true},
+		{"Tags reorder (different set)", func(t *config.Tuber) { t.Tags = []string{"db", "prod"} }, true},
+		{"Socks5User", func(t *config.Tuber) { t.Socks5User = "s2" }, true},
+		{"Socks5Password", func(t *config.Tuber) { t.Socks5Password = "p2" }, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := changed(tc.mod); got != tc.want {
+				t.Errorf("tuberChanged(%s) = %v, want %v", tc.name, got, tc.want)
+			}
+		})
+	}
+}
