@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/spf13/cobra"
+
 	"github.com/portuber/portato/internal/forward"
 )
 
@@ -61,72 +63,67 @@ func TestResolveTagOrName(t *testing.T) {
 
 // TestEnableDisableRestart_Tag covers the end-to-end --tag path: each command
 // resolves the tagged set via the daemon's List, issues one RPC per tuber, and
-// prints one line per tuber.
+// prints one line per tuber. Table-driven to keep per-function complexity low
+// (CodeFactor runs gocyclo on test files too; the local .golangci.yml exempts
+// them). Mirrors the TestEnableDisableRestart_ConfirmAndRPC shape.
 func TestEnableDisableRestart_Tag(t *testing.T) {
-	t.Run("enable --tag prod", func(t *testing.T) {
-		s := newStubServer(t, taggedStatuses())
-		useStub(t, s)
-		enableTag = "prod"
-		t.Cleanup(func() { enableTag = "" })
-		c, out, errOut := captureCmd()
-		if err := enableRunE(c, nil); err != nil {
-			t.Fatalf("enableRunE: %v", err)
-		}
-		if errOut.String() != "" {
-			t.Errorf("unexpected stderr: %q", errOut.String())
-		}
-		for _, want := range []string{"enabled: db-prod", "enabled: web-prod"} {
-			if !strings.Contains(out.String(), want) {
-				t.Errorf("output missing %q\ngot:\n%s", want, out.String())
+	cases := []struct {
+		name    string
+		tag     string
+		setTag  func(string)
+		run     func(*cobra.Command, []string) error
+		getRPCs func(*stubServer) []string
+		verb    string
+		want    []string
+		notWant []string
+	}{
+		{
+			name: "enable --tag prod", tag: "prod",
+			setTag: func(v string) { enableTag = v },
+			run:    enableRunE, getRPCs: func(s *stubServer) []string { return s.enabled },
+			verb: "enabled", want: []string{"db-prod", "web-prod"},
+		},
+		{
+			name: "disable --tag prod", tag: "prod",
+			setTag: func(v string) { disableTag = v },
+			run:    disableRunE, getRPCs: func(s *stubServer) []string { return s.disabled },
+			verb: "disabled", want: []string{"db-prod", "web-prod"},
+		},
+		{
+			name: "restart --tag db", tag: "db",
+			setTag: func(v string) { restartTag = v },
+			run:    restartRunE, getRPCs: func(s *stubServer) []string { return s.restarts },
+			verb: "restarted", want: []string{"db-prod"}, notWant: []string{"web-prod"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			s := newStubServer(t, taggedStatuses())
+			useStub(t, s)
+			tc.setTag(tc.tag)
+			t.Cleanup(func() { tc.setTag("") })
+			c, out, errOut := captureCmd()
+			if err := tc.run(c, nil); err != nil {
+				t.Fatalf("run: %v", err)
 			}
-		}
-		if len(s.enabled) != 2 {
-			t.Errorf("enable RPCs: got %v, want 2", s.enabled)
-		}
-	})
-
-	t.Run("disable --tag prod", func(t *testing.T) {
-		s := newStubServer(t, taggedStatuses())
-		useStub(t, s)
-		disableTag = "prod"
-		t.Cleanup(func() { disableTag = "" })
-		c, out, errOut := captureCmd()
-		if err := disableRunE(c, nil); err != nil {
-			t.Fatalf("disableRunE: %v", err)
-		}
-		if errOut.String() != "" {
-			t.Errorf("unexpected stderr: %q", errOut.String())
-		}
-		if !strings.Contains(out.String(), "disabled: db-prod") || !strings.Contains(out.String(), "disabled: web-prod") {
-			t.Errorf("output should name both prod tubers\ngot:\n%s", out.String())
-		}
-		if len(s.disabled) != 2 {
-			t.Errorf("disable RPCs: got %v, want 2", s.disabled)
-		}
-	})
-
-	t.Run("restart --tag db", func(t *testing.T) {
-		s := newStubServer(t, taggedStatuses())
-		useStub(t, s)
-		restartTag = "db"
-		t.Cleanup(func() { restartTag = "" })
-		c, out, errOut := captureCmd()
-		if err := restartRunE(c, nil); err != nil {
-			t.Fatalf("restartRunE: %v", err)
-		}
-		if errOut.String() != "" {
-			t.Errorf("unexpected stderr: %q", errOut.String())
-		}
-		if !strings.Contains(out.String(), "restarted: db-prod") {
-			t.Errorf("output should name the db-tagged tuber\ngot:\n%s", out.String())
-		}
-		if strings.Contains(out.String(), "web-prod") {
-			t.Errorf("web-prod is not db-tagged; should not be restarted\ngot:\n%s", out.String())
-		}
-		if len(s.restarts) != 1 || s.restarts[0] != "db-prod" {
-			t.Errorf("restart RPCs: got %v, want [db-prod]", s.restarts)
-		}
-	})
+			if errOut.String() != "" {
+				t.Errorf("unexpected stderr: %q", errOut.String())
+			}
+			for _, name := range tc.want {
+				if !strings.Contains(out.String(), tc.verb+": "+name) {
+					t.Errorf("output missing %q\ngot:\n%s", tc.verb+": "+name, out.String())
+				}
+			}
+			for _, name := range tc.notWant {
+				if strings.Contains(out.String(), name) {
+					t.Errorf("%s should not appear in output\ngot:\n%s", name, out.String())
+				}
+			}
+			if got := tc.getRPCs(s); !sameSet(got, tc.want) {
+				t.Errorf("RPCs: got %v, want %v", got, tc.want)
+			}
+		})
+	}
 }
 
 // TestEnable_TagAndNameRejected confirms the RunE surfaces the mutual-exclusion
