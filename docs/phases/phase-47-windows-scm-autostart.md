@@ -1,7 +1,7 @@
 ---
 phase: 47
 title: "Windows autostart via Service Control Manager"
-status: todo
+status: in-progress
 depends_on: [17]
 ---
 

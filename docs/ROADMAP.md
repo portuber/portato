@@ -62,7 +62,7 @@
 | 44  | `~/.ssh/config` resolution        | `[x]` | [phase-44-ssh-config.md](./phases/phase-44-ssh-config.md) |
 | 45  | Shell completions                 | `[x]` | [phase-45-shell-completions.md](./phases/phase-45-shell-completions.md) |
 | 46  | Tunnel tags / groups              | `[x]` | [phase-46-tunnel-tags.md](./phases/phase-46-tunnel-tags.md) |
-| 47  | Windows SCM autostart             | `[ ]` | [phase-47-windows-scm-autostart.md](./phases/phase-47-windows-scm-autostart.md) |
+| 47  | Windows SCM autostart             | `[~]` | [phase-47-windows-scm-autostart.md](./phases/phase-47-windows-scm-autostart.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
