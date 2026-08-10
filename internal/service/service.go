@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -25,7 +26,27 @@ type Options struct {
 	// Description (the unit file name stays portato.service, as systemd
 	// forbids dots).
 	Label string
+	// Account is the Windows account the SCM service runs as
+	// (`DOMAIN\user`). Empty means "the installing user" on Windows; the
+	// special values "LocalSystem" / "NT AUTHORITY\SYSTEM" select the
+	// LocalSystem account (no password, but no user profile either). Unused
+	// on darwin/linux. Phase 47.
+	Account string
+	// Password is the Windows account password handed to SCM (stored by SCM
+	// as an LSA secret, never persisted by portato). Empty for LocalSystem.
+	// Unused on darwin/linux. Phase 47.
+	Password string
+	// Legacy selects the Phase-17 HKCU Run-key mechanism on Windows instead
+	// of SCM, for locked-down environments where service creation is blocked
+	// by GPO/AV. Ignored on darwin/linux. Phase 47.
+	Legacy bool
 }
+
+// DaemonFunc runs the daemon until ctx is cancelled. The Windows SCM service
+// handler calls it (wired in cmd/portato/run_windows.go); the concrete
+// implementation is cmd.RunDaemon, so the service package does not import cmd
+// (which would be a cycle). Phase 47.
+type DaemonFunc func(ctx context.Context) error
 
 // Installer abstracts the per-OS autostart mechanism. New returns the
 // build-tagged implementation for the current OS (launchd on darwin,
