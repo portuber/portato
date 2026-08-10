@@ -43,6 +43,18 @@ func init() {
 }
 
 func daemonRunE(_ *cobra.Command, _ []string) error {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return runDaemon(ctx)
+}
+
+// runDaemon prepares and runs the daemon until ctx is cancelled: it loads the
+// config, sets up the rotating logger, takes the single-instance lock, adopts
+// any standalone hand-off listeners, and serves. The context source is the
+// only thing that differs between callers — the cobra command wires
+// signal.NotifyContext, the Windows SCM handler wires the service stop signal
+// — so both share this path. Pure extraction; no behaviour change.
+func runDaemon(ctx context.Context) error {
 	if ipcTokenFlag == "off" || os.Getenv("PORTATO_NO_IPC_TOKEN") == "1" {
 		daemon.SetIpcTokenDisabled(true)
 	}
@@ -85,8 +97,6 @@ func daemonRunE(_ *cobra.Command, _ []string) error {
 		}
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	return srv.Start(ctx)
 }
 
