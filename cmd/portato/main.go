@@ -1,13 +1,12 @@
 package main
 
-import (
-	"os"
+import "os"
 
-	"github.com/portuber/portato/internal/cmd"
-)
-
+// main dispatches to run, which is platform-specific: on Windows it detects a
+// Service Control Manager launch before cobra runs (run_windows.go); elsewhere
+// it runs the cobra tree directly (run_other.go).
 func main() {
-	if err := cmd.Execute(); err != nil {
+	if err := run(); err != nil {
 		os.Exit(1)
 	}
 }

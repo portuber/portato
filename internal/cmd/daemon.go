@@ -3,11 +3,14 @@ package cmd
 import (
 	"context"
 	"errors"
+	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/spf13/cobra"
@@ -98,6 +101,46 @@ func runDaemon(ctx context.Context) error {
 	}
 
 	return srv.Start(ctx)
+}
+
+// RunDaemon is the exported entry point used by the Windows SCM service handler
+// (internal/service.RunAsService), which runs the daemon without the cobra
+// tree. It mirrors the cobra path exactly.
+func RunDaemon(ctx context.Context) error { return runDaemon(ctx) }
+
+// ParseDaemonArgs populates the daemon's flag-backed package vars
+// (--config/--ipc-token/--listen-fds/--log-level) from a raw arg slice. The
+// Windows SCM launches the service binary with the recorded command line
+// (e.g. `portato.exe daemon --config <abs>`), but cobra never runs under SCM,
+// so the handler parses those args itself before calling RunDaemon. Unknown
+// flags are ignored (the SCM command line is owned by `portato install`).
+func ParseDaemonArgs(args []string) {
+	fs := flag.NewFlagSet("daemon", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+	fs.Usage = func() {}
+	var cfg, ipc, lfds, lvl string
+	fs.StringVar(&cfg, "config", "", "")
+	fs.StringVar(&ipc, "ipc-token", "on", "")
+	fs.StringVar(&lfds, "listen-fds", "", "")
+	fs.StringVar(&lvl, "log-level", "info", "")
+	// Drop a leading subcommand token (e.g. "daemon"): the SCM-recorded command
+	// line is `portato.exe daemon --config <abs>`, and flag.Parse stops at the
+	// first non-flag positional, so the leading "daemon" must be skipped or
+	// --config would never be parsed.
+	for len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		args = args[1:]
+	}
+	if err := fs.Parse(args); err != nil {
+		return
+	}
+	if cfg != "" {
+		cfgFile = cfg
+	}
+	ipcTokenFlag = ipc
+	listenFdsPath = lfds
+	if l, err := parseLogLevel(lvl); err == nil {
+		logLevel = l
+	}
 }
 
 // adoptPassedListeners dials the standalone's transfer socket and reconstructs
