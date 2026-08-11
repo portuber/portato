@@ -55,6 +55,21 @@ var (
 // of the dead socket. Idempotent: prints "no daemon running" (exit 0) when
 // nothing is alive, and cleans a stale marker on the way out.
 func stopRunE(*cobra.Command, []string) error {
+	// Windows SCM: if the daemon runs as a service, stop it via the Service
+	// Control Manager (graceful svc.Stop triggers the daemon's Shutdown). This
+	// must run before the PID path — TerminateProcess on the SCM-owned process
+	// would look like a crash and trigger the recovery restart. No-op on
+	// non-Windows and when no service is installed (falls through to SIGTERM).
+	if stopped, err := stopViaSCM(); err != nil {
+		return err
+	} else if stopped {
+		fmt.Fprintln(os.Stdout, "daemon stopped (service)")
+		if markPath, _ := stopMarkerPath(); markPath != "" {
+			_ = daemon.RemoveMarker(markPath)
+		}
+		return nil
+	}
+
 	socket, err := stopResolveSocket()
 	if err != nil {
 		return fmt.Errorf("resolve daemon socket: %w", err)

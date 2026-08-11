@@ -358,7 +358,10 @@ func defaultAutostartArtefact() string {
 	case "linux":
 		return filepath.Join(xdg.ConfigHome, "systemd", "user", "portato.service")
 	case "windows":
-		return `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
+		// Since Phase 47 the primary autostart is the SCM service record; the
+		// HKCU Run-key is the --legacy-runkey fallback. autostartInstalled
+		// checks both; this string is the display path for the SCM record.
+		return `HKLM\SYSTEM\CurrentControlSet\Services\Portato`
 	default:
 		return ""
 	}
