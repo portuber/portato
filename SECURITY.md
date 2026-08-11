@@ -21,8 +21,9 @@ are in scope:
 - SSH authentication material: identity files, passphrases (OS keyring cache),
   and interactive passwords.
 - The daemon IPC bearer token and the unix-socket / named-pipe permissions.
-- Autostart entries written by `portato install` (launchd / systemd / Windows
-  Run key).
+- Autostart entries written by `portato install` (launchd / systemd / the
+  Windows SCM service, whose install-time account password SCM stores as an LSA
+  secret).
 - Supply chain: vulnerable dependencies (`govulncheck` runs weekly in CI).
 
 Out of scope: vulnerabilities in upstream OpenSSH or the Go toolchain itself —

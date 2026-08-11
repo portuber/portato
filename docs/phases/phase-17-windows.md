@@ -99,6 +99,11 @@ portato uninstall
   not sufficient.
 - Out of scope here: Windows service (Service Control Manager) autostart; the
   Run key is the MVP-equivalent. SCM can be a later refinement.
+  > **Update:** that deferred refinement landed in **Phase 47**
+  > ([phase-47-windows-scm-autostart.md](./phase-47-windows-scm-autostart.md)):
+  > `portato install` now registers a real SCM service (starts at boot, runs
+  > without login, started immediately), `portato stop` is graceful, and the
+  > Run-key mechanism survives behind `--legacy-runkey`.
 
 ## Verification status
 

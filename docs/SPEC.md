@@ -573,7 +573,7 @@ Limitation: the seamless hand-off preserves continuous **local-port** availabili
 |--------|-----------------|---------------------------------------------------------------------|
 | macOS  | launchd         | `~/Library/LaunchAgents/dev.portato.daemon.plist`, `RunAtLoad=true`, `KeepAlive=true` |
 | Linux  | systemd --user  | `~/.config/systemd/user/portato.service` (+ `portato.socket`), `Restart=on-failure`, lingering enabled |
-| Windows | registry Run key | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Portato` (REG_SZ) → `portato daemon --config <abs>` |
+| Windows | SCM service     | `HKLM\SYSTEM\CurrentControlSet\Services\Portato` — `SERVICE_WIN32_OWN_PROCESS`, `StartType=Automatic`, `DelayedAutoStart=true`, depends on `Tcpip`, recovery = `SC_ACTION_RESTART` after 30 s, runs as the install-time user (password stored by SCM as an LSA secret); `portato install` starts it immediately |
 
 `portato install` detects the OS and installs the right mechanism; `portato uninstall` reverses it.
 Since tunnels are `enabled: false` by default, at system boot **only** the control daemon is brought up.
@@ -583,6 +583,27 @@ activation); the service `Requires`+`After`s it so systemd hands the daemon the
 pre-bound IPC socket via `LISTEN_FDS`. macOS launchd does **not** get a `Sockets`
 dict: claiming the handed fd needs a libc call that would require cgo, breaking
 the pure-Go single binary — socket activation there is deferred.
+
+On Windows (Phase 47) `install` registers a real Service Control Manager
+service named `Portato`. SCM is the launchd/systemd equivalent: it owns the
+lifecycle, restarts the daemon on failure (recovery action), and — by logging
+on the install-time user account itself — gives the boot-time process a session
+with full access to `%USERPROFILE%\.ssh\` and `%APPDATA%\portato\config.yaml`
+without anyone logged in. The account defaults to the installing user
+(`%USERDOMAIN%\%USERNAME%`); its password is collected once at `portato install`
+(interactive no-echo prompt, or `--password-file` for CI) and handed straight to
+SCM, which keeps it as an LSA secret (portato never persists it). A Windows
+account password change therefore requires a fresh `portato install`. The
+`--service-account LocalSystem` (a.k.a. `NT AUTHORITY\SYSTEM`) option skips the
+password but runs without a user profile (headless / CI). `portato install`
+starts the service immediately, so `portato list` works the moment install
+returns — parity with macOS `launchctl bootstrap` and Linux `systemctl --user
+enable --now`. `portato stop` sends `svc.Stop` (graceful drain) instead of
+`TerminateProcess`. A Scoop-installed binary's version-pinned path is rewritten
+to the stable `…\scoop\apps\portato\current\…` junction so the service survives
+`scoop update portato`. The Phase-17 HKCU `Run`-key mechanism is kept behind
+`--legacy-runkey` for locked-down environments (GPO/AV) where service creation
+is blocked.
 
 ## 14. Logging
 

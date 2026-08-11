@@ -370,23 +370,51 @@ systemctl --user status portato      # status
 systemctl --user disable --now portato   # stop (or `portato uninstall`)
 ```
 
-### Windows (registry Run key)
+### Windows (Service Control Manager)
 
-`portato install` writes a per-user entry in the HKCU registry Run key so the
-daemon launches at login:
+`portato install` registers a real Windows service with the Service Control
+Manager so the daemon starts at **boot** (not login), runs **without anyone
+logged in**, and is **started immediately** by install (parity with macOS and
+Linux):
 
-- key: `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`, value `Portato`
-  → `"<binary>" daemon --config "<config>"` (paths are quoted so a location
-  with spaces survives the shell's command-line parse)
-- unlike launchd's `KeepAlive`, the Run key only **starts** the daemon at login
-  — it is not restarted after a crash (a full Windows Service / SCM is a later
-  refinement)
-- `portato uninstall` removes the value
+- service: `Portato` (`HKLM\SYSTEM\CurrentControlSet\Services\Portato`)
+- `StartType = Automatic`, `DelayedAutoStart = true`, depends on `Tcpip`
+- recovery: restart after 30 s on failure (the `KeepAlive` / `Restart=on-failure`
+  equivalent)
+- runs as the install-time user (`DOMAIN\user`); SCM logs that user on at
+  service start, so the process gets `%USERPROFILE%\.ssh\` and
+  `%APPDATA%\portato\config.yaml` without an interactive login
+- install prompts once for the Windows account password (no echo; or pass
+  `--password-file <path>` for CI / automation). The password is stored by SCM
+  as an LSA secret — **re-run `portato install` after changing your Windows
+  account password**
+- `--service-account LocalSystem` runs without a password (no user profile —
+  for headless / CI)
+- `portato stop` stops the service gracefully (`svc.Stop`) instead of
+  terminating the process
 
-Inspect it directly:
+Inspect / control it directly:
 
 ```pwsh
-reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v Portato
+Get-Service Portato                       # status + StartType
+sc.exe qc Portato                         # SERVICE_START_NAME, BINARY_PATH_NAME
+Stop-Service Portato ; Start-Service Portato   # (or `portato stop`)
+```
+
+A Scoop-installed binary's version-pinned path is rewritten to the stable
+`…\scoop\apps\portato\current\…` junction so the service survives
+`scoop update portato`.
+
+#### `--legacy-runkey` (fallback)
+
+In locked-down environments where service creation is blocked (GPO / AV), the
+Phase-17 HKCU registry Run-key mechanism is still available:
+
+```pwsh
+portato install --legacy-runkey
+# HKCU\Software\Microsoft\Windows\CurrentVersion\Run, value Portato
+# → fires at login only (no SCM recovery, no boot start)
+portato uninstall --legacy-runkey
 ```
 
 ## Windows specifics
@@ -400,9 +428,10 @@ Portato runs natively on Windows (built and shipped from the same release):
   is reached over the agent's named pipe `\\.\pipe\openssh-ssh-agent`; there is
   no `SSH_AUTH_SOCK` on Windows. As elsewhere, a key in the agent is tried
   before identity and password.
-- **`portato stop`:** on Windows it terminates the daemon (there is no
-  SIGTERM), so it stops immediately rather than draining.
-- **Autostart** is a per-user Run key — see above.
+- **`portato stop`:** under the SCM service it stops the daemon gracefully
+  (`svc.Stop` → the daemon drains and reports `Stopped`). The `--legacy-runkey`
+  path still terminates the process directly (no graceful signal).
+- **Autostart** is a Windows Service registered with the SCM — see above.
 
 ## Logs, themes & diagnostics
 

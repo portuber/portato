@@ -63,18 +63,18 @@ migration and no `~/.ssh` copying.
 
 ## Tasks
 
-- [ ] **Refactor the daemon run path into a reusable function.**
+- [x] **Refactor the daemon run path into a reusable function.**
       `internal/cmd/daemon.go:45` (`daemonRunE`) currently inlines flag
       parsing → `routelog.Setup` → `daemon.New` → `srv.Start(ctx)`. Extract
       the body into `runDaemon(ctx, cfg, path, listenFdsPath, logger) error`
       so both the cobra command and the SCM service handler call the same
       code. Pure prepare commit — no behaviour change.
-- [ ] **Detect SCM launch before cobra dispatch.**
+- [x] **Detect SCM launch before cobra dispatch.**
       `cmd/portato/main.go:9` on Windows must branch *before* `cmd.Execute()`:
       `if isSvc, _ := svc.IsWindowsService(); isSvc { return service.RunAsService() }`.
       SCM launches services with no argv and no stdio; the cobra tree must
       not run in that mode. Build-tagged (`//go:build windows`).
-- [ ] **SCM service handler** (`internal/service/svcmain_windows.go`,
+- [x] **SCM service handler** (`internal/service/svcmain_windows.go`,
       `//go:build windows`): `RunAsService()` calls `svc.Run(serviceName,
       &handler{})`. `handler.Execute(...)` maps SCM commands to the daemon
       lifecycle:
@@ -87,7 +87,7 @@ migration and no `~/.ssh` copying.
       The service name is the constant `Portato` (matches the SCM display
       name; `EffectiveLabel` is reused for the launchd-style reverse-DNS on
       macOS only).
-- [ ] **Rewrite `internal/service/service_windows.go` to use SCM** via
+- [x] **Rewrite `internal/service/service_windows.go` to use SCM** via
       `golang.org/x/sys/windows/svc/mgr` (already a transitive dep — see
       `go.mod` `golang.org/x/sys v0.46.0`; no new module needed):
       - **`Install(o Options)`**: `mgr.Connect()` → `mgr.CreateService(
@@ -105,7 +105,7 @@ migration and no `~/.ssh` copying.
         bounded wait → `s.Delete`. Idempotent: a missing service is a no-op.
       - **`Status`**: `mgr.QueryState` → `running / stopped / not installed`
         (+ last error / exit code when stopped).
-- [ ] **Credentials collection on install.** Add to
+- [x] **Credentials collection on install.** Add to
       `internal/cmd/install.go`:
       - `--service-account string` (default: the current user —
         `%USERDOMAIN%\%USERNAME%`).
@@ -119,29 +119,29 @@ migration and no `~/.ssh` copying.
       - A clear message at the end of install notes that **the password must
         be re-supplied (via a fresh `portato install`) after the Windows
         account password changes**, since SCM's stored secret goes stale.
-- [ ] **`--legacy-runkey` fallback.** Keep the Phase-17 `Run`-key code as a
+- [x] **`--legacy-runkey` fallback.** Keep the Phase-17 `Run`-key code as a
       fallback behind a `--legacy-runkey` flag on `install`/`uninstall` for
       locked-down environments where service creation is blocked by GPO /
       AV. When set, `Install` takes the old registry path instead of SCM.
       `Status` reports whichever mechanism is in effect (preferring SCM).
-- [ ] **Stable Scoop `current` path.** In `buildServiceOptions`
+- [x] **Stable Scoop `current` path.** In `buildServiceOptions`
       (`internal/cmd/service_opts.go`), if `os.Executable()` lives under
       `…\scoop\apps\portato\<version>\`, rewrite `Options.BinaryPath` to the
       `…\scoop\apps\portato\current\…` junction (which Scoop updates
       atomically on `scoop update portato`). Non-Scoop layouts and the
       `--legacy-runkey` path are untouched. The detection is path-shape-only
       — no registry / scoop-state reads.
-- [ ] **`portato stop` parity under SCM.** Phase 17 left `stop` using
+- [x] **`portato stop` parity under SCM.** Phase 17 left `stop` using
       `TerminateProcess` (no graceful SIGTERM equivalent). Under SCM,
       `portato stop` should instead open the service and send
       `svc.Stop` (the handler then cancels the daemon context, draining
       gracefully). `--legacy-runkey` mode keeps the existing
       `TerminateProcess` behaviour. The `stopKill` seam in
       `internal/cmd/stop.go` already abstracts the kill mechanism.
-- [ ] **Update `portato doctor` autostart reporting on Windows**
+- [x] **Update `portato doctor` autostart reporting on Windows**
       (`internal/cmd/autostart_windows.go`) to query the SCM service state
       instead of (or in addition to) the `Run` value.
-- [ ] **Unit tests behind an SCM seam.** Introduce
+- [x] **Unit tests behind an SCM seam.** Introduce
       `internal/service/scm_windows.go` with a small interface
       (`scmClient`) wrapping the `mgr` calls used; the production
       implementation is a thin adapter over `golang.org/x/sys/windows/svc/mgr`,
@@ -152,7 +152,7 @@ migration and no `~/.ssh` copying.
       CreateService → SetRecoveryActions → Start sequence, idempotent
       Uninstall on a missing service, `--legacy-runkey` routes to the old
       code path.
-- [ ] **CI: rewrite `windows-smoke`** (`.github/workflows/ci.yml:74`). The
+- [x] **CI: rewrite `windows-smoke`** (`.github/workflows/ci.yml:74`). The
       current job asserts the HKCU `Run`-value install/uninstall; replace
       the autostart block with an SCM flow: `portato install
       --service-account <runner user> --password-file <(echo $PWD)>` →
@@ -161,17 +161,17 @@ migration and no `~/.ssh` copying.
       → `Get-Service Portato` throws "no service found". `windows-latest`
       runners run with admin privileges, so SCM install works there. Keep a
       short `--legacy-runkey` regression block.
-- [ ] **SPEC §13.** Replace the Windows row of the autostart table with
+- [x] **SPEC §13.** Replace the Windows row of the autostart table with
       `SCM service (Start=Automatic, DelayedAutoStart, recovery=restart,
       runs as the install-time user)` and update the paragraph below it
       (currently SPEC.md:572–585) to describe the SCM mechanism, the
       install-time password prompt, the `--legacy-runkey` fallback, and the
       Scoop `current`-junction path note.
-- [ ] **README.** Update the Windows install instructions to mention the
+- [x] **README.** Update the Windows install instructions to mention the
       one-time password prompt and the post-password-change re-install
       caveat. Add a note that `portato install` now starts the daemon
       immediately on Windows (matching macOS/Linux).
-- [ ] **Phase-17 cross-link.** Append a note to
+- [x] **Phase-17 cross-link.** Append a note to
       `docs/phases/phase-17-windows.md` (Technical details) that the
       "deferred SCM refinement" landed in Phase 47.
 
