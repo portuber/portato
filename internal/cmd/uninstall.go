@@ -29,4 +29,5 @@ func uninstallRunE(cmd *cobra.Command, _ []string) error {
 
 func init() {
 	uninstallCmd.Flags().StringVar(&serviceLabel, "label", "", "service label to remove (default: dev.portato.daemon)")
+	registerWindowsUninstallFlags(uninstallCmd)
 }

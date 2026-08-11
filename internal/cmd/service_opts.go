@@ -39,7 +39,13 @@ func buildServiceOptions(cmd *cobra.Command, label string) (service.Options, err
 	if err != nil {
 		return service.Options{}, fmt.Errorf("resolve config path: %w", err)
 	}
-	return service.Options{BinaryPath: binary, ConfigPath: cfgPath, Label: service.EffectiveLabel(label)}, nil
+	return service.Options{
+		BinaryPath: stableBinaryPath(binary),
+		ConfigPath: cfgPath,
+		Label:      service.EffectiveLabel(label),
+		Account:    serviceAccount,
+		Legacy:     legacyRunKey,
+	}, nil
 }
 
 // warnIfUnstableBinary warns when the running binary lives in the OS temp dir
