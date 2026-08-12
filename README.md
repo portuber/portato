@@ -29,7 +29,7 @@ The single binary works in several modes:
 | `portato restart <name>`     | Restart a tunnel                                                    |
 | `portato reload`             | Reload the daemon's config from disk (also auto-reloads on change)  |
 | `portato stop`               | Stop the running daemon (graceful, via SIGTERM)                     |
-| `portato install`            | Install system autostart (launchd / systemd --user)                 |
+| `portato install`            | Install system autostart (launchd / systemd --user / SCM on Windows)|
 | `portato uninstall`          | Remove system autostart                                             |
 | `portato add-identity <path>`| Cache a passphrase for a passphrase-protected SSH key (OS keyring)  |
 | `portato forget-identity <path>` | Forget a cached identity passphrase                             |
@@ -448,7 +448,7 @@ Portato runs natively on Windows (built and shipped from the same release):
 - **`portato doctor`** — checks config validity, identity keys and `ssh-agent`,
   `known_hosts`, daemon reachability over the local IPC socket (or named pipe on
   Windows) and its owner-only permissions, the autostart entry (launchd plist /
-  systemd unit / Windows Run key), and (Linux) lingering. Prints a `✓`/`✗` line
+  systemd unit / Windows SCM service), and (Linux) lingering. Prints a `✓`/`✗` line
   per check and exits non-zero on any failure.
 
 ### Unknown host keys (TOFU)
