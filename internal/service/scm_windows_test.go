@@ -154,51 +154,71 @@ func TestWindows_SCMInstall_ConfigAndSequence(t *testing.T) {
 	if c.name != ServiceName {
 		t.Errorf("create name = %q, want %q", c.name, ServiceName)
 	}
-	wantArgs := []string{"daemon", "--config", `C:\Users\me\.config\portato\config.yaml`}
-	if len(c.args) != len(wantArgs) {
-		t.Errorf("create args = %v, want %v", c.args, wantArgs)
-	}
 	// mgr.CreateService appends args after the escaped exepath; the daemon must
 	// be told to run as a daemon with the config path.
-	for i, want := range wantArgs {
-		if i >= len(c.args) || c.args[i] != want {
-			t.Errorf("create args[%d] = %q, want %q (full: %v)", i, argOr(c.args, i), want, c.args)
-		}
-	}
-	if c.cfg.ServiceType != windows.SERVICE_WIN32_OWN_PROCESS {
-		t.Errorf("ServiceType = %d, want SERVICE_WIN32_OWN_PROCESS", c.cfg.ServiceType)
-	}
-	if c.cfg.StartType != mgr.StartAutomatic {
-		t.Errorf("StartType = %d, want StartAutomatic", c.cfg.StartType)
-	}
-	if !c.cfg.DelayedAutoStart {
-		t.Errorf("DelayedAutoStart = false, want true")
-	}
-	if len(c.cfg.Dependencies) != 1 || c.cfg.Dependencies[0] != "Tcpip" {
-		t.Errorf("Dependencies = %v, want [Tcpip]", c.cfg.Dependencies)
-	}
-	if c.cfg.ServiceStartName != `DOMAIN\me` {
-		t.Errorf("ServiceStartName = %q, want DOMAIN\\me", c.cfg.ServiceStartName)
-	}
-	if c.cfg.Password != "p4ss" {
-		t.Errorf("Password = %q, want p4ss", c.cfg.Password)
-	}
+	assertCreateArgs(t, c.args, []string{"daemon", "--config", `C:\Users\me\.config\portato\config.yaml`})
+	assertMgrConfig(t, c.cfg, `DOMAIN\me`, "p4ss")
 
-	// Recovery actions set + the service started immediately.
 	svc1 := fx.services[ServiceName]
 	if svc1 == nil {
 		t.Fatal("service not registered in fake")
 	}
-	if len(svc1.recoveryActions) != 1 || svc1.recoveryActions[0].Type != mgr.ServiceRestart {
-		t.Errorf("recovery = %v, want one ServiceRestart", svc1.recoveryActions)
+	assertRecoveryAndStart(t, svc1)
+}
+
+// assertCreateArgs checks the recorded CreateService argv matches want exactly.
+func assertCreateArgs(t *testing.T, got, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Errorf("create args = %v, want %v", got, want)
+		return
 	}
-	if svc1.recoveryReset != 60 {
-		t.Errorf("recovery reset = %d, want 60s", svc1.recoveryReset)
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("create args[%d] = %q, want %q (full: %v)", i, got[i], want[i], got)
+		}
 	}
-	if len(svc1.startArgs) != 1 {
-		t.Errorf("service was not started (startArgs=%v)", svc1.startArgs)
+}
+
+// assertMgrConfig checks the mgr.Config fields windowsInstaller must set for an
+// SCM install (ServiceType, StartType, DelayedAutoStart, Tcpip dep, account,
+// password).
+func assertMgrConfig(t *testing.T, c mgr.Config, wantAccount, wantPassword string) {
+	t.Helper()
+	if c.ServiceType != windows.SERVICE_WIN32_OWN_PROCESS {
+		t.Errorf("ServiceType = %d, want SERVICE_WIN32_OWN_PROCESS", c.ServiceType)
 	}
-	if svc1.deleted {
+	if c.StartType != mgr.StartAutomatic {
+		t.Errorf("StartType = %d, want StartAutomatic", c.StartType)
+	}
+	if !c.DelayedAutoStart {
+		t.Error("DelayedAutoStart = false, want true")
+	}
+	if len(c.Dependencies) != 1 || c.Dependencies[0] != "Tcpip" {
+		t.Errorf("Dependencies = %v, want [Tcpip]", c.Dependencies)
+	}
+	if c.ServiceStartName != wantAccount {
+		t.Errorf("ServiceStartName = %q, want %q", c.ServiceStartName, wantAccount)
+	}
+	if c.Password != wantPassword {
+		t.Errorf("Password = %q, want %q", c.Password, wantPassword)
+	}
+}
+
+// assertRecoveryAndStart checks the install set restart-on-failure recovery and
+// started the service immediately, without deleting it.
+func assertRecoveryAndStart(t *testing.T, s *fakeSvc) {
+	t.Helper()
+	if len(s.recoveryActions) != 1 || s.recoveryActions[0].Type != mgr.ServiceRestart {
+		t.Errorf("recovery = %v, want one ServiceRestart", s.recoveryActions)
+	}
+	if s.recoveryReset != 60 {
+		t.Errorf("recovery reset = %d, want 60s", s.recoveryReset)
+	}
+	if len(s.startArgs) != 1 {
+		t.Errorf("service was not started (startArgs=%v)", s.startArgs)
+	}
+	if s.deleted {
 		t.Error("service was deleted on install")
 	}
 }
@@ -347,11 +367,4 @@ func TestWindows_StopService_NoServiceIsNoop(t *testing.T) {
 	if stopped {
 		t.Error("StopService returned stopped=true with no service installed")
 	}
-}
-
-func argOr(args []string, i int) string {
-	if i < len(args) {
-		return args[i]
-	}
-	return ""
 }
