@@ -123,16 +123,25 @@ jobs:
           if ($svc.StartType -ne "Automatic") { throw "service StartType = $($svc.StartType), want Automatic" }
           Write-Host "installed SCM service: $($svc.Status), StartType=$($svc.StartType)"
 
-          # The service starts the daemon immediately (parity with launchctl / systemctl --now);
-          # wait for it to answer over the named pipe.
-          $ok = $false; $last = ""
+          # The daemon runs as LocalSystem here (a different profile/session from
+          # the runner user), so `portato list` cannot reach it cross-user: the
+          # IPC bearer token (%LOCALAPPDATA%\portato\portato.token) and the
+          # named-pipe security descriptor are per-user by design -- the service
+          # is meant to run as the install-time user (the same one running
+          # `portato list`). The same-user IPC round-trip is already covered by
+          # the "daemon + list round-trip" step above. Here we prove the service
+          # launched the daemon and it bound its named pipe -- the SCM plumbing
+          # this phase owns. Pipe enumeration (\\.\pipe\) is global, so it works
+          # cross-user without the token.
+          $pipe = $null
           foreach ($i in 1..50) {
-            $last = & $exe list 2>&1 | Out-String
-            if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+            $pipe = Get-ChildItem '\\.\pipe\' -ErrorAction SilentlyContinue |
+                    Where-Object { $_.Name -eq 'portato' }
+            if ($pipe) { break }
             Start-Sleep -Milliseconds 200
           }
-          if (-not $ok) { throw "portato list did not answer after SCM install:`n$last" }
-          Write-Host "daemon reachable via the SCM-started service; list:`n$last"
+          if (-not $pipe) { throw "daemon did not bind \\.\pipe\portato under the SCM service" }
+          Write-Host "daemon bound \\.\pipe\portato under the SCM service"
 
           # Graceful stop via SCM (svc.Stop), not TerminateProcess.
           & $exe stop
