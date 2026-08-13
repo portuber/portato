@@ -55,7 +55,7 @@ var (
 	procLsaClose            = advapi32.NewProc("LsaClose")
 	procLsaAddAccountRights = advapi32.NewProc("LsaAddAccountRights")
 	procLsaNtStatusToWinErr = advapi32.NewProc("LsaNtStatusToWinError")
-	procLogonUser           = advapi32.NewProc("LogonUser")
+	procLogonUser           = advapi32.NewProc("LogonUserW")
 )
 
 // lsaGrantServiceLogonRight / lsaValidateServiceCreds are seams over the advapi32

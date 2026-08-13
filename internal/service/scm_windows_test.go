@@ -432,3 +432,14 @@ func TestWindows_StopService_NoServiceIsNoop(t *testing.T) {
 		t.Error("StopService returned stopped=true with no service installed")
 	}
 }
+
+func TestWindows_Advapi32Procs_Resolve(t *testing.T) {
+	for _, p := range []*windows.LazyProc{
+		procLogonUser, procLsaOpenPolicy, procLsaClose,
+		procLsaAddAccountRights, procLsaNtStatusToWinErr,
+	} {
+		if err := p.Find(); err != nil {
+			t.Errorf("advapi32 proc %s: %v", p.Name, err)
+		}
+	}
+}
