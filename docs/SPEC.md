@@ -596,9 +596,14 @@ SCM, which keeps it as an LSA secret (portato never persists it). A Windows
 account password change therefore requires a fresh `portato install`. The
 `--service-account LocalSystem` (a.k.a. `NT AUTHORITY\SYSTEM`) option skips the
 password but runs without a user profile (headless / CI). `portato install`
-starts the service immediately, so `portato list` works the moment install
-returns — parity with macOS `launchctl bootstrap` and Linux `systemctl --user
-enable --now`. `portato stop` sends `svc.Stop` (graceful drain) instead of
+needs administrator privileges (creating a service); a non-admin user should
+use `--legacy-runkey`. Portato grants the account `SeServiceLogonRight` itself
+(`CreateService` does not reliably) and validates the password up front via
+`LogonUser`, so the password must be the account's **local** password — a
+Windows Hello PIN or a Microsoft-account cloud password is rejected.
+`portato install` starts the service immediately, so `portato list` works the
+moment install returns — parity with macOS `launchctl bootstrap` and Linux
+`systemctl --user enable --now`. `portato stop` sends `svc.Stop` (graceful drain) instead of
 `TerminateProcess`. A Scoop-installed binary's version-pinned path is rewritten
 to the stable `…\scoop\apps\portato\current\…` junction so the service survives
 `scoop update portato`. The Phase-17 HKCU `Run`-key mechanism is kept behind

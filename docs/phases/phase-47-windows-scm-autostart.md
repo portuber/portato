@@ -309,3 +309,25 @@ reg query HKCU\Software\Microsoft\Windows\CurrentVersion\Run /v Portato
   `//go:build windows`. The `runDaemon` refactor in `internal/cmd/daemon.go`
   is a pure extraction — the cobra `daemon` command's observable behaviour
   on macOS / Linux does not change.
+
+## Post-verification refinements (v1.5.1)
+
+Real-Windows verification (same-user install under a standard account) surfaced
+three things not in the original plan; fixed in follow-up commits:
+
+- **`SeServiceLogonRight` auto-grant.** `CreateService` does not reliably grant
+  the account the right to log on as a service, so the first `Start` failed with
+  a generic "logon failure." Portato now grants it itself via `LsaOpenPolicy` /
+  `LsaAddAccountRights` (advapi32, no new dependency) right after
+  `CreateService`.
+- **Credential pre-check.** A wrong password / Windows Hello PIN /
+  Microsoft-account mismatch is now caught up front via `LogonUser`
+  (`LOGON32_LOGON_NETWORK`) **before** the service is created, with a clear
+  message; a half-created service is rolled back on any later failure.
+- **`portato doctor` socket-perms check is unix-only.** A named pipe has no
+  filesystem mode (it stats as `0666`), so the 0600 owner-only check was a
+  Windows false-fail; skipped on Windows (pipe security = its SD + the Phase 18
+  bearer token).
+
+Outstanding verification (phase stays `[~]`): boot survival / reboot without
+login (DoD 2), which also confirms `SeServiceLogonRight` persists.
