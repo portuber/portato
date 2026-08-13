@@ -390,6 +390,11 @@ Linux):
   account password**
 - `--service-account LocalSystem` runs without a password (no user profile —
   for headless / CI)
+- install needs **administrator** privileges (it creates a service). portato
+  grants the account the `Log on as a service` right itself and validates the
+  password up front — enter the account's **local password, not a Windows Hello
+  PIN** (a Microsoft-account / PIN will be rejected). If you can't elevate, use
+  `portato install --legacy-runkey` instead (per-user, no admin).
 - `portato stop` stops the service gracefully (`svc.Stop`) instead of
   terminating the process
 

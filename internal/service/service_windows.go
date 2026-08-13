@@ -79,6 +79,15 @@ func (w windowsInstaller) Status(o Options) (string, error) {
 }
 
 func (w windowsInstaller) scmInstall(o Options) (string, error) {
+	// Pre-check the credentials before creating anything: catches a wrong
+	// password / Windows Hello PIN / Microsoft-account mismatch with a clear
+	// message instead of a half-configured service that fails to start.
+	if !IsLocalSystemAccount(o.Account) {
+		if err := lsaValidateServiceCreds(o.Account, o.Password); err != nil {
+			return "", err
+		}
+	}
+
 	cfg := mgr.Config{
 		ServiceType:      windows.SERVICE_WIN32_OWN_PROCESS,
 		StartType:        mgr.StartAutomatic,
@@ -98,21 +107,51 @@ func (w windowsInstaller) scmInstall(o Options) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer s.close()
+	// Roll back the just-created service on any later failure so a bad install
+	// does not leave a stopped, half-configured service behind (a re-install
+	// still updates it in place, but a clean slate is friendlier).
+	cleanup := func(reason error) (string, error) {
+		_ = s.delete()
+		_ = s.close()
+		return "", reason
+	}
+
+	// A user account needs SeServiceLogonRight to log on as a service; SCM does
+	// not reliably grant it, so grant it explicitly (LocalSystem already has it).
+	if !IsLocalSystemAccount(o.Account) {
+		if err := lsaGrantServiceLogonRight(o.Account); err != nil {
+			return cleanup(fmt.Errorf("grant 'Log on as a service' to %s: %w", o.Account, err))
+		}
+	}
+
 	// Restart on failure after 30s with a 1-minute reset window: the Windows
 	// equivalent of launchd KeepAlive / systemd Restart=on-failure.
 	if err := s.setRecoveryActions(
 		[]mgr.RecoveryAction{{Type: mgr.ServiceRestart, Delay: 30 * time.Second}},
 		60,
 	); err != nil {
-		return "", fmt.Errorf("set recovery actions: %w", err)
+		return cleanup(fmt.Errorf("set recovery actions: %w", err))
 	}
 	// Start now — parity with `launchctl bootstrap` (RunAtLoad) and
 	// `systemctl --user enable --now`.
 	if err := s.start(); err != nil {
-		return "", fmt.Errorf("start service: %w", err)
+		return cleanup(fmt.Errorf("start service: %w%s", err, startFailureHint(err, o.Account)))
+	}
+	if err := s.close(); err != nil {
+		// The service is up; a close error on our handle is informational only.
+		return scmServicePath, nil
 	}
 	return scmServicePath, nil
+}
+
+// startFailureHint adds an actionable tail to a service-start error. SCM reports
+// both a bad password and a missing SeServiceLogonRight as a generic "logon
+// failure", so spell out the common causes.
+func startFailureHint(err error, account string) string {
+	if errors.Is(err, windows.ERROR_LOGON_FAILURE) {
+		return fmt.Sprintf(" (Windows could not log %s on as a service; enter the account's local password, not a Windows Hello PIN; the account needs the 'Log on as a service' right)", account)
+	}
+	return ""
 }
 
 func (w windowsInstaller) scmUninstall() error {

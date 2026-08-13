@@ -3,6 +3,7 @@
 package service
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -132,6 +133,7 @@ func (s *fakeSvc) close() error {
 }
 
 func TestWindows_SCMInstall_ConfigAndSequence(t *testing.T) {
+	stubLSA(t)
 	fx := newFakeSCM()
 	w := &windowsInstaller{scm: fx}
 
@@ -223,7 +225,69 @@ func assertRecoveryAndStart(t *testing.T, s *fakeSvc) {
 	}
 }
 
+// stubLSA replaces the advapi32 LSA/LogonUser seams with no-op fakes and
+// restores them after the test, so installer-flow tests run without a real LSA
+// policy / domain controller. The grant side also tracks whether it was called.
+func stubLSA(t *testing.T) *lsaCallLog {
+	t.Helper()
+	og, ov := lsaGrantServiceLogonRight, lsaValidateServiceCreds
+	log := &lsaCallLog{}
+	lsaGrantServiceLogonRight = func(a string) error { log.grants = append(log.grants, a); return nil }
+	lsaValidateServiceCreds = func(_, _ string) error { return nil }
+	t.Cleanup(func() {
+		lsaGrantServiceLogonRight = og
+		lsaValidateServiceCreds = ov
+	})
+	return log
+}
+
+type lsaCallLog struct{ grants []string }
+
+func TestWindows_SCMInstall_GrantsServiceLogonRightForUser(t *testing.T) {
+	log := stubLSA(t)
+	fx := newFakeSCM()
+	w := &windowsInstaller{scm: fx}
+	if _, err := w.Install(Options{BinaryPath: `C:\p.exe`, ConfigPath: `C:\c.yaml`, Account: `DOMAIN\me`, Password: "x"}); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if len(log.grants) != 1 || log.grants[0] != `DOMAIN\me` {
+		t.Errorf("SeServiceLogonRight grant = %v, want exactly [DOMAIN\\me]", log.grants)
+	}
+}
+
+func TestWindows_SCMInstall_NoGrantForLocalSystem(t *testing.T) {
+	log := stubLSA(t)
+	fx := newFakeSCM()
+	w := &windowsInstaller{scm: fx}
+	if _, err := w.Install(Options{BinaryPath: `C:\p.exe`, ConfigPath: `C:\c.yaml`, Account: "LocalSystem"}); err != nil {
+		t.Fatalf("Install: %v", err)
+	}
+	if len(log.grants) != 0 {
+		t.Errorf("LocalSystem must not get an SeServiceLogonRight grant; got %v", log.grants)
+	}
+}
+
+func TestWindows_SCMInstall_BadCredsAbortBeforeCreate(t *testing.T) {
+	og, ov := lsaGrantServiceLogonRight, lsaValidateServiceCreds
+	t.Cleanup(func() { lsaGrantServiceLogonRight = og; lsaValidateServiceCreds = ov })
+	lsaGrantServiceLogonRight = func(string) error { t.Error("grant must not run on bad creds"); return nil }
+	lsaValidateServiceCreds = func(_, _ string) error {
+		return fmt.Errorf("wrong password for DOMAIN\\me")
+	}
+
+	fx := newFakeSCM()
+	w := &windowsInstaller{scm: fx}
+	_, err := w.Install(Options{BinaryPath: `C:\p.exe`, ConfigPath: `C:\c.yaml`, Account: `DOMAIN\me`, Password: "bad"})
+	if err == nil {
+		t.Fatal("Install with bad creds should fail")
+	}
+	if len(fx.createCalls) != 0 {
+		t.Errorf("bad creds must abort before CreateService; createCalls=%v", fx.createCalls)
+	}
+}
+
 func TestWindows_SCMInstall_IdempotentUpdate(t *testing.T) {
+	stubLSA(t)
 	fx := newFakeSCM()
 	fx.createErrOnExists = windows.ERROR_SERVICE_EXISTS
 	existing := &fakeSvc{name: ServiceName, queryState: svc.Running}

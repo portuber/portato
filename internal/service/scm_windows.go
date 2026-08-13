@@ -46,6 +46,9 @@ var defaultSCM scmAPI = realSCM{}
 func (realSCM) create(name, exepath string, cfg mgr.Config, args []string) (scmService, error) {
 	m, err := mgr.Connect()
 	if err != nil {
+		if errors.Is(err, windows.ERROR_ACCESS_DENIED) {
+			return nil, fmt.Errorf("connect SCM: %w (creating a Windows service requires administrator privileges; run from an elevated terminal, or use `portato install --legacy-runkey` for the per-user Run-key autostart)", err)
+		}
 		return nil, fmt.Errorf("connect SCM: %w", err)
 	}
 	defer m.Disconnect()
