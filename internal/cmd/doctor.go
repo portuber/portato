@@ -247,8 +247,14 @@ func checkDaemon(d *doctor) {
 	checkSocketPerms(d, socket)
 }
 
-// checkSocketPerms verifies the IPC socket is owner-only (SPEC §6: 0600).
+// checkSocketPerms verifies the IPC socket is owner-only (SPEC §6: 0600). On
+// Windows the IPC transport is a named pipe, which has no filesystem mode; its
+// security is the pipe security descriptor + the Phase 18 IPC bearer token, so
+// the 0600 check is unix-only (a named pipe always stats as 0666, a false fail).
 func checkSocketPerms(d *doctor, socket string) {
+	if runtime.GOOS == "windows" {
+		return
+	}
 	info, statErr := os.Stat(socket)
 	if statErr != nil {
 		return
