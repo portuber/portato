@@ -821,6 +821,26 @@ func validName(s string) bool {
 	return true
 }
 
+// ValidName is the exported form of validName: the shared tuber/tag name
+// alphabet (letters, digits, `-`, `_`). The Phase-48 importer uses it to
+// derive tuber names from ssh_config host patterns.
+func ValidName(s string) bool { return validName(s) }
+
+// ResolveSSHHost resolves a bare `ssh:` target (e.g. a ssh_config host
+// pattern) against cfg with the Phase-44 precedence (explicit parts win,
+// ssh-config fills the gaps) and reports the effective host and port. A
+// pattern with no matching block resolves to itself, port 22. The empty
+// host means resolution failed (a ProxyJump cycle in ssh config) — the
+// caller treats that as an error. Exported for the Phase-48 importer's
+// dedup key, which compares resolved endpoints, not raw spellings.
+func ResolveSSHHost(target string, cfg *ssh_config.Config) (host string, port int) {
+	t := Tuber{SSH: target}
+	if err := resolveTuber(&t, cfg); err != nil {
+		return "", 0
+	}
+	return t.Host, t.Port
+}
+
 func currentUser() string {
 	if v := os.Getenv("USER"); v != "" {
 		return v
