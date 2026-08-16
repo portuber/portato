@@ -204,6 +204,7 @@ func Execute() error {
 		uninstallCmd,
 		forwardCmd,
 		doctorCmd,
+		importCmd,
 		addIdentityCmd,
 		forgetIdentityCmd,
 		versionCmd,
