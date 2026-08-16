@@ -1,7 +1,7 @@
 ---
 phase: 48
 title: "Import forwards from ~/.ssh/config (portato import + first-run offer)"
-status: todo
+status: in-progress
 depends_on: [44]
 ---
 
@@ -142,6 +142,16 @@ Design locked with the maintainer:
 
 ## Technical details
 
+- **Why per-block iteration (a `GetAll` refinement)**: a literal
+  `cfg.GetAll(pattern, key)` also collects values from every *other* block
+  whose patterns match the alias (notably `Host *`), leaking global forwards
+  into each host's candidates and breaking the skip rule. The scanner
+  instead walks `cfg.Hosts` and reads each block's own KV nodes for the
+  three directives (all occurrences — the multi-forward intent of "GetAll,
+  not Get"), and `Include` nodes within a block via `Include.GetAll`. The
+  skip rules (`Host *` / implicit / `Match` / negated-only) apply uniformly
+  to blocks enumerated from Include files too (the library does not expose
+  those via `cfg.Hosts`, so the scanner decodes them itself).
 - **Markers**: empty regular files next to the daemon's state files (the
   `xdg.StateHome/portato/` dir); presence = truth. The pair exists so a
   non-interactive first run (the daemon creating the config) does not
