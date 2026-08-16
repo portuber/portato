@@ -87,6 +87,12 @@ func runStandalone() error {
 		return fmt.Errorf("load config: %w", err)
 	}
 
+	// Phase-48 first-run nudge: a fresh interactive install offers a
+	// one-time import of ~/.ssh/config forwards before the TUI takes over.
+	// The daemon branch never runs this, so a daemon that bootstrapped the
+	// config does not consume the offer.
+	cfg = maybeOfferImport(path, cfg)
+
 	logger, ring, closer, err := routelog.Setup("", logLevel, logOptions(cfg))
 	if err != nil {
 		return fmt.Errorf("setup logger: %w", err)

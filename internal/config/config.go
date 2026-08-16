@@ -342,6 +342,10 @@ func EnsureExample(p string) (bool, error) {
 	if err := exampleConfig().Save(p); err != nil {
 		return false, err
 	}
+	// A config bootstrapped by portato (not hand-written by an upgrading
+	// user) flags the install as fresh, so the Phase-48 first-run import
+	// offer may fire on the first interactive launch.
+	MarkFreshInstall()
 	return true, nil
 }
 

@@ -1,4 +1,4 @@
-.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff e2e-proxyjump e2e-sshconfig e2e-docker third-party-licenses optimize-assets release release-patch release-minor release-major
+.PHONY: build run test fmt vet lint cover build-all cross snapshot install-service stop reload e2e-handoff e2e-proxyjump e2e-sshconfig e2e-import e2e-docker third-party-licenses optimize-assets release release-patch release-minor release-major
 
 build:
 	go build -o bin/portato ./cmd/portato
@@ -86,12 +86,18 @@ e2e-proxyjump:
 e2e-sshconfig:
 	go test -tags e2e ./internal/daemon/... -run TestSSHConfigE2E -v -count=1
 
+# e2e-import runs the Phase-48 import-offer marker E2E: a daemon-first
+# bootstrap sets fresh_install without consuming the one-time offer.
+e2e-import:
+	go test -tags e2e ./internal/daemon/... -run TestImportMarkersE2E -v -count=1
+
 # e2e-docker runs a real-Linux/systemd E2E case in Docker — the only way to
 # verify against real OpenSSH + systemd on Linux without a native host (the dev
 # is on macOS; the make e2e-* targets above cover the dial logic in-process on
-# the host). E2E_CASE selects the e2e.sh case (check|jump|sshconfig); default
-# check. It cross-builds the linux binary if missing, (re)builds the image, and
-# recreates the container fresh each run so image changes always take effect.
+# the host). E2E_CASE selects the e2e.sh case (check|jump|sshconfig|import);
+# default check. It cross-builds the linux binary if missing, (re)builds the
+# image, and recreates the container fresh each run so image changes always
+# take effect.
 # Heavy (Docker + a privileged container); NOT part of CI. The container is
 # removed at the end by default; set E2E_KEEP=1 to leave it running and iterate
 # with `docker exec portato-test /e2e/e2e.sh <case>` between cases (then

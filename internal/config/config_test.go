@@ -355,6 +355,7 @@ func TestExpandTilde(t *testing.T) {
 }
 
 func TestEnsureExample(t *testing.T) {
+	t.Setenv("PORTATO_STATE_HOME", t.TempDir())
 	dir := t.TempDir()
 	p := filepath.Join(dir, "sub", "config.yaml")
 	created, err := EnsureExample(p)
@@ -380,6 +381,7 @@ func TestEnsureExample(t *testing.T) {
 }
 
 func TestLoadCreatesExampleWhenMissing(t *testing.T) {
+	t.Setenv("PORTATO_STATE_HOME", t.TempDir())
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
 	c, err := Load(p)
