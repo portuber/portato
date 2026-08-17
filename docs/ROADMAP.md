@@ -63,7 +63,7 @@
 | 45  | Shell completions                 | `[x]` | [phase-45-shell-completions.md](./phases/phase-45-shell-completions.md) |
 | 46  | Tunnel tags / groups              | `[x]` | [phase-46-tunnel-tags.md](./phases/phase-46-tunnel-tags.md) |
 | 47  | Windows SCM autostart             | `[~]`  | [phase-47-windows-scm-autostart.md](./phases/phase-47-windows-scm-autostart.md) |
-| 48  | Import forwards from ssh_config   | `[~]`  | [phase-48-ssh-config-import.md](./phases/phase-48-ssh-config-import.md) |
+| 48  | Import forwards from ssh_config   | `[x]`  | [phase-48-ssh-config-import.md](./phases/phase-48-ssh-config-import.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -77,7 +77,7 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–46 are all `[x]`; Phase 47 (Windows SCM autostart) is `[~]` in progress, and Phase 48 (importing existing forwards from `~/.ssh/config`) is planned next.** 47 remains `[~]` solely pending reboot verification on the office Windows PC; 48 proceeds in parallel by maintainer decision (exception to the one-`[~]` rule). The roadmap's core is complete, including ProxyJump (jump hosts), `~/.ssh/config` alias resolution, shell completion, and tunnel tags/groups; the rest of the backlog is in [Post-1.0 candidate features](#post-10-candidate-features). The stability
+**Phases 0–46 and 48 are all `[x]`; Phase 47 (Windows SCM autostart) is the only `[~]`.** 47 remains `[~]` solely pending reboot verification on the office Windows PC; 48 ran in parallel by maintainer decision (exception to the one-`[~]` rule) and is complete. The roadmap's core is complete, including ProxyJump (jump hosts), `~/.ssh/config` alias resolution and forward import, shell completion, and tunnel tags/groups; the rest of the backlog is in [Post-1.0 candidate features](#post-10-candidate-features). The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes; any future break goes through the deprecation
 cycle defined there. For the most recent batch see [Current work](#current-work);
@@ -202,11 +202,12 @@ fixes only.
 - **Phase 45** — Shell completions (done, `[x]`): dynamic TAB completion of tuber names for `enable` / `disable` / `restart` / `forward` and `logs --tuber` (via `ValidArgsFunction` / `RegisterFlagCompletionFunc`; source = `config.yaml` load, so it works with no daemon running). Cobra's `completion bash/zsh/fish/powershell` already generates the shell script; the README documents per-shell sourcing (`eval` / `source`, document-only — no packaging changes). Additive ⇒ MINOR (`v1.3.0`). depends_on [].
 - **Phase 46** — Tunnel tags / groups (done, `[x]`): `tags:` on a tuber; `enable` / `disable` / `restart --tag X` operate on every tuber with that tag (with `--tag` TAB-completion of the distinct values from `config.yaml`); a precise `#tag` filter in the TUI (a leading `#` is an exact tag selector — `#db` matches a tuber *tagged* `db`, not one merely *named* `db-stage`); and `a` / `x` (enable/disable-all) respect the active `/` filter for instant group ops (no filter ⇒ byte-identical to before). `forward.Status` carries tags so `list` / `list --json` and the TUI show and filter on them over IPC (no new IPC method); the editor gains a tags field. Tags render as `#tag` tokens everywhere (byte-identical to the filter syntax); in the TUI they live in the Phase-39 detail strip (≤1 line, an error wins) rather than a new column, keeping the Phase-38 responsive layout intact. Additive ⇒ MINOR (`v1.4.0`). depends_on [].
 - **Phase 47** — Windows SCM autostart (in progress, `[~]`): replaces the Phase-17 HKCU `Run`-key autostart with a real Service Control Manager service so the daemon starts at **boot** (not logon), runs **without anyone logged in** (SCM logs on the install-time user — the password is collected once at `portato install` and kept as an LSA secret), and `install` **starts the daemon immediately** (parity with macOS `launchctl bootstrap` / Linux `systemctl --user enable --now`). Also fixes the Scoop drift failure mode (`portato install` captures a version-pinned path that breaks on the next `scoop update`; the service path is rewritten to Scoop's stable `current` junction), makes `portato stop` graceful (sends `svc.Stop` instead of `TerminateProcess`), and keeps the Phase-17 Run-key mechanism behind `--legacy-runkey` for locked-down environments. The deferred refinement from the end of Phase 17. depends_on [17].
-- **Phase 48** — import forwards from `~/.ssh/config` (in progress, `[~]`): `portato import` (+ a fresh-install one-time offer) scans `LocalForward` / `RemoteForward` / `DynamicForward` via the Phase-44 config reader (`GetAll`, so multi-forward hosts import fully) and creates `enabled: false` tubers — a one-time copy that never modifies ssh_config; the nudge is marker-gated (`fresh_install` / `import_offered` in the state dir), interactive-only, never repeats, and never fires for upgrading users. depends_on [44].
+- **Phase 48** — import forwards from `~/.ssh/config` (done, `[x]`): `portato import` (+ a fresh-install one-time offer) scans `LocalForward` / `RemoteForward` / `DynamicForward` via the Phase-44 config reader (`GetAll`, so multi-forward hosts import fully) and creates `enabled: false` tubers — a one-time copy that never modifies ssh_config; the nudge is marker-gated (`fresh_install` / `import_offered` in the state dir), interactive-only, never repeats, and never fires for upgrading users. depends_on [44].
 
 ## Current work
 
-**Phases 0–46 are all `[x]`.** The most recent batch:
+**Phases 0–46 and 48 are all `[x]` (47 awaits a Windows-PC reboot for its
+final verification).** The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
@@ -303,6 +304,27 @@ fixes only.
   in the TUI they live in the Phase-39 detail strip (≤1 line, an error wins)
   rather than a new column, keeping the Phase-38 responsive layout intact.
   Additive ⇒ MINOR (`v1.4.0`).
+
+- **Phase 48** — import forwards from `~/.ssh/config` (done, `[x]`):
+  `portato import [<pattern>…]` (with `--all` / `--from` / `--dry-run` /
+  `--yes`) copies the `LocalForward` / `RemoteForward` / `DynamicForward`
+  directives into `config.yaml` as `enabled: false` tubers — a one-time
+  copy; ssh_config is read via the Phase-44 reader and never written
+  (content + mtime test-asserted). The scan walks Host blocks per block (a
+  literal `GetAll(alias, …)` would leak `Host *` forwards into every
+  host), skips `Host *` / `Match` / negated-only blocks uniformly through
+  `Include` files; a bare-port `RemoteForward` imports as
+  `127.0.0.1:port` (OpenSSH binds loopback by default; Portato's bare port
+  means `*`); names derive from pattern + listen port (`db-5432`),
+  de-conflicted `-2`/`-3`; dedup drops a forward an existing tuber already
+  covers, resolving both sides against the scanned config. A fresh install
+  (config bootstrapped by portato) gets a one-time y/N import-all offer on
+  the first interactive launch — markers `fresh_install` /
+  `import_offered` in the state dir: a daemon-first bootstrap never
+  consumes the offer, a non-TTY launch leaves it pending, upgrading
+  installs are never nudged. Verified in-process with the real binary
+  (`make e2e-import`) and on real Linux + real OpenSSH
+  (`make e2e-docker E2E_CASE=import`). Additive → MINOR.
 
 Earlier phases (33 CodeFactor cleanup + lint guardrails, 34 `portato license` +
 `--license`, 17 Windows, 35 SSH password auth, …) are all `[x]`; see the phase

@@ -1,7 +1,7 @@
 ---
 phase: 48
 title: "Import forwards from ~/.ssh/config (portato import + first-run offer)"
-status: in-progress
+status: done
 depends_on: [44]
 ---
 
@@ -112,21 +112,21 @@ Design locked with the maintainer:
 
 ## Definition of Done
 
-- [ ] `portato import --dry-run` lists candidates from a fixture ssh_config;
+- [x] `portato import --dry-run` lists candidates from a fixture ssh_config;
       `portato import --yes` creates them `enabled: false`, and the config
       round-trips (`portato list` shows them off).
-- [ ] A fresh install (no config) with a forwarded ssh_config gets the
+- [x] A fresh install (no config) with a forwarded ssh_config gets the
       one-time y/N offer on first interactive launch; accepting or
       declining never re-prompts; 0 candidates ⇒ no prompt at all, still
       never again.
-- [ ] An upgraded install (config exists, no markers) is never nudged.
-- [ ] `portato daemon` running first does not suppress a later interactive
+- [x] An upgraded install (config exists, no markers) is never nudged.
+- [x] `portato daemon` running first does not suppress a later interactive
       offer.
-- [ ] `~/.ssh/config` is byte-identical after an import (test-asserted).
-- [ ] A bare-port `RemoteForward` imports as `127.0.0.1:port`
+- [x] `~/.ssh/config` is byte-identical after an import (test-asserted).
+- [x] A bare-port `RemoteForward` imports as `127.0.0.1:port`
       (loopback-preserving, not `*:port`).
-- [ ] Multi-forward hosts import all their forwards (`GetAll`, not `Get`).
-- [ ] `make fmt && make vet && make test && make lint` clean.
+- [x] Multi-forward hosts import all their forwards (`GetAll`, not `Get`).
+- [x] `make fmt && make vet && make test && make lint` clean.
 
 ## Verification
 
