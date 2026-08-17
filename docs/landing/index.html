@@ -137,12 +137,16 @@
           <p><code>-L</code>, <code>-R</code> and <code>-D</code> tunnels. A dynamic forward runs a SOCKS5 proxy so you can reach any internal address through the bastion without a forward per port.</p>
         </div>
         <div class="card">
+          <h3>Migrate from <code>~/.ssh/config</code></h3>
+          <p>Forwards already live in your ssh config? <code>portato import</code> copies every <code>LocalForward</code> / <code>RemoteForward</code> / <code>DynamicForward</code> into Portato as disabled tunnels — one command, your ssh config is read, never written.</p>
+        </div>
+        <div class="card">
           <h3>Background daemon + seamless hand-off</h3>
           <p>Start standalone, then hand off to the daemon without dropping a connection — already-bound local listeners are passed over SCM_RIGHTS, so the port never goes down.</p>
         </div>
         <div class="card">
           <h3>Cross-platform</h3>
-          <p>macOS, Linux and Windows from the same release. Named-pipe IPC, ssh-agent over the OpenSSH pipe, and a registry Run-key autostart on Windows.</p>
+          <p>macOS, Linux and Windows from the same release. Named-pipe IPC, ssh-agent over the OpenSSH pipe, and autostart as a real Windows service (SCM) that starts at boot — no login needed.</p>
         </div>
         <div class="card">
           <h3>Security by default</h3>
@@ -169,7 +173,8 @@
             <tr><td>See what's running</td><td>nothing — <code>ps</code> and scrollback</td><td>one TUI screen, live status for every tunnel</td></tr>
             <tr><td>Reconnect after sleep / drop</td><td><code>autossh</code>, one process per tunnel</td><td>built-in backoff + reconnect, all tunnels</td></tr>
             <tr><td>Many tunnels</td><td>one command and process each</td><td>named tunnels from one <code>config.yaml</code></td></tr>
-            <tr><td>Survive logout</td><td>hand-rolled systemd / launchd unit</td><td><code>portato install</code> — launchd / systemd / Windows Run key</td></tr>
+            <tr><td>Forwards already in <code>~/.ssh/config</code></td><td>re-type them by hand</td><td><code>portato import</code> — one command, disabled by default</td></tr>
+            <tr><td>Survive logout</td><td>hand-rolled systemd / launchd unit</td><td><code>portato install</code> — launchd / systemd / Windows service</td></tr>
             <tr><td>Toggle without re-running</td><td>—</td><td><code>space</code> in the TUI</td></tr>
             <tr><td>Don't drop the port on hand-off</td><td>—</td><td>FD-passing — standalone→daemon, port stays up</td></tr>
           </tbody>
