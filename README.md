@@ -28,6 +28,7 @@ The single binary works in several modes:
 | `portato disable <name>`     | Disable a tunnel on the daemon                                      |
 | `portato restart <name>`     | Restart a tunnel                                                    |
 | `portato reload`             | Reload the daemon's config from disk (also auto-reloads on change)  |
+| `portato import [<pattern>…]` | Import forwards from `~/.ssh/config` as disabled tunnels (`--all`, `--dry-run`, `--yes`) |
 | `portato stop`               | Stop the running daemon (graceful, via SIGTERM)                     |
 | `portato install`            | Install system autostart (launchd / systemd --user / SCM on Windows)|
 | `portato uninstall`          | Remove system autostart                                             |
