@@ -22,6 +22,17 @@ in appuser's `~/.ssh/config`, and an `ssh: target-alias` tuber
 chain comes entirely from ssh-config resolution. Same two sshd, so it reuses
 the `jump` image; `make e2e-sshconfig` covers the in-process path on macOS.
 
+The `import` run is the Phase 48 real-Linux proof: `Host import-alias` in
+`~/.ssh/config` carries one Local/Remote/Dynamic forward each (plus a `Host *`
+forward that must be skipped). `portato import --dry-run --all` lists exactly
+the three candidates, `--all --yes` creates them `enabled: false` with
+`~/.ssh/config` byte-identical, a re-import dedups, each imported tuber
+connects through the real sshd (`nc -z` on 19092/19093/19094 — the bare-port
+`RemoteForward` binds loopback on the sshd side), and the case ends with the
+daemon-first marker flow (`fresh_install` written, `import_offered` not
+consumed). `make e2e-import` covers the marker flow with the real binary
+in-process on macOS.
+
 ## Build (from repo root)
 
     make cross
@@ -36,7 +47,7 @@ container, execs a case, then removes the container). Pick a case with
 `E2E_CASE`; set `E2E_KEEP=1` to leave the container running and iterate with
 `docker exec` between cases:
 
-    make e2e-docker E2E_CASE=sshconfig   # or check, jump (default check)
+    make e2e-docker E2E_CASE=sshconfig   # or check, jump, import (default check)
     # Intel mac: ... E2E_LINUX_BIN=bin/portato-linux-amd64
     # Iterate:   ... E2E_KEEP=1  then  docker exec portato-test /e2e/e2e.sh jump
 
@@ -47,6 +58,7 @@ Or step through it by hand:
     docker exec portato-test /e2e/e2e.sh check      # -> block of PASS, exit 0
     docker exec portato-test /e2e/e2e.sh jump       # Phase 43: two-hop forward + reconnect
     docker exec portato-test /e2e/e2e.sh sshconfig  # Phase 44: ssh-config alias forward + reconnect
+    docker exec portato-test /e2e/e2e.sh import     # Phase 48: import from ~/.ssh/config + markers
 
 ## [115] reboot survival
 

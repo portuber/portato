@@ -17,11 +17,15 @@ RUN ssh-keygen -A \
     && chown -R appuser:appuser /home/appuser/.ssh \
     && chmod 600 /home/appuser/.ssh/id_ed25519 /home/appuser/.ssh/authorized_keys /home/appuser/.ssh/known_hosts
 
-# A ~/.ssh/config alias for the Phase 44 ssh-config-resolution E2E: `ssh:
-# target-alias` resolves to the target sshd (:22) and ProxyJumps through the
-# bastion sshd (:2222). The literal-host tubers (echo, echo-via-bastion) don't
-# match `Host target-alias`, so this file leaves their cases untouched.
-RUN printf 'Host target-alias\n  HostName 127.0.0.1\n  Port 22\n  User appuser\n  ProxyJump appuser@127.0.0.1:2222\n' \
+# A ~/.ssh/config for the Phase 44 ssh-config-resolution E2E (`Host
+# target-alias` → the target sshd (:22), ProxyJump through the bastion sshd
+# (:2222)) and the Phase 48 import E2E (`Host import-alias` carries one
+# Local/Remote/Dynamic forward each — imported by `portato import`; the
+# trailing `Host *` forward must be skipped by the importer). The
+# literal-host tubers (echo, echo-via-bastion) match no block here, so this
+# file leaves their cases untouched; `Host *` sets none of the keys the
+# Phase-44 resolver reads, so it is inert for target-alias too.
+RUN printf 'Host target-alias\n  HostName 127.0.0.1\n  Port 22\n  User appuser\n  ProxyJump appuser@127.0.0.1:2222\n\nHost import-alias\n  HostName 127.0.0.1\n  Port 22\n  User appuser\n  LocalForward 19092 127.0.0.1:28080\n  DynamicForward 19093\n  RemoteForward 19094 127.0.0.1:28080\n\nHost *\n  LocalForward 19999 127.0.0.1:28080\n' \
         > /home/appuser/.ssh/config \
     && chown appuser:appuser /home/appuser/.ssh/config && chmod 600 /home/appuser/.ssh/config
 
