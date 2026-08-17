@@ -302,6 +302,38 @@ existing `user@host:port` values keep working unchanged. Only an unreadable
 conditional blocks and `UserKnownHostsFile` are not resolved (Portato keeps its
 own `known_hosts`).
 
+### Importing from `~/.ssh/config`
+
+Migrating from hand-rolled `ssh -N` setups? `portato import` copies the
+`LocalForward` / `RemoteForward` / `DynamicForward` directives from your
+`~/.ssh/config` into `config.yaml` as **disabled** tubers — a one-time copy;
+your ssh config is read, never written.
+
+```sh
+portato import --dry-run          # list what would be imported (names included)
+portato import db                 # import only the Host db block (exact pattern, case-insensitive)
+portato import --all              # every block with forwards, with a y/N confirmation
+portato import --all --yes        # non-interactive (no TTY)
+portato import --from ~/ssh-backup --all   # a different ssh config file
+```
+
+- Imported tubers land `enabled: false` — nothing auto-connects.
+- `ssh:` keeps the raw Host pattern (`ssh: db-stage`), so alias resolution
+  (above) applies at load. A bare-port `RemoteForward` imports as
+  `127.0.0.1:port` — OpenSSH binds the remote side to loopback by default.
+- Names derive from the pattern + port (`db-5432`), de-conflicted with a
+  `-2`/`-3` suffix; a forward an existing tuber already covers is listed as
+  `already configured` and skipped.
+- Blocks reached through `Include` are scanned with the same rules. `Host *`
+  and `Match` blocks are skipped (the ssh-config library does not support
+  `Match`), as are unix-socket forwards (`LocalForward /run/x.sock …`).
+
+A **fresh install** (no config yet) gets a one-time offer: the first
+interactive `portato` launch lists the forwards found in `~/.ssh/config` and
+asks `y/N` — import them all or decline; either way the offer never repeats.
+A daemon started first does not consume the offer, and upgrading installs are
+never asked.
+
 ### Tags (grouping)
 
 A tuber may carry `tags:` for ad-hoc grouping — by environment (`prod`,

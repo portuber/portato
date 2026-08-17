@@ -27,6 +27,7 @@ internal/
   cmd/                cobra commands (root + subcommands)
   config/             YAML config load/save/validation (phase 1)
   forward/            tunnel engine, native SSH (phase 2)
+  importer/           ~/.ssh/config forward import (phase 48)
   fdpass/             SCM_RIGHTS listener transfer for the hand-off (phase 16)
   controller/         Controller interface + local/remote (phase 3+)
   secret/             identity passphrase cache + OS keyring (phase 19)

@@ -58,14 +58,14 @@ Design locked with the maintainer:
 
 ## Tasks
 
-- [ ] **Scanner** (`internal/importer/`): load ssh_config via the Phase-44
+- [x] **Scanner** (`internal/importer/`): load ssh_config via the Phase-44
       reader (`config.loadUserSSHConfig`, config.go:551) and collect
       candidates: for each host block (skipping `Host *` and `Match`), read
       `LocalForward`, `RemoteForward`, `DynamicForward` **via `cfg.GetAll`**
       (`Get` returns only the first match; a host may carry several
       forwards). Candidate = {sshHost (the block's pattern), type, local,
       remote}.
-- [ ] **Semantics mapping**:
+- [x] **Semantics mapping**:
       - `LocalForward [bind:]port host:port` → `type: local`,
         `local: [bind:]port`, `remote: host:port`.
       - `RemoteForward [bind:]port host:port` → `type: remote`,
@@ -76,19 +76,19 @@ Design locked with the maintainer:
         preserve behaviour (the Phase-13 normalisation caveat).
       - `DynamicForward [bind:]port` → `type: dynamic`,
         `local: [bind:]port`.
-- [ ] **Dedup**: drop a candidate an existing tuber already covers (same
+- [x] **Dedup**: drop a candidate an existing tuber already covers (same
       type + local + remote + resolved ssh host) and duplicates within one
       import; the CLI lists skipped ones as `already configured`.
-- [ ] **Naming**: derive a valid tuber name (`validName`, config.go:807)
+- [x] **Naming**: derive a valid tuber name (`validName`, config.go:807)
       from the host pattern + local port (`db-5432`), de-conflicted with a
       `-2`/`-3` suffix. Names appear in the preview list.
-- [ ] **`portato import` command** (`internal/cmd/import.go`): optional
+- [x] **`portato import` command** (`internal/cmd/import.go`): optional
       positional host patterns + `--all` / `--from` / `--dry-run` / `--yes`;
       default = show the list, ask y/N; non-TTY without `--yes` fails with
       a hint. Writes through the existing config save path, prints one line
       per created tuber. No completion surface changes (patterns, not
       names).
-- [ ] **First-run nudge**: the `fresh_install` marker is written when
+- [x] **First-run nudge**: the `fresh_install` marker is written when
       `EnsureExample` (config.go:335) creates the config (created=true);
       `import_offered` is written when the offer is shown (either outcome)
       or when a fresh install's scan finds 0 candidates (silent, still
@@ -97,17 +97,17 @@ Design locked with the maintainer:
       the TUI), never in `daemonRunE`. Markers live in the daemon state dir
       (`internal/daemon/paths_unix.go` / `paths_windows.go`;
       `xdg.StateHome/portato/`).
-- [ ] **Resolution reuse**: imported tubers keep `ssh: <pattern>` verbatim
+- [x] **Resolution reuse**: imported tubers keep `ssh: <pattern>` verbatim
       so Phase 44 resolves HostName/User/Port/IdentityFile/ProxyJump at
       load — the importer maps directives, it must not re-implement
       resolution.
-- [ ] **Tests**: scanner (multi-forward per host, `Host *`/`Match` skip,
+- [x] **Tests**: scanner (multi-forward per host, `Host *`/`Match` skip,
       semantics swap, bare-port expansion, dedup), CLI (`--dry-run`,
       `--yes`, non-TTY guard, host-pattern filtering), markers (fresh →
       offered once; daemon-first does not consume the offer; upgrade user
       never nudged), ssh_config NOT modified (content/mtime asserted
       unchanged).
-- [ ] **Docs**: README "Importing from ~/.ssh/config" section; SPEC §7
+- [x] **Docs**: README "Importing from ~/.ssh/config" section; SPEC §7
       note (import = copy, ssh_config never written).
 
 ## Definition of Done
@@ -139,6 +139,14 @@ Design locked with the maintainer:
    shows them; the ssh_config file is unchanged.
 4. Marker flow: remove state markers + config → run `portato daemon` →
    stop it → run the TUI → the offer appears once; re-run → never again.
+5. Real-Linux/docker: `make e2e-docker E2E_CASE=import` (systemd + real
+   OpenSSH): dry-run lists the three `import-alias` candidates with the
+   `Host *` forward skipped, `--all --yes` writes them `enabled: false`
+   with `~/.ssh/config` byte-identical, a re-import dedups, each imported
+   tuber connects through the real sshd (`nc -z` 19092/19093/19094 — the
+   bare-port `RemoteForward` binds loopback server-side), and the
+   daemon-first bootstrap writes `fresh_install` without consuming the
+   offer. `make e2e-import` covers the marker flow in-process on macOS.
 
 ## Technical details
 

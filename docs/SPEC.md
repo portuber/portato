@@ -396,6 +396,32 @@ The meaning of `local`/`remote` depends on `type`:
   only when the selected row has no error — the strip never jitters between one
   and two lines). A width-aware TAGS column is a possible later refinement.
 
+### Import from ssh_config (Phase 48)
+
+`portato import [<host-pattern>…]` maps `LocalForward` / `RemoteForward` /
+`DynamicForward` directives from `~/.ssh/config` (`--from` overrides the
+location) to `enabled: false` tubers — a one-time **copy**, not a live link:
+ssh_config is read (via the Phase-44 reader) and **never written**. The
+scanner walks Host blocks per-block (each block's own directives, all
+occurrences — `Get` would return only the first, and a literal
+`GetAll(alias, …)` would leak `Host *` values into every host), skipping
+`Host *`, `Match`, and negated-only blocks, uniformly through `Include`
+files. A bare-port `RemoteForward` imports as `127.0.0.1:port` (OpenSSH
+binds the remote side to loopback by default; Portato's bare port normalises
+to `*`). `ssh:` keeps the raw pattern so Phase-44 resolution applies at
+load. Dedup drops a forward an existing tuber already covers (same type +
+normalised listen addresses + resolved ssh host — both sides resolved against
+the scanned config). Flags: `--all`, `--dry-run`, `--yes` (required without
+a TTY); names derive from the pattern + listen port, de-conflicted `-2`/`-3`.
+
+A fresh install (config bootstrapped by portato — the `fresh_install` marker
+in the state dir) gets a one-time `y/N` import-all offer on the first
+**interactive** launch; the `import_offered` marker consumes it on any
+outcome (decline included), and 0 candidates consume it silently. The daemon
+never runs the offer (a daemon-first bootstrap does not consume it), a
+non-TTY launch leaves it unconsumed, and upgrading installs (no fresh
+marker) are never nudged.
+
 ## 8. Tunnel types
 
 | Type      | SSH flag | Semantics                                            | Phase      |
