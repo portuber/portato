@@ -18,7 +18,7 @@ func TestPipeSDDLFormat(t *testing.T) {
 	want := `^D:P` +
 		`\(A;;GA;;;SY\)` +
 		`\(A;;GA;;;BA\)` +
-		`\(A;;GA;;;S-1-[0-5]-[0-9-]+$`
+		`\(A;;GA;;;S-1-[0-5]-[0-9-]+\)$`
 	if !regexp.MustCompile(want).MatchString(sddl) {
 		t.Errorf("pipeSDDL = %q, want SYSTEM+BA+user-SID GENERIC_ALL ACEs", sddl)
 	}

@@ -42,8 +42,12 @@ func (f *fakeSCM) create(name, exepath string, cfg mgr.Config, args []string) (s
 	defer f.mu.Unlock()
 	f.createCalls = append(f.createCalls, fakeCreateCall{name, exepath, cfg, args})
 	if f.createErrOnExists != nil {
+		// Mirror realSCM.create's ERROR_SERVICE_EXISTS branch: the adapter
+		// opens the existing service itself and updates its config in place
+		// (no open() through the seam), so the fake applies the update here.
 		if existing, ok := f.services[name]; ok {
-			return existing, nil // caller will UpdateConfig
+			existing.updatedCfg = &cfg
+			return existing, nil
 		}
 		return nil, f.createErrOnExists
 	}
@@ -297,13 +301,11 @@ func TestWindows_SCMInstall_IdempotentUpdate(t *testing.T) {
 	if _, err := w.Install(Options{BinaryPath: `C:\p.exe`, ConfigPath: `C:\c.yaml`, Account: `DOMAIN\me`, Password: "x"}); err != nil {
 		t.Fatalf("idempotent Install: %v", err)
 	}
-	// create was attempted, then open returned the existing service, whose
-	// config was updated.
-	if len(fx.openCalls) == 0 || fx.openCalls[len(fx.openCalls)-1] != ServiceName {
-		t.Errorf("expected an open(%s) after create-on-exists; openCalls=%v", ServiceName, fx.openCalls)
-	}
+	// create was attempted and hit ERROR_SERVICE_EXISTS; realSCM.create then
+	// opens the existing service itself and updates its config in place (the
+	// fake applies the same update inside its create-on-exists branch).
 	if existing.updatedCfg == nil {
-		t.Errorf("existing service config was not updated on re-install")
+		t.Fatalf("existing service config was not updated on re-install")
 	}
 	if existing.updatedCfg.StartType != mgr.StartAutomatic {
 		t.Errorf("updated StartType = %d, want StartAutomatic", existing.updatedCfg.StartType)
