@@ -428,6 +428,9 @@ Linux):
   password up front — enter the account's **local password, not a Windows Hello
   PIN** (a Microsoft-account / PIN will be rejected). If you can't elevate, use
   `portato install --legacy-runkey` instead (per-user, no admin).
+- the service starts at boot, and `portato list` / `attach` / `doctor` work
+  from a regular (non-elevated) session of the same user — the IPC pipe's
+  security descriptor grants the user explicitly (v1.6.1).
 - `portato stop` stops the service gracefully (`svc.Stop`) instead of
   terminating the process
 

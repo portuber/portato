@@ -210,6 +210,13 @@ Implementations:
   Intended for tests and CI.
 - **Protocol:** HTTP over the unix socket (`net.Listen("unix", path)` + `http.Serve`). JSON in request/response bodies.
 - **Permissions:** the socket is created with mode `0600`, accessible only to the owner.
+  On Windows the named pipe is the equivalent: an explicit security descriptor
+  (SDDL) grants `GENERIC_ALL` to SYSTEM, Administrators, and the process
+  token's user SID — so the pipe is reachable both from the boot-started SCM
+  service (session 0) and from an unelevated interactive session of the same
+  user (v1.6.1; a nil descriptor had let the service token's default DACL
+  deny the interactive session). The Phase 18 bearer token still gates the
+  protocol on top.
 - **Socket activation (Phase 22):** under systemd the service manager can own the
   listening socket and hand it to the daemon. `portato install` writes a
   `portato.socket` unit (`ListenStream=/run/user/<uid>/portato-<uid>.sock`,
