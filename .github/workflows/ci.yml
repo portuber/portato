@@ -90,6 +90,12 @@ jobs:
           cache: true
       - name: build
         run: go build -o portato.exe ./cmd/portato
+      - name: windows-tagged unit tests
+        # The windows-build-tagged unit tests (pipe SDDL, pidAlive semantics,
+        # SCMInstalled vs sc.exe, the SCM installer fakes) only compile on
+        # Windows, so a darwin/linux `make test` never runs them — prove them
+        # here, on the real OS.
+        run: go test ./internal/daemon/transport/ ./internal/daemon/ ./internal/service/ -count=1
       - name: daemon + list round-trip over the named pipe
         shell: pwsh
         run: |
