@@ -132,11 +132,22 @@ func stoppable(s svc.State) bool {
 
 // SCMInstalled reports whether the Portato SCM service is registered (regardless
 // of state). Used by `portato doctor` to report the SCM autostart mechanism.
+// It must not require elevation, so it does NOT go through the scmAPI seam
+// (whose mgr.Connect requests SC_MANAGER_ALL_ACCESS — fine for install, but an
+// unelevated `portato doctor` gets access denied and reports "not installed"
+// for a perfectly healthy service): it opens the SCM with plain connect
+// rights and the service with query-status rights only, both granted to
+// ordinary users.
 func SCMInstalled() bool {
-	s, err := defaultSCM.open(ServiceName)
+	m, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
 	if err != nil {
 		return false
 	}
-	_ = s.close()
+	defer windows.CloseServiceHandle(m)
+	s, err := windows.OpenService(m, windows.StringToUTF16Ptr(ServiceName), windows.SERVICE_QUERY_STATUS)
+	if err != nil {
+		return false
+	}
+	_ = windows.CloseServiceHandle(s)
 	return true
 }
