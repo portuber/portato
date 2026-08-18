@@ -62,7 +62,7 @@
 | 44  | `~/.ssh/config` resolution        | `[x]` | [phase-44-ssh-config.md](./phases/phase-44-ssh-config.md) |
 | 45  | Shell completions                 | `[x]` | [phase-45-shell-completions.md](./phases/phase-45-shell-completions.md) |
 | 46  | Tunnel tags / groups              | `[x]` | [phase-46-tunnel-tags.md](./phases/phase-46-tunnel-tags.md) |
-| 47  | Windows SCM autostart             | `[~]`  | [phase-47-windows-scm-autostart.md](./phases/phase-47-windows-scm-autostart.md) |
+| 47  | Windows SCM autostart             | `[x]`  | [phase-47-windows-scm-autostart.md](./phases/phase-47-windows-scm-autostart.md) |
 | 48  | Import forwards from ssh_config   | `[x]`  | [phase-48-ssh-config-import.md](./phases/phase-48-ssh-config-import.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
@@ -77,7 +77,12 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–46 and 48 are all `[x]`; Phase 47 (Windows SCM autostart) is the only `[~]`.** 47 remains `[~]` solely pending reboot verification on the office Windows PC; 48 ran in parallel by maintainer decision (exception to the one-`[~]` rule) and is complete. The roadmap's core is complete, including ProxyJump (jump hosts), `~/.ssh/config` alias resolution and forward import, shell completion, and tunnel tags/groups; the rest of the backlog is in [Post-1.0 candidate features](#post-10-candidate-features). The stability
+**Phases 0–48 are all `[x]` — the roadmap is complete.** The last one to
+close was 47 (Windows SCM autostart), verified end-to-end on the office
+Windows PC across v1.5.x→v1.6.1; everything beyond it lives in
+[Post-1.0 candidate features](#post-10-candidate-features). The core
+includes ProxyJump (jump hosts), `~/.ssh/config` alias resolution and
+forward import, shell completion, and tunnel tags/groups. The stability
 surface (`config.yaml` + the CLI; see [`VERSIONING.md`](./VERSIONING.md)) has
 no planned breaking changes; any future break goes through the deprecation
 cycle defined there. For the most recent batch see [Current work](#current-work);
@@ -201,13 +206,12 @@ fixes only.
 - **Phase 44** — `~/.ssh/config` resolution (done, `[x]`): `ssh: <alias>` resolves HostName/User/Port/IdentityFile/ProxyJump from the user's ssh config (via `kevinburke/ssh_config`, first-match-wins, patterns + `Include` honoured), so host definitions aren't duplicated in `config.yaml`; an alias's `ProxyJump` auto-populates Phase 43's `jump:` (resolved recursively, cycle-guarded), which Phase 43 then dials. Explicit tuber fields (`identity:` / `jump:` / `ssh: me@x:port`) override ssh-config; a missing alias is used literally (openssh-faithful), and only an unreadable `~/.ssh/config` or a ProxyJump cycle/depth is a clear load error. The dial path is unchanged — this is a config-layer resolution. depends_on [43].
 - **Phase 45** — Shell completions (done, `[x]`): dynamic TAB completion of tuber names for `enable` / `disable` / `restart` / `forward` and `logs --tuber` (via `ValidArgsFunction` / `RegisterFlagCompletionFunc`; source = `config.yaml` load, so it works with no daemon running). Cobra's `completion bash/zsh/fish/powershell` already generates the shell script; the README documents per-shell sourcing (`eval` / `source`, document-only — no packaging changes). Additive ⇒ MINOR (`v1.3.0`). depends_on [].
 - **Phase 46** — Tunnel tags / groups (done, `[x]`): `tags:` on a tuber; `enable` / `disable` / `restart --tag X` operate on every tuber with that tag (with `--tag` TAB-completion of the distinct values from `config.yaml`); a precise `#tag` filter in the TUI (a leading `#` is an exact tag selector — `#db` matches a tuber *tagged* `db`, not one merely *named* `db-stage`); and `a` / `x` (enable/disable-all) respect the active `/` filter for instant group ops (no filter ⇒ byte-identical to before). `forward.Status` carries tags so `list` / `list --json` and the TUI show and filter on them over IPC (no new IPC method); the editor gains a tags field. Tags render as `#tag` tokens everywhere (byte-identical to the filter syntax); in the TUI they live in the Phase-39 detail strip (≤1 line, an error wins) rather than a new column, keeping the Phase-38 responsive layout intact. Additive ⇒ MINOR (`v1.4.0`). depends_on [].
-- **Phase 47** — Windows SCM autostart (in progress, `[~]`): replaces the Phase-17 HKCU `Run`-key autostart with a real Service Control Manager service so the daemon starts at **boot** (not logon), runs **without anyone logged in** (SCM logs on the install-time user — the password is collected once at `portato install` and kept as an LSA secret), and `install` **starts the daemon immediately** (parity with macOS `launchctl bootstrap` / Linux `systemctl --user enable --now`). Also fixes the Scoop drift failure mode (`portato install` captures a version-pinned path that breaks on the next `scoop update`; the service path is rewritten to Scoop's stable `current` junction), makes `portato stop` graceful (sends `svc.Stop` instead of `TerminateProcess`), and keeps the Phase-17 Run-key mechanism behind `--legacy-runkey` for locked-down environments. The deferred refinement from the end of Phase 17. depends_on [17].
+- **Phase 47** — Windows SCM autostart (done, `[x]`; shipped in v1.5.0, verified and hardened through v1.6.1): replaces the Phase-17 HKCU `Run`-key autostart with a real Service Control Manager service so the daemon starts at **boot** (not logon), runs **without anyone logged in** (SCM logs on the install-time user — the password is collected once at `portato install` and kept as an LSA secret), and `install` **starts the daemon immediately** (parity with macOS `launchctl bootstrap` / Linux `systemctl --user enable --now`). Also fixes the Scoop drift failure mode (`portato install` captures a version-pinned path that breaks on the next `scoop update`; the service path is rewritten to Scoop's stable `current` junction), makes `portato stop` graceful (sends `svc.Stop` instead of `TerminateProcess`), and keeps the Phase-17 Run-key mechanism behind `--legacy-runkey` for locked-down environments. The deferred refinement from the end of Phase 17. The final verification (real reboot, no login) surfaced and fixed three IPC gaps shipped as v1.6.1: the named pipe's explicit SDDL (an unelevated `list`/`doctor` reaches the boot-started service), pidAlive treating an unopenable session-0 PID as alive (the discovery marker is no longer culled), and `doctor` seeing the SCM service without elevation. depends_on [17].
 - **Phase 48** — import forwards from `~/.ssh/config` (done, `[x]`): `portato import` (+ a fresh-install one-time offer) scans `LocalForward` / `RemoteForward` / `DynamicForward` via the Phase-44 config reader (`GetAll`, so multi-forward hosts import fully) and creates `enabled: false` tubers — a one-time copy that never modifies ssh_config; the nudge is marker-gated (`fresh_install` / `import_offered` in the state dir), interactive-only, never repeats, and never fires for upgrading users. depends_on [44].
 
 ## Current work
 
-**Phases 0–46 and 48 are all `[x]` (47 awaits a Windows-PC reboot for its
-final verification).** The most recent batch:
+**Phases 0–48 are all `[x]` — the roadmap is complete.** The most recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
@@ -304,6 +308,24 @@ final verification).** The most recent batch:
   in the TUI they live in the Phase-39 detail strip (≤1 line, an error wins)
   rather than a new column, keeping the Phase-38 responsive layout intact.
   Additive ⇒ MINOR (`v1.4.0`).
+
+- **Phase 47** — Windows SCM autostart (done, `[x]`): the final reboot
+  verification on the office Windows PC closed the last open DoD — after a
+  real reboot with no user logged in, the delayed-auto-start service brings
+  the daemon up (log entries at boot+2min, discovery marker intact) and an
+  unelevated `portato list` answers right after login. That verification
+  surfaced three IPC gaps, all fixed and shipped in **v1.6.1**: the named
+  pipe now carries an explicit SDDL (GENERIC_ALL for SYSTEM,
+  Administrators, and the process user's SID — previously the service
+  token's default DACL denied the same user's interactive session), a
+  Windows pidAlive misread access-denied on the session-0 service process
+  as dead and culled a live daemon's discovery marker, and
+  `doctor`/`SCMInstalled` required SCM ALL_ACCESS (now minimal rights, no
+  elevation). The `win-rdp` tunnel itself needed `GatewayPorts
+  clientspecified` on the bastion (server-side, our phase-41 diagnostics
+  pointed straight at it). The windows-smoke CI job now also runs the
+  windows-tagged unit tests, which had never executed anywhere before.
+  Shipped in v1.5.0; verification fixes in v1.6.1.
 
 - **Phase 48** — import forwards from `~/.ssh/config` (done, `[x]`):
   `portato import [<pattern>…]` (with `--all` / `--from` / `--dry-run` /

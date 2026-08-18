@@ -1,7 +1,7 @@
 ---
 phase: 47
 title: "Windows autostart via Service Control Manager"
-status: in-progress
+status: done
 depends_on: [17]
 ---
 
@@ -177,34 +177,34 @@ migration and no `~/.ssh` copying.
 
 ## Definition of Done
 
-- [ ] On a Windows host, `portato install` registers an SCM service named
+- [x] On a Windows host, `portato install` registers an SCM service named
       `Portato` (`StartAutomatic`, `DelayedAutoStart=true`,
       `SERVICE_WIN32_OWN_PROCESS`, runs as the install-time user, recovery =
       `SC_ACTION_RESTART` after 30 s) and the daemon is reachable via
       `portato list` immediately after install returns — no logoff/reboot
       needed.
-- [ ] After a real Windows reboot with **no user logged in**, the daemon is
+- [x] After a real Windows reboot with **no user logged in**, the daemon is
       up and `portato list` answers once a user logs in (proving the service
       started at boot under the stored credentials).
-- [ ] `portato uninstall` stops and removes the service; a subsequent
+- [x] `portato uninstall` stops and removes the service; a subsequent
       `Get-Service Portato` fails with "Cannot find any service".
-- [ ] `portato stop` gracefully stops the running service (state → Stopped)
+- [x] `portato stop` gracefully stops the running service (state → Stopped)
       rather than `TerminateProcess`-killing it.
-- [ ] `portato doctor` reports the SCM service state (Running / Stopped /
+- [x] `portato doctor` reports the SCM service state (Running / Stopped /
       Not installed) on Windows.
-- [ ] `portato install --legacy-runkey` reproduces the Phase-17 HKCU `Run`
+- [x] `portato install --legacy-runkey` reproduces the Phase-17 HKCU `Run`
       behaviour exactly (regression for locked-down environments).
-- [ ] After `scoop update portato`, the previously-installed SCM service
+- [x] After `scoop update portato`, the previously-installed SCM service
       still starts (the binary path points at the stable `current`
       junction, not the pruned version directory).
-- [ ] `GOOS=windows go build ./...`, `GOOS=windows go vet ./...`,
+- [x] `GOOS=windows go build ./...`, `GOOS=windows go vet ./...`,
       `gofmt -l .`, and `golangci-lint run ./...` are all clean; new
       functions stay under gocyclo 15; the phase's unit tests are green.
-- [ ] darwin/linux behaviour is byte-identical (all SCM code is
+- [x] darwin/linux behaviour is byte-identical (all SCM code is
       `//go:build windows`; the `runDaemon` refactor is pure extraction).
-- [ ] The `windows-smoke` CI job runs green with the SCM install/start/stop/
+- [x] The `windows-smoke` CI job runs green with the SCM install/start/stop/
       uninstall sequence and the `--legacy-runkey` regression block.
-- [ ] SPEC §13, README, and `phase-17-windows.md` cross-link updated; this
+- [x] SPEC §13, README, and `phase-17-windows.md` cross-link updated; this
       file's status and the ROADMAP row flip together on completion.
 
 ## Verification
