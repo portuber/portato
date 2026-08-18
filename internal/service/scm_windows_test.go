@@ -69,6 +69,14 @@ func (f *fakeSCM) open(name string) (scmService, error) {
 	return nil, windows.ERROR_SERVICE_DOES_NOT_EXIST
 }
 
+// installed mirrors realSCM.installed: presence in the fake service table.
+func (f *fakeSCM) installed(name string) bool {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	_, ok := f.services[name]
+	return ok
+}
+
 // fakeSvc records every operation windowsInstaller/StopService performs.
 type fakeSvc struct {
 	name            string

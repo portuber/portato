@@ -30,6 +30,7 @@ type scmService interface {
 type scmAPI interface {
 	create(name, exepath string, cfg mgr.Config, args []string) (scmService, error)
 	open(name string) (scmService, error)
+	installed(name string) bool
 }
 
 // realSCM is the production scmAPI: a thin adapter over golang.org/x/sys/
@@ -98,3 +99,22 @@ func (r realSvc) control(c svc.Cmd) (svc.Status, error) { return r.s.Control(c) 
 func (r realSvc) query() (svc.Status, error)            { return r.s.Query() }
 func (r realSvc) delete() error                         { return r.s.Delete() }
 func (r realSvc) close() error                          { return r.s.Close() }
+
+// installed reports whether the named service is registered. It deliberately
+// avoids mgr.Connect / OpenService through the ALL_ACCESS-defaulting helpers:
+// SC_MANAGER_CONNECT + SERVICE_QUERY_STATUS are granted to ordinary users, so
+// an unelevated `portato doctor` sees a real service instead of an
+// access-denied misread as "not installed" (the Phase-47 verification fix).
+func (realSCM) installed(name string) bool {
+	m, err := windows.OpenSCManager(nil, nil, windows.SC_MANAGER_CONNECT)
+	if err != nil {
+		return false
+	}
+	defer windows.CloseServiceHandle(m)
+	s, err := windows.OpenService(m, windows.StringToUTF16Ptr(name), windows.SERVICE_QUERY_STATUS)
+	if err != nil {
+		return false
+	}
+	_ = windows.CloseServiceHandle(s)
+	return true
+}
