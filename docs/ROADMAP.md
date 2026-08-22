@@ -64,7 +64,7 @@
 | 46  | Tunnel tags / groups              | `[x]` | [phase-46-tunnel-tags.md](./phases/phase-46-tunnel-tags.md) |
 | 47  | Windows SCM autostart             | `[x]`  | [phase-47-windows-scm-autostart.md](./phases/phase-47-windows-scm-autostart.md) |
 | 48  | Import forwards from ssh_config   | `[x]`  | [phase-48-ssh-config-import.md](./phases/phase-48-ssh-config-import.md) |
-| 49  | Update checker (consent-gated)    | `[ ]`  | [phase-49-update-checker.md](./phases/phase-49-update-checker.md) |
+| 49  | Update checker (consent-gated)    | `[~]`  | [phase-49-update-checker.md](./phases/phase-49-update-checker.md) |
 | 50  | Self-update (update apply)        | `[ ]`  | [phase-50-self-update.md](./phases/phase-50-self-update.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done

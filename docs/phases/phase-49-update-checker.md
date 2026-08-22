@@ -1,7 +1,7 @@
 ---
 phase: 49
 title: "Update checker (GitHub Releases check, consent-gated background polling)"
-status: todo
+status: in-progress
 depends_on: [21]
 ---
 
