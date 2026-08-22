@@ -61,6 +61,9 @@ func runDaemon(ctx context.Context) error {
 	if ipcTokenFlag == "off" || os.Getenv("PORTATO_NO_IPC_TOKEN") == "1" {
 		daemon.SetIpcTokenDisabled(true)
 	}
+	// The background update poll identifies itself as this binary's version
+	// (Phase 49); set before any goroutine could fire a check.
+	daemon.SetUpdateUserAgent("portato/" + version)
 
 	path := cfgFile
 	if path == "" {

@@ -110,6 +110,10 @@ type Server struct {
 	// only the production daemon watches. Started in Start, stopped in Shutdown.
 	watcher *watcher
 
+	// updater is the phase-49 background update poll (consent-gated, 24h
+	// TTL). nil on servers built via newServer (tests); started in Start.
+	updater *updateChecker
+
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -198,6 +202,7 @@ func New(cfg *config.Config, cfgPath string, log *slog.Logger, ring *routelog.Ri
 	s.engine = forward.NewEngine(s.ctx, cfg, log, store, passwordStore)
 	s.ipcToken = !ipcTokenDisabled
 	s.watcher = newWatcher(cfgPath, s.reloadFromWatch, log)
+	s.updater = newUpdateChecker(log)
 	return s, nil
 }
 
@@ -272,6 +277,9 @@ func (s *Server) Start(ctx context.Context) error {
 	s.adopted = nil
 	if s.watcher != nil {
 		s.watcher.start()
+	}
+	if s.updater != nil {
+		go s.updater.run(s.ctx, s.cfgPath, config.Load)
 	}
 
 	serveErr := make(chan error, 1)
