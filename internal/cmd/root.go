@@ -93,6 +93,11 @@ func runStandalone() error {
 	// config does not consume the offer.
 	cfg = maybeOfferImport(path, cfg)
 
+	// Phase-49 one-time consent ask: after the import offer (which owns
+	// the first screen), ask about background update checks once; the
+	// daemon branch never asks, and a non-TTY launch leaves it pending.
+	cfg = maybeAskUpdateConsent(path, cfg)
+
 	logger, ring, closer, err := routelog.Setup("", logLevel, logOptions(cfg))
 	if err != nil {
 		return fmt.Errorf("setup logger: %w", err)

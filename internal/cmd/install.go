@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+
+	"github.com/portuber/portato/internal/config"
 )
 
 var installCmd = &cobra.Command{
@@ -28,6 +30,16 @@ func installRunE(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "%s\nSee: %s\n", installMessage(opts), path)
+
+	// Phase-49: install starts the daemon that would do the background
+	// polling, so it is the natural moment for the one-time consent ask
+	// (TTY only; any other state — already answered, non-interactive —
+	// stays silent).
+	cfgPath := cfgFile
+	if cfgPath == "" {
+		cfgPath = config.DefaultPath()
+	}
+	maybeAskConsentTTY(cfgPath)
 	return nil
 }
 

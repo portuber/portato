@@ -129,6 +129,23 @@ func writeCheckCache(latest string) {
 	})
 }
 
+// formatCheckAge renders how long ago the cache was last written ("2h ago",
+// "never") for the doctor line.
+func formatCheckAge(now, checked time.Time) string {
+	if checked.IsZero() {
+		return "never"
+	}
+	d := now.Sub(checked).Round(time.Minute)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d.Minutes()))
+	default:
+		return fmt.Sprintf("%dh ago", int(d.Hours()))
+	}
+}
+
 func updateConsentRunE(cmd *cobra.Command, args []string) error {
 	out := cmd.OutOrStdout()
 	path := cfgFile

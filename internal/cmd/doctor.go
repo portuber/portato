@@ -22,6 +22,7 @@ import (
 	"github.com/portuber/portato/internal/forward"
 	routelog "github.com/portuber/portato/internal/log"
 	"github.com/portuber/portato/internal/service"
+	"github.com/portuber/portato/internal/update"
 )
 
 var doctorCmd = &cobra.Command{
@@ -99,6 +100,9 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 	// 6. Log file + rotation.
 	checkLogs(d)
 
+	// 6b. Update checker state (Phase 49): consent + cached verdict.
+	checkUpdate(d, cfgPath)
+
 	// 7. Daemon reachability + 8. IPC socket permissions.
 	checkDaemon(d)
 
@@ -123,7 +127,45 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 	if d.failed > 0 {
 		return fmt.Errorf("doctor: %d check(s) failed", d.failed)
 	}
+
+	// Phase-49 one-time consent ask: doctor is one of the interactive
+	// surfaces (install and the standalone launcher are the others). Only
+	// after every check passed — never mid-diagnosis — and only when the
+	// question is still pending; scriptability is preserved (non-TTY is
+	// silent, the exit code is unaffected).
+	maybeAskConsentTTY(cfgPath)
 	return nil
+}
+
+// checkUpdate reports the update-checker state (Phase 49): consent plus the
+// cached verdict. Informational in every state — update checks are optional;
+// a pending question is not a failure.
+func checkUpdate(d *doctor, cfgPath string) {
+	cfg, err := config.Load(cfgPath)
+	if err != nil {
+		return
+	}
+	switch {
+	case cfg.Defaults.UpdateCheck != nil && *cfg.Defaults.UpdateCheck:
+		cache, _ := update.LoadCache()
+		age := formatCheckAge(time.Now(), cache.LastCheck)
+		cur, curOK := update.ParseVersion(version)
+		latest, latestOK := update.ParseVersion(cache.Latest)
+		switch {
+		case cache.Latest == "":
+			d.info("update", "checks on, no result yet")
+		case !latestOK || !curOK:
+			d.info("update", "latest %s (checked %s)", cache.Latest, age)
+		case cur.Compare(latest) < 0:
+			d.ok("update", "%s available (checked %s) — portato update check", latest, age)
+		default:
+			d.ok("update", "up to date (checked %s)", age)
+		}
+	case cfg.Defaults.UpdateCheck != nil:
+		d.info("update", "checks off (portato update consent on)")
+	default:
+		d.info("update", "not asked yet — portato update consent on|off")
+	}
 }
 
 // checkKnownHosts reports the resolved known_hosts file: auto-created on first
