@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 
 	"github.com/portuber/portato/internal/controller"
+	"github.com/portuber/portato/internal/update"
 )
 
 type Model struct {
@@ -102,6 +103,13 @@ type Model struct {
 
 	cfgPath string
 
+	// updateVer is the running binary's version (Options.Version); updateHint
+	// is the derived `update: vX.Y.Z` header segment (Phase 49) — empty when
+	// the cache holds nothing newer or the build is not a comparable release.
+	// Computed once in New; the TUI performs no update network I/O.
+	updateVer  string
+	updateHint string
+
 	// help is the Phase 38 full-screen help overlay (? / esc), nil when
 	// inactive. It mirrors logsView as a sub-model so every binding is
 	// reachable (scrollable) at any terminal size; the potato logo is
@@ -112,11 +120,12 @@ type Model struct {
 
 func New(ctrl controller.Controller, opt Options) Model {
 	m := Model{
-		ctrl:    ctrl,
-		list:    ctrl.List(),
-		mode:    opt.Mode,
-		attach:  strings.HasPrefix(opt.Mode, "attach"),
-		cfgPath: opt.CfgPath,
+		ctrl:      ctrl,
+		list:      ctrl.List(),
+		mode:      opt.Mode,
+		attach:    strings.HasPrefix(opt.Mode, "attach"),
+		cfgPath:   opt.CfgPath,
+		updateVer: opt.Version,
 	}
 	// Seed the palette with the environment-only resolver as the pre-message
 	// default (covers the first frame and unit tests). The runtime OSC-11
@@ -126,8 +135,31 @@ func New(ctrl controller.Controller, opt Options) Model {
 	m.filter = newFilterInput()
 	m.passphraseInput = newPassphraseInput()
 	m.passwordInput = newPasswordInput()
+	m.updateHint = updateHintFromCache(m.updateVer)
 	m.clampCursor()
 	return m
+}
+
+// updateHintFromCache derives the header's `update: vX.Y.Z` segment (Phase
+// 49): shown only when the running version is a comparable release AND the
+// shared check cache (written by the daemon poll or an explicit
+// `portato update check`) holds a strictly newer one. Empty otherwise —
+// dev builds, up-to-date caches, no cache at all. Read once at launch; the
+// TUI never dials the network.
+func updateHintFromCache(current string) string {
+	cur, ok := update.ParseVersion(current)
+	if !ok {
+		return ""
+	}
+	cache, err := update.LoadCache()
+	if err != nil {
+		return ""
+	}
+	latest, ok := update.ParseVersion(cache.Latest)
+	if !ok || cur.Compare(latest) >= 0 {
+		return ""
+	}
+	return "update: " + latest.String()
 }
 
 // newFilterInput builds the `/`-opened substring filter input. It has no prompt

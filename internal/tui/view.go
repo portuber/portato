@@ -315,6 +315,9 @@ func (m Model) header() string {
 	}
 	left += " " + m.pal.dim.Render("— Port Forwarding")
 	right := m.pal.mode.Render("mode: " + m.mode)
+	if m.updateHint != "" {
+		right += "  " + m.pal.mode.Render(m.updateHint)
+	}
 	return joinRight(left, right, m.width-2*sideMargin)
 }
 

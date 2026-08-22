@@ -67,7 +67,7 @@ func rootRunE(cmd *cobra.Command, _ []string) error {
 		if socket, err := daemon.ResolveSocket(); err == nil && socket != "" && probeDaemon(socket) {
 			ctrl := controller.NewRemote(client.New(socket))
 			defer ctrl.Close()
-			return tui.Run(ctrl, tui.Options{Mode: "attach"})
+			return tui.Run(ctrl, tui.Options{Mode: "attach", Version: version})
 		}
 	}
 	return runStandalone()
@@ -112,7 +112,7 @@ func runStandalone() error {
 	// hand-off to the daemon brings up the same set instead of surprise tubers.
 	ctrl.StartEnabled()
 
-	return tui.Run(ctrl, tui.Options{Mode: "standalone", CfgPath: path})
+	return tui.Run(ctrl, tui.Options{Mode: "standalone", CfgPath: path, Version: version})
 }
 
 // probeDaemon reports whether a live daemon is answering on the socket within

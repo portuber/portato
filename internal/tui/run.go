@@ -17,6 +17,11 @@ type Options struct {
 	Mode string
 	// CfgPath is passed to the spawned daemon (--config) on hand-off.
 	CfgPath string
+	// Version is the running binary's version string (Phase 49): when the
+	// shared update-check cache holds a strictly newer release, the header
+	// shows an `update: vX.Y.Z` segment. Empty or non-release strings never
+	// show a hint. The TUI itself performs no network I/O.
+	Version string
 }
 
 func Run(ctrl controller.Controller, opt Options) error {
