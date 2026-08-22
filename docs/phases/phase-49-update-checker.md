@@ -77,51 +77,62 @@ Design locked with the maintainer:
       non-parseable *current* build (`dev`, `unknown`, `*-next` snapshots) is
       "not comparable": commands report `current dev (not comparable); latest
       vX.Y.Z` instead of a bogus verdict.
-- [ ] **State file**: `Load/Save` of `update.json` — atomic (tmp+rename,
-      mode `0600`), schema `{"consent":"ask|on|off","last_check":<RFC3339>,
-      "latest":"vX.Y.Z"}`. Written fields: consent on ask/answer;
-      last_check+latest on every successful network check. The daemon is the
-      only background writer; `update check` / `update consent` write it in
-      the foreground. Reuses the `PORTATO_STATE_HOME` seam.
+- [ ] **Consent + check cache**: consent is a *user setting* —
+      `defaults.update_check: true|false` in `config.yaml`; **absent = "not
+      asked yet"** (the tri-state without a third value). Persisted through
+      the comment-preserving AST patcher (`SetDefaultsBoolNode`); `ask` = the
+      key is removed, re-arming the question. The Phase-28 reload watcher
+      picks a live edit up for free. The *machine* half — `CheckCache
+      {last_check, latest}` — lives in `xdg.StateHome/portato/update.json`
+      (atomic tmp+rename, 0600, `PORTATO_STATE_HOME` seam): written only on a
+      successful check, corrupt = zero (the cache is disposable).
 - [ ] **One-time consent ask**: `maybeAskUpdateConsent()` in
       `runStandalone` (root.go:80) *after* `maybeOfferImport` (root.go:94) —
       the import offer owns the very first screen. Gate:
-      `consent == "ask"` && `term.IsTerminal(stdin)`. Ask
-      "check for updates in the background (GitHub, once a day)? [y/N]";
-      either answer is final and persisted. The attach branch, every CLI
-      command and the daemon never ask — a daemon-first bootstrap leaves the
-      question pending for the next interactive launch (the Phase-48
-      fresh/import marker pair behaviour).
+- [ ] **One-time consent ask**: `maybeAskUpdateConsent()` in
+      `runStandalone` (root.go:80) *after* `maybeOfferImport` (root.go:94) —
+      the import offer owns the very first screen. Gate:
+      `defaults.update_check == nil` && `term.IsTerminal(stdin)`. Ask
+      "Check for portato updates in the background (GitHub, once a day)?
+      [Y/n]" — Enter/y defaults to **yes** (low-stakes, reversible with one
+      command); either answer is final, persisted via `SetDefaultsBoolNode`,
+      and never asked again. The attach branch, every CLI command and the
+      daemon never ask — a daemon-first bootstrap leaves the key absent for
+      the next interactive launch (the Phase-48 fresh/import marker pair
+      behaviour).
 - [ ] **Ask at `install`**: after a successful install (TTY only), the same
       question with the same persistence — install is the natural moment
       (the daemon it starts will do the polling).
-- [ ] **`doctor`**: a `update` check line — `consent: off` →
+- [ ] **`doctor`**: an `update` check line — `update_check: false` →
       "checks off (`portato update consent on`)"; cache newer →
       "vX.Y.Z available (checked 2h ago)"; up to date → "up to date
       (checked 5h ago)"; never checked → the consent hint. When stdin is a
-      TTY and consent is still `ask`, ask the same one-time question;
+      TTY and the key is still absent, ask the same one-time question;
       otherwise just print the hint (doctor must stay scriptable).
-- [ ] **Daemon background check**: only when consent is `on` — a ticker
-      (1h) checks `last_check`; older than 24h → `Latest(ctx)`, write the
-      cache. Failures log at debug and leave the cache untouched; no retry
-      storm (the next attempt waits for the next tick + TTL). Consent
-      flipped to `off` at runtime → the ticker observes the state file and
-      goes idle (re-read on tick; no restart needed).
+- [ ] **Daemon background check**: only when `update_check: true` — a ticker
+      (1h) re-reads the config (a live `consent` edit reaches the daemon via
+      the existing reload path) and checks the cache; `last_check` older
+      than 24h → `Latest(ctx)`, write the cache. Failures log at debug and
+      leave the cache untouched; no retry storm (a failed check does not
+      advance `last_check`, so retries wait for tick + TTL). Consent flipped
+      to `off` at runtime → the ticker sees it and goes idle.
 - [ ] **TUI header hint**: when the cached `latest` is newer than the
       running version, the header line gains a short `update: vX.Y.Z`
       segment (existing hint styling, theme-aware, one segment — no new
-      rows). The TUI never performs network I/O; it reads the state file at
-      launch. Hidden when up to date / not comparable / consent off.
+      rows). The TUI never performs network I/O; it reads the cache at
+      launch. Hidden when up to date / not comparable / checks off.
 - [ ] **Commands**: `portato update check` (explicit check, ignores consent
       and cache age, prints current / latest / release URL; exit 0 on
       "up to date" and on "available", non-zero only on error) and
-      `portato update consent on|off|ask` (writes the state file, prints
-      what changed; `ask` re-arms the one-time question).
+      `portato update consent on|off|ask` (on/off set the config key, ask
+      removes it; prints what changed; `ask` re-arms the one-time question).
 - [ ] **Tests**: `ParseVersion`/`Compare` table (equal/major/minor/patch,
       `v`-prefix optional, garbage); `Latest` against `httptest` (200 parse,
-      403 rate-limit, network refusal); state-file round-trip + atomic write
-      + `PORTATO_STATE_HOME`; consent ask gating (non-TTY does not consume
-      `ask`; y/n persist; daemon path never asks); daemon TTL logic (clock
+      403 rate-limit, network refusal); cache round-trip + 0600 + corrupt →
+      zero + `NeedsCheck` TTL table; `SetDefaultsBoolNode` (set/replace/
+      remove-re-arms, absent-noop keeps bytes, defaults created, comments
+      preserved); consent ask gating (non-TTY does not consume the absent
+      key; y/n persist; daemon path never asks); daemon TTL logic (clock
       seam: fresh → checks, 23h-old → skips, 25h-old → checks); doctor line
       in all states; TUI header shows/hides per cache.
 - [ ] **Docs**: SPEC §3 command list (`update check`, `update consent`) and
@@ -135,10 +146,11 @@ Design locked with the maintainer:
       the fixture path through `SetBaseForTest` works with zero real network
       (test), and `NewClient` dials the compile-time `DefaultBase` when no
       seam is installed (test).
-- [ ] A fresh state file + first interactive launch asks the consent
-      question exactly once; `y` enables the daemon's daily check (proved by
-      a fake-clock test), `n` never asks again and no background request
-      ever happens; `update consent on|off|ask` round-trips.
+- [ ] A config with no `defaults.update_check` + first interactive launch
+      asks the consent question exactly once; `y`/Enter enables the daemon's
+      daily check (proved by a fake-clock test), `n` never asks again and no
+      background request ever happens; `update consent on|off|ask`
+      round-trips (ask = key removed, question re-armed).
 - [ ] A daemon-first bootstrap does not consume the ask.
 - [ ] `doctor` prints the update line in all three consent states.
 - [ ] The TUI header shows the hint only when the cache holds a newer
@@ -158,9 +170,9 @@ go test ./internal/update/... -v
 GOOS=windows go build ./... && GOOS=windows go test -tags windows ./internal/cmd/... -run TestUpdate -v
 ```
 
-Manual: remove `update.json` from the state dir → first TUI launch asks →
-answer `y` → `doctor` reports the check; `update consent off` → the daemon
-ticker goes idle (debug log).
+Manual: set `defaults.update_check: true` (or answer `y` on a first launch
+without the key) → `doctor` reports the check once the daemon has polled;
+`update consent off` → the daemon ticker goes idle (debug log).
 
 ## Technical details
 
@@ -171,14 +183,21 @@ ticker goes idle (debug log).
 - **Why hand-rolled compare:** `golang.org/x/mod/semver` is not in the module
   graph and pulls a module for what is, under the no-prerelease policy, an
   integer-triple comparison (~20 lines, fully table-tested).
-- **Consent is `"ask"` initially**, not absent: the tri-state in one field
-  keeps the file schema stable (`ask` = question pending; `off` = refused;
-  `on` = opted in). Missing file ⇒ `ask` (fresh install); corrupt file ⇒
-  treated as `ask` and rewritten on the next persist.
+- **Consent lives in config, cache in state** (a maintainer decision that
+  revised the original all-in-state plan): consent is a *user setting* —
+  visible and hand-editable in `config.yaml`, persisted through the same
+  comment-preserving AST patching as `enabled:`, and a live edit reaches a
+  running daemon through the existing Phase-28 reload watcher with zero new
+  plumbing. The tri-state needs no third value: **absent = "not asked yet"**,
+  `true` = daily checks, `false` = off; `update consent ask` removes the key.
+  The cache (`last_check`/`latest`) is *machine state* — it stays in
+  `xdg.StateHome/portato/update.json` so the config is not rewritten on every
+  poll. Trade-off accepted: copying `config.yaml` to a new machine carries
+  the answered consent (no second ask there).
 - **Ordering with the Phase-48 nudge:** import offer first (it edits the
   config the TUI then loads), consent ask second — both one-shot, both
-  standalone-only; two independent markers mean no cross-coupling.
-- **The TUI reads the state file at launch**, not an IPC call: works in
+  standalone-only; two independent mechanisms mean no cross-coupling.
+- **The TUI reads the cache at launch**, not an IPC call: works in
   standalone (no daemon) and stays consistent with "no new IPC methods".
 - **Rate-limit handling:** a 403 with `X-RateLimit-Remaining: 0` is a
   temporary error — the cache keeps the last good `latest` and `last_check`

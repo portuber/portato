@@ -77,6 +77,15 @@ type Defaults struct {
 	// persistence, mirroring IdentityPassphraseStore.
 	SSHPasswordStore bool `yaml:"ssh_password_store" json:"ssh_password_store"`
 
+	// UpdateCheck (Phase 49) gates the background update check: an anonymous
+	// GET to GitHub's releases/latest API at most once per 24h. nil (absent)
+	// means "not asked yet" — the first interactive launch (and install /
+	// doctor) asks a one-time question and persists the answer here; true =
+	// the daemon checks daily; false = no background network traffic ever.
+	// Explicitly editable by hand or via `portato update consent on|off|ask`.
+	// Removing the key re-arms the one-time question.
+	UpdateCheck *bool `yaml:"update_check,omitempty" json:"update_check,omitempty"`
+
 	// Log configures the persistent file's size-capped rotation (Phase 22). The
 	// fields are hints: a zero/negative value falls back to the rotating
 	// writer's package defaults at setup time, so an absent `log:` block keeps

@@ -253,6 +253,67 @@ func (c *Config) WithTuberMoved(name string, delta int) (*Config, error) {
 	return out, nil
 }
 
+// SetDefaultsBoolNode sets or removes a boolean leaf under defaults: in the
+// YAML file at path (Phase 49: defaults.update_check). value == nil removes
+// the key (re-arming the one-time consent question); otherwise the leaf is
+// set/created in place, leaving every other key and comment untouched. When
+// the whole defaults: mapping is absent and value != nil, it is created.
+func SetDefaultsBoolNode(path, key string, value *bool) error {
+	doc, err := LoadNode(path)
+	if err != nil {
+		return err
+	}
+	root, err := documentRoot(doc)
+	if err != nil {
+		return err
+	}
+	defaults := mappingValue(root, "defaults")
+	if value == nil {
+		if defaults == nil || defaults.Kind != yaml.MappingNode {
+			return nil
+		}
+		if !removeMappingEntry(defaults, key) {
+			return nil
+		}
+		return SaveNode(path, doc)
+	}
+	if defaults == nil {
+		keyNode := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "defaults"}
+		defaults = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		root.Content = append(root.Content, keyNode, defaults)
+	} else if defaults.Kind != yaml.MappingNode {
+		return fmt.Errorf("config defaults is not a mapping")
+	}
+	if existing := mappingValue(defaults, key); existing != nil {
+		existing.Tag = "!!bool"
+		existing.Value = boolString(*value)
+		return SaveNode(path, doc)
+	}
+	k := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key}
+	v := &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: boolString(*value)}
+	defaults.Content = append(defaults.Content, k, v)
+	return SaveNode(path, doc)
+}
+
+func boolString(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+// removeMappingEntry deletes key (and its value node) from a mapping node,
+// reporting whether the key was present.
+func removeMappingEntry(mapping *yaml.Node, key string) bool {
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
+			return true
+		}
+	}
+	return false
+}
+
 // Clone returns a deep copy of the config so callers can mutate it without
 // affecting the controller's in-memory state.
 func (c *Config) Clone() *Config { return c.clone() }
