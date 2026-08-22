@@ -25,7 +25,7 @@ checksum-verified, atomic, and leaves a one-level rollback
 ## Background
 
 Built entirely on Phase 49's machinery (`internal/update.Latest`, the state
-file, `PORTATO_UPDATE_URL`) and Phase 21's release shape:
+file, the in-repo `SetBaseForTest` seam) and Phase 21's release shape:
 
 - Every release publishes archives named by the goreleaser template
   (`.goreleaser.yml:51`): `portato_<v>_<macOS|Windows|linux>_<x86_64|arm64>`
@@ -101,7 +101,7 @@ file, `PORTATO_UPDATE_URL`) and Phase 21's release shape:
       the binary untouched; tar.gz and zip extraction (fixture archives);
       channel classification from path fixtures (+ the dpkg/rpm lookup
       behind a seam); full apply against an `httptest` "release" serving a
-      fixture binary + checksums (via `PORTATO_UPDATE_URL`): old file
+      fixture binary + checksums (via `update.SetBaseForTest`): old file
       swapped, `portato.old` exists, mode preserved, second run says "up to
       date"; PM channel → refusal text; `--yes` in a non-TTY; the daemon
       hint behind a probe seam.

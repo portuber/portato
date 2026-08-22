@@ -64,8 +64,11 @@ Design locked with the maintainer:
       PublishedAt, Assets}`; `Latest(ctx)` does
       `GET {base}/repos/portuber/portato/releases/latest` with a 10s timeout,
       `Accept: application/vnd.github+json`, a `portato/<version>` User-Agent;
-      base URL overridable via `PORTATO_UPDATE_URL` (the test seam and the
-      no-network manual verification path; default `https://api.github.com`).
+      the base URL is the compile-time `DefaultBase` (`https://api.github.com`)
+      — deliberately **not** runtime-configurable (no env, no flag), so the
+      checker (and the Phase-50 `apply`) can only ever talk to GitHub. The
+      in-repo test seam is `SetBaseForTest(t, base)` — a package-level
+      setter taking a testing-style hook; production code cannot call it.
       Error taxonomy: network / rate-limited (403 + `X-RateLimit-Remaining:
       0`) / malformed — all surfaced as plain errors, never panic.
 - [ ] **Compare**: `ParseVersion("vX.Y.Z") → ([3]int, bool)` (strip the `v`,
@@ -129,8 +132,9 @@ Design locked with the maintainer:
 
 - [ ] `portato update check` against the real repo prints current vs latest
       (+ URL) and exits 0; with the network cut it fails cleanly non-zero;
-      against `PORTATO_UPDATE_URL=<httptest>` it works with zero real
-      network (test).
+      the fixture path through `SetBaseForTest` works with zero real network
+      (test), and `NewClient` dials the compile-time `DefaultBase` when no
+      seam is installed (test).
 - [ ] A fresh state file + first interactive launch asks the consent
       question exactly once; `y` enables the daemon's daily check (proved by
       a fake-clock test), `n` never asks again and no background request
@@ -148,7 +152,7 @@ Design locked with the maintainer:
 
 ```sh
 make build
-PORTATO_UPDATE_URL=https://api.github.com bin/portato update check   # real check
+bin/portato update check                                             # real check against api.github.com
 bin/portato update consent on                                        # then: doctor shows the line
 go test ./internal/update/... -v
 GOOS=windows go build ./... && GOOS=windows go test -tags windows ./internal/cmd/... -run TestUpdate -v
