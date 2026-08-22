@@ -64,6 +64,7 @@
 | 46  | Tunnel tags / groups              | `[x]` | [phase-46-tunnel-tags.md](./phases/phase-46-tunnel-tags.md) |
 | 47  | Windows SCM autostart             | `[x]`  | [phase-47-windows-scm-autostart.md](./phases/phase-47-windows-scm-autostart.md) |
 | 48  | Import forwards from ssh_config   | `[x]`  | [phase-48-ssh-config-import.md](./phases/phase-48-ssh-config-import.md) |
+| 49  | Update checker (consent-gated)    | `[ ]`  | [phase-49-update-checker.md](./phases/phase-49-update-checker.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -77,9 +78,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
 ## Current focus
 
-**Phases 0–48 are all `[x]` — the roadmap is complete.** The last one to
-close was 47 (Windows SCM autostart), verified end-to-end on the office
-Windows PC across v1.5.x→v1.6.1; everything beyond it lives in
+**Phases 0–48 are all `[x]`; phase 49 (update checker) is planned (`[ ]`).**
+The last one to close was 47 (Windows SCM autostart), verified end-to-end on
+the office Windows PC across v1.5.x→v1.6.1; beyond it, the update checker is
+formalised as phase 49 (self-update will follow as its own phase) and the
+rest lives in
 [Post-1.0 candidate features](#post-10-candidate-features). The core
 includes ProxyJump (jump hosts), `~/.ssh/config` alias resolution and
 forward import, shell completion, and tunnel tags/groups. The stability
@@ -208,10 +211,12 @@ fixes only.
 - **Phase 46** — Tunnel tags / groups (done, `[x]`): `tags:` on a tuber; `enable` / `disable` / `restart --tag X` operate on every tuber with that tag (with `--tag` TAB-completion of the distinct values from `config.yaml`); a precise `#tag` filter in the TUI (a leading `#` is an exact tag selector — `#db` matches a tuber *tagged* `db`, not one merely *named* `db-stage`); and `a` / `x` (enable/disable-all) respect the active `/` filter for instant group ops (no filter ⇒ byte-identical to before). `forward.Status` carries tags so `list` / `list --json` and the TUI show and filter on them over IPC (no new IPC method); the editor gains a tags field. Tags render as `#tag` tokens everywhere (byte-identical to the filter syntax); in the TUI they live in the Phase-39 detail strip (≤1 line, an error wins) rather than a new column, keeping the Phase-38 responsive layout intact. Additive ⇒ MINOR (`v1.4.0`). depends_on [].
 - **Phase 47** — Windows SCM autostart (done, `[x]`; shipped in v1.5.0, verified and hardened through v1.6.1): replaces the Phase-17 HKCU `Run`-key autostart with a real Service Control Manager service so the daemon starts at **boot** (not logon), runs **without anyone logged in** (SCM logs on the install-time user — the password is collected once at `portato install` and kept as an LSA secret), and `install` **starts the daemon immediately** (parity with macOS `launchctl bootstrap` / Linux `systemctl --user enable --now`). Also fixes the Scoop drift failure mode (`portato install` captures a version-pinned path that breaks on the next `scoop update`; the service path is rewritten to Scoop's stable `current` junction), makes `portato stop` graceful (sends `svc.Stop` instead of `TerminateProcess`), and keeps the Phase-17 Run-key mechanism behind `--legacy-runkey` for locked-down environments. The deferred refinement from the end of Phase 17. The final verification (real reboot, no login) surfaced and fixed three IPC gaps shipped as v1.6.1: the named pipe's explicit SDDL (an unelevated `list`/`doctor` reaches the boot-started service), pidAlive treating an unopenable session-0 PID as alive (the discovery marker is no longer culled), and `doctor` seeing the SCM service without elevation. depends_on [17].
 - **Phase 48** — import forwards from `~/.ssh/config` (done, `[x]`): `portato import` (+ a fresh-install one-time offer) scans `LocalForward` / `RemoteForward` / `DynamicForward` via the Phase-44 config reader (`GetAll`, so multi-forward hosts import fully) and creates `enabled: false` tubers — a one-time copy that never modifies ssh_config; the nudge is marker-gated (`fresh_install` / `import_offered` in the state dir), interactive-only, never repeats, and never fires for upgrading users. depends_on [44].
+- **Phase 49** — update checker (planned, `[ ]`): `internal/update` + `portato update check` / `update consent`; a consent-gated daily GitHub `releases/latest` poll (anonymous, 24h TTL, state in `xdg.StateHome/portato/update.json` — `ask|on|off`) surfacing "vX.Y.Z available" in the TUI header and `portato doctor`; the one-time consent ask follows the Phase-48 nudge pattern (interactive launcher + install; the daemon never asks). Hand-rolled semver under the strict-`vX.Y.Z` VERSIONING policy; zero new dependencies. depends_on [21].
 
 ## Current work
 
-**Phases 0–48 are all `[x]` — the roadmap is complete.** The most recent batch:
+**Phases 0–48 are all `[x]`; 49 (update checker) is planned.** The most
+recent batch:
 
 - **Phase 36** — CI security hardening: a `govulncheck` workflow (PR/push +
   weekly cron) scanning dependencies for reachable CVEs, plus a `lint` job in
