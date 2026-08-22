@@ -76,6 +76,12 @@ portato --license       -> print the license summary and exit (pipe-safe; parall
 portato completion <shell> -> emit a TAB-completion script (bash|zsh|fish|powershell); source it so
                            enable/disable/restart/forward <name> and logs --tuber complete tuber
                            names from config.yaml (no daemon needed)
+portato update check    -> CLI: fetch the latest GitHub release and compare with the running
+                           binary (explicit, ignores consent and cache age; exit 0 on "available"
+                           and "up to date", non-zero only on error) (Phase 49)
+portato update consent <on|off|ask>
+                       -> set defaults.update_check: on = daily background checks, off = never,
+                           ask = forget the answer, re-ask on the next interactive launch (Phase 49)
 ```
 
 For `portato` (smart): the daemon's presence is detected by reading the discovery marker (§6) for its socket path and PID, then probing the socket.
@@ -324,6 +330,10 @@ defaults:
   identity_passphrase_store: false # opt-in (Phase 19): persist identity passphrases in the OS keyring
   password_auth: false            # opt-OUT (Phase 35): disable the SSH password fallback (on by default); set false to keep a tunnel key-only
   ssh_password_store: false       # opt-in (Phase 35): persist SSH passwords in the OS keyring (per account)
+  update_check: true              # optional (Phase 49): absent = not asked yet (one-time prompt on the
+                                  # first interactive launch); true = daily anonymous GitHub check by the
+                                  # daemon; false = no background checks ever. `portato update consent`
+                                  # manages it; removing the key re-arms the question.
   log:                            # optional (Phase 22): persistent log-rotation knobs
     max_size_mb: 1                # rotate the log file at this size; 0 -> default (1 MiB)
     max_age_days: 0               # purge rotated archives older than N days; 0 -> disabled
@@ -671,7 +681,58 @@ is blocked.
 - **Startup behavior:** on the first run, if there is no config — an example is created and the path is shown to the user.
 - **Tests:** the key packages (`config`, `forward`, `controller`) are covered by unit tests (Phases 1, 2, 6).
 
-## 16. Open questions (to resolve as we go)
+## 16. Update check (Phase 49; self-update arrives in a later phase)
+
+Portato can learn that a newer release exists — but never talks to the
+network before the user has answered a one-time question, and never
+applies anything on its own.
+
+- **Source:** `GET https://api.github.com/repos/portuber/portato/releases/latest`
+  (anonymous, 10s timeout, `portato/<version>` User-Agent). The base URL is
+  a compile-time constant — **not** runtime-configurable (no env, no
+  flag), so the checker can only ever talk to GitHub; in-repo tests
+  redirect via a package-internal seam. `releases/latest` resolves to the
+  newest non-draft non-prerelease release — exactly the project's
+  strict-`vX.Y.Z` VERSIONING policy. A 403 with `X-RateLimit-Remaining: 0`
+  is a temporary "try later" condition; version comparison is a
+  hand-rolled integer-triple (no `golang.org/x/mod` dependency); a dev or
+  snapshot build is "not comparable" rather than stale.
+- **Consent** is a user setting: `defaults.update_check` in `config.yaml`.
+  **Absent = "not asked yet"** — the first interactive surface (the
+  standalone launcher right after the Phase-48 import offer, `portato
+  install`, or a fully green `portato doctor`) asks once:
+  `Check for portato updates in the background (GitHub, once a day)? [Y/n]`
+  (Enter/y = yes — low stakes, one command to undo). Either answer is
+  persisted through the comment-preserving AST patcher and never asked
+  again; `portato update consent on|off|ask` manages it (ask removes the
+  key, re-arming the question). The daemon, attach and every other CLI
+  command never ask; a non-TTY launch does not consume the question. A
+  failed persist leaves it pending.
+- **The background poll** (daemon only, consent on): an hourly ticker
+  re-reads the config — so `consent off` takes effect within one tick,
+  no restart — and when the shared cache is past its 24h TTL performs one
+  anonymous GET and records `{last_check, latest}`. Failures log at debug
+  and never advance the clock (retry waits for tick+TTL; no storm). Off
+  consent the checker is fully idle: zero requests, zero writes.
+- **Cache:** `xdg.StateHome/portato/update.json` (`0600`, atomic
+  tmp+rename) — machine state, deliberately not in `config.yaml` so the
+  config is not rewritten on every poll. Missing or corrupt = "never
+  checked" (the cache is disposable). Surfaces read it without network
+  I/O: `portato doctor` (informational line in every consent/cache state)
+  and the TUI header (`update: vX.Y.Z` segment next to `mode:`, shown
+  only when the running version is a comparable release and the cache is
+  strictly newer).
+- **`portato update check`** is the explicit, consent-independent check:
+  prints current/latest/verdict + release URL; exit 0 on "available" and
+  "up to date", non-zero only on error. A successful check feeds the
+  cache; a dev build reports "not comparable" without poisoning it.
+- **Privacy:** the check sends no identifiers — an anonymous GET to
+  api.github.com is the entire footprint; `HTTPS_PROXY`/`NO_PROXY` are
+  honoured by the default transport.
+- **Not yet (a later phase):** downloading or applying an update — the
+  checker only reports; applying stays a deliberate user action.
+
+## 17. Open questions (to resolve as we go)
 
 - IPC authorization: only filesystem permissions (0600) or a token? -> **resolved (Phase 18)**: a 32-byte bearer token in `<socketDir>/portato.token`, layered on the `0600` socket; `--ipc-token off` disables it. See §6.
 - Where to store a passphrase for an identity when the agent is unavailable? -> **resolved (Phase 19)**: an in-memory cache (per process, so reconnects don't re-prompt) plus the OS keyring (macOS Keychain / Linux Secret Service / Windows Credential Manager via `zalando/go-keyring`) for cross-restart persistence. Opt-in keyring persistence via `defaults.identity_passphrase_store` (off by default); explicit `portato add-identity`/`forget-identity` always write/clear the keyring. Nothing is ever written to disk in plaintext. See §9.

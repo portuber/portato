@@ -148,6 +148,51 @@ portato completion powershell | Out-String | Invoke-Expression
 Restart your shell (or re-`source` the file), then `portato enable <TAB>`
 lists your tubers.
 
+## Updating
+
+Portato can tell you when a newer release is out — but it never touches
+the network before you agree, and it never updates itself on its own.
+
+- **One-time question.** On the first interactive launch (or at
+  `portato install` / a green `portato doctor`), you are asked once:
+
+  ```
+  Check for portato updates in the background (GitHub, once a day)? [Y/n]
+  ```
+
+  `Enter` or `y` enables a daily anonymous check by the daemon; `n`
+  declines. The answer is stored as `defaults.update_check` in
+  `config.yaml` and never asked again.
+
+- **Manual check, any time:**
+
+  ```sh
+  portato update check     # current vs latest + release URL; ignores consent
+  ```
+
+- **Change your mind:**
+
+  ```sh
+  portato update consent on     # daily background checks
+  portato update consent off    # none, ever
+  portato update consent ask    # forget the answer, ask again on next run
+  ```
+
+- **Where it shows up:** the TUI header gains an `update: vX.Y.Z` segment
+  when a newer release is known, and `portato doctor` reports the state
+  (off / pending / `vX.Y.Z available` / up to date).
+
+The check is an anonymous `GET` to `api.github.com`
+(`repos/portuber/portato/releases/latest`) — no identifiers, no telemetry;
+only the latest tag is recorded, in a local cache
+(`~/.local/state/portato/update.json` on Linux; the platform state dir
+elsewhere). The daemon polls at most once per 24h and only after consent;
+a flaky network never retries more than hourly. Applying an update stays
+a deliberate action — for now, use your install channel (`brew upgrade`,
+`scoop update`, `apt upgrade`, or download from
+[releases/latest](https://github.com/portuber/portato/releases/latest));
+self-update (`portato update apply`) arrives in a later release.
+
 ## Build
 
 ```sh

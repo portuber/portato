@@ -60,7 +60,7 @@ Design locked with the maintainer:
 
 ## Tasks
 
-- [ ] **`internal/update` package — client**: `Release{Version, URL,
+- [x] **`internal/update` package — client**: `Release{Version, URL,
       PublishedAt, Assets}`; `Latest(ctx)` does
       `GET {base}/repos/portuber/portato/releases/latest` with a 10s timeout,
       `Accept: application/vnd.github+json`, a `portato/<version>` User-Agent;
@@ -71,13 +71,13 @@ Design locked with the maintainer:
       setter taking a testing-style hook; production code cannot call it.
       Error taxonomy: network / rate-limited (403 + `X-RateLimit-Remaining:
       0`) / malformed — all surfaced as plain errors, never panic.
-- [ ] **Compare**: `ParseVersion("vX.Y.Z") → ([3]int, bool)` (strip the `v`,
+- [x] **Compare**: `ParseVersion("vX.Y.Z") → ([3]int, bool)` (strip the `v`,
       exactly three numeric components — the VERSIONING.md guarantee makes
       pre-release grammar dead code); `Compare(a, b) → -1|0|+1`. A
       non-parseable *current* build (`dev`, `unknown`, `*-next` snapshots) is
       "not comparable": commands report `current dev (not comparable); latest
       vX.Y.Z` instead of a bogus verdict.
-- [ ] **Consent + check cache**: consent is a *user setting* —
+- [x] **Consent + check cache**: consent is a *user setting* —
       `defaults.update_check: true|false` in `config.yaml`; **absent = "not
       asked yet"** (the tri-state without a third value). Persisted through
       the comment-preserving AST patcher (`SetDefaultsBoolNode`); `ask` = the
@@ -86,10 +86,10 @@ Design locked with the maintainer:
       {last_check, latest}` — lives in `xdg.StateHome/portato/update.json`
       (atomic tmp+rename, 0600, `PORTATO_STATE_HOME` seam): written only on a
       successful check, corrupt = zero (the cache is disposable).
-- [ ] **One-time consent ask**: `maybeAskUpdateConsent()` in
+- [x] **One-time consent ask**: `maybeAskUpdateConsent()` in
       `runStandalone` (root.go:80) *after* `maybeOfferImport` (root.go:94) —
       the import offer owns the very first screen. Gate:
-- [ ] **One-time consent ask**: `maybeAskUpdateConsent()` in
+- [x] **One-time consent ask**: `maybeAskUpdateConsent()` in
       `runStandalone` (root.go:80) *after* `maybeOfferImport` (root.go:94) —
       the import offer owns the very first screen. Gate:
       `defaults.update_check == nil` && `term.IsTerminal(stdin)`. Ask
@@ -100,33 +100,33 @@ Design locked with the maintainer:
       daemon never ask — a daemon-first bootstrap leaves the key absent for
       the next interactive launch (the Phase-48 fresh/import marker pair
       behaviour).
-- [ ] **Ask at `install`**: after a successful install (TTY only), the same
+- [x] **Ask at `install`**: after a successful install (TTY only), the same
       question with the same persistence — install is the natural moment
       (the daemon it starts will do the polling).
-- [ ] **`doctor`**: an `update` check line — `update_check: false` →
+- [x] **`doctor`**: an `update` check line — `update_check: false` →
       "checks off (`portato update consent on`)"; cache newer →
       "vX.Y.Z available (checked 2h ago)"; up to date → "up to date
       (checked 5h ago)"; never checked → the consent hint. When stdin is a
       TTY and the key is still absent, ask the same one-time question;
       otherwise just print the hint (doctor must stay scriptable).
-- [ ] **Daemon background check**: only when `update_check: true` — a ticker
+- [x] **Daemon background check**: only when `update_check: true` — a ticker
       (1h) re-reads the config (a live `consent` edit reaches the daemon via
       the existing reload path) and checks the cache; `last_check` older
       than 24h → `Latest(ctx)`, write the cache. Failures log at debug and
       leave the cache untouched; no retry storm (a failed check does not
       advance `last_check`, so retries wait for tick + TTL). Consent flipped
       to `off` at runtime → the ticker sees it and goes idle.
-- [ ] **TUI header hint**: when the cached `latest` is newer than the
+- [x] **TUI header hint**: when the cached `latest` is newer than the
       running version, the header line gains a short `update: vX.Y.Z`
       segment (existing hint styling, theme-aware, one segment — no new
       rows). The TUI never performs network I/O; it reads the cache at
       launch. Hidden when up to date / not comparable / checks off.
-- [ ] **Commands**: `portato update check` (explicit check, ignores consent
+- [x] **Commands**: `portato update check` (explicit check, ignores consent
       and cache age, prints current / latest / release URL; exit 0 on
       "up to date" and on "available", non-zero only on error) and
       `portato update consent on|off|ask` (on/off set the config key, ask
       removes it; prints what changed; `ask` re-arms the one-time question).
-- [ ] **Tests**: `ParseVersion`/`Compare` table (equal/major/minor/patch,
+- [x] **Tests**: `ParseVersion`/`Compare` table (equal/major/minor/patch,
       `v`-prefix optional, garbage); `Latest` against `httptest` (200 parse,
       403 rate-limit, network refusal); cache round-trip + 0600 + corrupt →
       zero + `NeedsCheck` TTL table; `SetDefaultsBoolNode` (set/replace/
@@ -135,7 +135,7 @@ Design locked with the maintainer:
       key; y/n persist; daemon path never asks); daemon TTL logic (clock
       seam: fresh → checks, 23h-old → skips, 25h-old → checks); doctor line
       in all states; TUI header shows/hides per cache.
-- [ ] **Docs**: SPEC §3 command list (`update check`, `update consent`) and
+- [x] **Docs**: SPEC §3 command list (`update check`, `update consent`) and
       the new SPEC §17 "Update check and self-update" (checker half; the
       apply half is marked Phase 50); README "Updating" section.
 
