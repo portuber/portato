@@ -211,6 +211,7 @@ func Execute() error {
 		forwardCmd,
 		doctorCmd,
 		importCmd,
+		updateCmd,
 		addIdentityCmd,
 		forgetIdentityCmd,
 		versionCmd,
