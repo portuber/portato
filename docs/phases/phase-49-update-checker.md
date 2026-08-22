@@ -1,7 +1,7 @@
 ---
 phase: 49
 title: "Update checker (GitHub Releases check, consent-gated background polling)"
-status: in-progress
+status: done
 depends_on: [21]
 ---
 
@@ -141,22 +141,22 @@ Design locked with the maintainer:
 
 ## Definition of Done
 
-- [ ] `portato update check` against the real repo prints current vs latest
+- [x] `portato update check` against the real repo prints current vs latest
       (+ URL) and exits 0; with the network cut it fails cleanly non-zero;
       the fixture path through `SetBaseForTest` works with zero real network
       (test), and `NewClient` dials the compile-time `DefaultBase` when no
       seam is installed (test).
-- [ ] A config with no `defaults.update_check` + first interactive launch
+- [x] A config with no `defaults.update_check` + first interactive launch
       asks the consent question exactly once; `y`/Enter enables the daemon's
       daily check (proved by a fake-clock test), `n` never asks again and no
       background request ever happens; `update consent on|off|ask`
       round-trips (ask = key removed, question re-armed).
-- [ ] A daemon-first bootstrap does not consume the ask.
-- [ ] `doctor` prints the update line in all three consent states.
-- [ ] The TUI header shows the hint only when the cache holds a newer
+- [x] A daemon-first bootstrap does not consume the ask.
+- [x] `doctor` prints the update line in all three consent states.
+- [x] The TUI header shows the hint only when the cache holds a newer
       version; the TUI path performs no network I/O (test).
-- [ ] `go.mod` require block unchanged (zero new dependencies).
-- [ ] `make fmt && make vet && make test && make lint` clean;
+- [x] `go.mod` require block unchanged (zero new dependencies).
+- [x] `make fmt && make vet && make test && make lint` clean;
       `GOOS=windows go build ./...` succeeds and the windows-tagged unit
       tests (the set the `windows-smoke` job runs) are green.
 
