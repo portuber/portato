@@ -50,21 +50,21 @@ file, the in-repo `SetBaseForTest` seam) and Phase 21's release shape:
 
 ## Tasks
 
-- [ ] **Asset selection**: map `runtime.GOOS`/`runtime.GOARCH` → the
+- [x] **Asset selection**: map `runtime.GOOS`/`runtime.GOARCH` → the
       goreleaser archive name (darwin→`macOS`, windows→`Windows`, else the
       GOOS; amd64→`x86_64`, arm64→`arm64`; `.zip` on Windows, `.tar.gz`
       elsewhere) and find it among `Release.Assets`; a missing asset is a
       clear error naming what was looked for.
-- [ ] **Download + verify**: stream the asset to a temp file (size-capped,
+- [x] **Download + verify**: stream the asset to a temp file (size-capped,
       e.g. 100 MiB); fetch `checksums.txt`, find the
       `<sha256> <filename>` line, verify. Any mismatch → delete the temp
       file, abort with a scary message, exit non-zero, **the installed
       binary is untouched**. Verify *before* any staging near the install
       dir.
-- [ ] **Extract**: pull the single `portato` member out of the tar.gz/zip
+- [x] **Extract**: pull the single `portato` member out of the tar.gz/zip
       (no full unpack), preserving the current binary's file mode (typically
       0755) rather than trusting archive bits.
-- [ ] **Channel detection** (`internal/update/channel.go`): classify
+- [x] **Channel detection** (`internal/update/channel.go`): classify
       `os.Executable()` into `brew | scoop | deb | rpm | apk | goinstall |
       direct` — path heuristics (`/opt/homebrew/`, `/usr/local/Cellar/`,
       `~/scoop/`, `gopath/bin`) plus `dpkg-query`/`rpm -q`/`apk info`
@@ -74,14 +74,14 @@ file, the in-repo `SetBaseForTest` seam) and Phase 21's release shape:
       Detection is advisory in `update check` (printed as a hint) and
       blocking in `apply` (any PM channel → refuse in-place; `--force`
       overrides after a loud warning).
-- [ ] **Apply flow (unix)**: stage `portato.new` in the install dir (same
+- [x] **Apply flow (unix)**: stage `portato.new` in the install dir (same
       filesystem) → `os.Rename(cur, cur+".old")` → `os.Rename(new, cur)` →
       print `vX → vY` + the backup path + the rollback command
       (`mv portato.old portato`). A previous `portato.old` is replaced
       (one level of rollback, not an archive). Failure at any step leaves
       the installed binary in place (the `.old`/`.new` intermediates are
       cleaned up best-effort).
-- [ ] **Apply flow (Windows)**: Scoop / SCM-service installs → hint only
+- [x] **Apply flow (Windows)**: Scoop / SCM-service installs → hint only
       (refuse regardless of `--force` for SCM — the service holds the file).
       Direct download → write `portato.new` next to the binary and complete
       the swap at the *next launch*: an early pre-cobra check (the
@@ -90,14 +90,14 @@ file, the in-repo `SetBaseForTest` seam) and Phase 21's release shape:
       is short-lived, and performs the rename dance on startup when the old
       file is not yet held. `apply` prints exactly this ("restart to
       finish the update").
-- [ ] **Live-daemon hint**: after a successful swap, probe
+- [x] **Live-daemon hint**: after a successful swap, probe
       `daemon.ResolveSocket()` + `Healthz` (the doctor pattern,
       doctor.go:162) — if a daemon answers, print "the daemon still runs
       vX until restarted (`portato stop`, then start/reboot)".
-- [ ] **`doctor`**: extend the Phase-49 update line with the detected
+- [x] **`doctor`**: extend the Phase-49 update line with the detected
       channel — e.g. "v1.7.0 available · brew install (`apply` defers to
       the package manager)".
-- [ ] **Tests**: asset-name mapping table; checksum mismatch → abort with
+- [x] **Tests**: asset-name mapping table; checksum mismatch → abort with
       the binary untouched; tar.gz and zip extraction (fixture archives);
       channel classification from path fixtures (+ the dpkg/rpm lookup
       behind a seam); full apply against an `httptest` "release" serving a

@@ -82,6 +82,11 @@ portato update check    -> CLI: fetch the latest GitHub release and compare with
 portato update consent <on|off|ask>
                        -> set defaults.update_check: on = daily background checks, off = never,
                            ask = forget the answer, re-ask on the next interactive launch (Phase 49)
+portato update apply   -> CLI: download + verify (SHA-256 vs checksums.txt) + swap the binary in
+                           place, keeping a one-level portato.old rollback; package-managed
+                           installs get their own upgrade command instead (Phase 50).
+                           Flags: --dry-run, --yes (non-TTY), --force (never overrides the
+                           checksum; never overrides a Windows SCM-held binary)
 ```
 
 For `portato` (smart): the daemon's presence is detected by reading the discovery marker (§6) for its socket path and PID, then probing the socket.
@@ -681,7 +686,7 @@ is blocked.
 - **Startup behavior:** on the first run, if there is no config — an example is created and the path is shown to the user.
 - **Tests:** the key packages (`config`, `forward`, `controller`) are covered by unit tests (Phases 1, 2, 6).
 
-## 16. Update check (Phase 49; self-update arrives in a later phase)
+## 16. Update check and self-update (Phases 49–50)
 
 Portato can learn that a newer release exists — but never talks to the
 network before the user has answered a one-time question, and never
@@ -726,11 +731,37 @@ applies anything on its own.
   prints current/latest/verdict + release URL; exit 0 on "available" and
   "up to date", non-zero only on error. A successful check feeds the
   cache; a dev build reports "not comparable" without poisoning it.
+- **`portato update apply`** (Phase 50) downloads the platform archive,
+  verifies the SHA-256 against `checksums.txt` (both fetched into a temp
+  dir; a mismatch — or an unlisted file — aborts with the installed
+  binary untouched), extracts the single `portato` member (mode from the
+  running binary, not the archive) and swaps it in place:
+  - **unix:** two atomic renames — current → `portato.old` (the one-level
+    rollback; a previous backup is replaced, not accumulated), staged new
+    → current, best-effort restore if the second rename fails. A running
+    daemon safely keeps its old inode; apply prints a restart hint when
+    one is live (`portato stop`, start again — or reboot for autostart).
+  - **windows:** a running `.exe` cannot be replaced — apply stages
+    `portato.new` next to the binary and the **next launch** (the pre-cobra
+    entry point, before SCM detection, the Phase-47 precedent) completes
+    the swap once the previous holder has exited.
+  - **Package-manager etiquette:** the install channel is detected
+    (brew/scoop by path — including the Phase-47 scoop `current`
+    junction — deb/rpm/apk by `dpkg-query`/`rpm -qf`/`apk info` ownership,
+    go-install by GOBIN) and a managed install is **refused** in place:
+    the channel's own upgrade command is printed instead (`brew upgrade
+    --cask portuber/tap/portato`, `scoop update portato`, `apt/dnf/apk
+    upgrade portato`, `go install …@latest`). `--force` overrides the
+    refusal — never the checksum. A binary held by the Windows SCM
+    service is never swapped, `--force` included. `doctor` names the
+    channel in its update line.
+  - **Flags:** `--dry-run` (plan only), `--yes` (skip the prompt; required
+    in a non-TTY), `--force`. Explicit runs only — nothing is ever
+    auto-applied; the Phase-49 consent gates *checking*, applying is
+    always a deliberate command.
 - **Privacy:** the check sends no identifiers — an anonymous GET to
   api.github.com is the entire footprint; `HTTPS_PROXY`/`NO_PROXY` are
   honoured by the default transport.
-- **Not yet (a later phase):** downloading or applying an update — the
-  checker only reports; applying stays a deliberate user action.
 
 ## 17. Open questions (to resolve as we go)
 

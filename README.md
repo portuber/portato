@@ -170,6 +170,37 @@ the network before you agree, and it never updates itself on its own.
   portato update check     # current vs latest + release URL; ignores consent
   ```
 
+- **Self-update (direct installs):**
+
+  ```sh
+  portato update apply     # download + SHA-256 verify + atomic swap
+  ```
+
+  The archive is verified against the release `checksums.txt` before
+  anything touches your install; a mismatch aborts with the binary
+  untouched. The previous binary is kept as `portato.old` (one level —
+  the documented rollback is printed on success). On Windows the swap
+  finishes on the next launch (a running `.exe` cannot be replaced).
+
+- **Package-managed installs defer to the package manager.** `apply`
+  detects the channel and refuses the in-place swap, printing the right
+  command instead:
+
+  | Install        | `apply` tells you to run |
+  |----------------|--------------------------|
+  | Homebrew cask  | `brew upgrade --cask portuber/tap/portato` |
+  | Scoop          | `scoop update portato` |
+  | deb            | `sudo apt upgrade portato` |
+  | rpm            | `sudo dnf upgrade portato` |
+  | apk            | `sudo apk upgrade portato` |
+  | `go install`   | `go install github.com/portuber/portato/cmd/portato@latest` |
+
+  (`--force` overrides the refusal at your own risk; it never skips the
+  checksum, and a Windows SCM service binary is never swapped.)
+
+  Other `apply` flags: `--dry-run` (the plan, nothing touched),
+  `--yes` (no prompt; required when stdin is not a terminal).
+
 - **Change your mind:**
 
   ```sh
@@ -187,11 +218,9 @@ The check is an anonymous `GET` to `api.github.com`
 only the latest tag is recorded, in a local cache
 (`~/.local/state/portato/update.json` on Linux; the platform state dir
 elsewhere). The daemon polls at most once per 24h and only after consent;
-a flaky network never retries more than hourly. Applying an update stays
-a deliberate action — for now, use your install channel (`brew upgrade`,
-`scoop update`, `apt upgrade`, or download from
-[releases/latest](https://github.com/portuber/portato/releases/latest));
-self-update (`portato update apply`) arrives in a later release.
+a flaky network never retries more than hourly. Applying an update is
+always a deliberate command (`update apply`) — nothing is ever
+auto-installed.
 
 ## Build
 
