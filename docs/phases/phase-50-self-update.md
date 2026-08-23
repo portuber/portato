@@ -1,7 +1,7 @@
 ---
 phase: 50
 title: "Self-update (portato update apply: checksum-verified swap, package-manager etiquette)"
-status: todo
+status: in-progress
 depends_on: [49]
 ---
 
