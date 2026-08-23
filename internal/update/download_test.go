@@ -194,7 +194,7 @@ func TestDownloadAndVerify(t *testing.T) {
 		"checksums.txt":                    []byte(sums),
 	})
 
-	d := newDownloader()
+	d := NewDownloader()
 	arch := filepath.Join(dir, "portato_1.8.0_macOS_arm64.tar.gz")
 	n, err := d.downloadFile(context.Background(), base+"/portato_1.8.0_macOS_arm64.tar.gz", arch, 0o600)
 	if err != nil || n != int64(len(binary)) {
@@ -221,7 +221,7 @@ func TestDownloadUnexpectedStatus(t *testing.T) {
 		http.NotFound(w, nil)
 	}))
 	t.Cleanup(srv.Close)
-	d := newDownloader()
+	d := NewDownloader()
 	dst := filepath.Join(t.TempDir(), "f")
 	if _, err := d.downloadFile(context.Background(), srv.URL+"/gone", dst, 0o600); err == nil || !strings.Contains(err.Error(), "unexpected status") {
 		t.Fatalf("err = %v, want unexpected-status", err)

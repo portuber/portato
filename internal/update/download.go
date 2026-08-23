@@ -70,21 +70,26 @@ func FindAsset(rel Release, goos, goarch string) (archive Asset, checksums Asset
 	return archive, checksums, nil
 }
 
-// downloader fetches release assets. The zero downloader uses the same
+// Downloader fetches release assets. The zero downloader uses the same
 // compile-time base discipline as the API client: asset URLs come from the
 // GitHub API response (browser_download_url), so with no seam installed a
 // download can only ever target github.com.
-type downloader struct {
+type Downloader struct {
 	http *http.Client
 }
 
-func newDownloader() *downloader {
-	return &downloader{http: &http.Client{Timeout: 5 * time.Minute}}
+// NewDownloader builds a Downloader (5-minute per-file timeout).
+func NewDownloader() *Downloader {
+	return &Downloader{http: &http.Client{Timeout: 5 * time.Minute}}
 }
 
-// downloadFile streams url to path (created with mode), capping the body at
+// Download streams url to path (created with mode), capping the body at
 // downloadCap. The partial file is removed on any failure.
-func (d *downloader) downloadFile(ctx context.Context, url, path string, mode os.FileMode) (int64, error) {
+func (d *Downloader) Download(ctx context.Context, url, path string) (int64, error) {
+	return d.downloadFile(ctx, url, path, 0o600)
+}
+
+func (d *Downloader) downloadFile(ctx context.Context, url, path string, mode os.FileMode) (int64, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return 0, fmt.Errorf("update: download: %w", err)
@@ -116,9 +121,14 @@ func (d *downloader) downloadFile(ctx context.Context, url, path string, mode os
 	return n, nil
 }
 
-// verifyChecksum parses the sha256sum-format checksums.txt and checks file
+// VerifyChecksum parses the sha256sum-format checksums.txt and checks file
 // against the line naming it. A missing line is a mismatch — a release
 // archive must be covered.
+func VerifyChecksum(checksumsPath, file string) error {
+	return verifyChecksum(checksumsPath, file)
+}
+
+// verifyChecksum is the internal implementation.
 func verifyChecksum(checksumsPath, file string) error {
 	data, err := os.ReadFile(checksumsPath)
 	if err != nil {
