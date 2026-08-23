@@ -140,10 +140,23 @@ func doctorRunE(cmd *cobra.Command, _ []string) error {
 // checkUpdate reports the update-checker state (Phase 49): consent plus the
 // cached verdict. Informational in every state — update checks are optional;
 // a pending question is not a failure.
+// doctorExecutable resolves the running binary path for the update-channel
+// hint; a seam so tests can fake a managed install path.
+var doctorExecutable = os.Executable
+
 func checkUpdate(d *doctor, cfgPath string) {
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return
+	}
+	// Phase 50: the install channel rides along — it tells the user how an
+	// update would arrive (apply defers to the package manager, doctor says
+	// so up front).
+	channel := ""
+	if exe, err := doctorExecutable(); err == nil {
+		if ci := update.DetectChannel(exe); ci.Managed {
+			channel = fmt.Sprintf(" · %s install (`apply` defers to: %s)", ci.Channel, ci.Upgrade)
+		}
 	}
 	switch {
 	case cfg.Defaults.UpdateCheck != nil && *cfg.Defaults.UpdateCheck:
@@ -153,18 +166,18 @@ func checkUpdate(d *doctor, cfgPath string) {
 		latest, latestOK := update.ParseVersion(cache.Latest)
 		switch {
 		case cache.Latest == "":
-			d.info("update", "checks on, no result yet")
+			d.info("update", "checks on, no result yet%s", channel)
 		case !latestOK || !curOK:
-			d.info("update", "latest %s (checked %s)", cache.Latest, age)
+			d.info("update", "latest %s (checked %s)%s", cache.Latest, age, channel)
 		case cur.Compare(latest) < 0:
-			d.ok("update", "%s available (checked %s) — portato update check", latest, age)
+			d.ok("update", "%s available (checked %s) — portato update check%s", latest, age, channel)
 		default:
-			d.ok("update", "up to date (checked %s)", age)
+			d.ok("update", "up to date (checked %s)%s", age, channel)
 		}
 	case cfg.Defaults.UpdateCheck != nil:
-		d.info("update", "checks off (portato update consent on)")
+		d.info("update", "checks off (portato update consent on)%s", channel)
 	default:
-		d.info("update", "not asked yet — portato update consent on|off")
+		d.info("update", "not asked yet — portato update consent on|off%s", channel)
 	}
 }
 

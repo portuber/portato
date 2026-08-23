@@ -126,11 +126,14 @@ func TestConsentAskPersistFailureStaysPending(t *testing.T) {
 }
 
 func TestDoctorUpdateLine(t *testing.T) {
+	prevExe := doctorExecutable
+	t.Cleanup(func() { doctorExecutable = prevExe })
 	cases := []struct {
 		name    string
 		cfg     string
 		cache   update.CheckCache
 		version string
+		exe     string
 		want    string
 		notWant string
 	}{
@@ -172,6 +175,14 @@ func TestDoctorUpdateLine(t *testing.T) {
 			want:    "latest v9.9.9",
 			notWant: "available",
 		},
+		{
+			name:    "managed-channel-hint",
+			cfg:     "defaults:\n  update_check: true\n",
+			cache:   update.CheckCache{Latest: "v9.9.9"},
+			version: "1.6.1",
+			exe:     "/opt/homebrew/bin/portato",
+			want:    "homebrew install (`apply` defers to: brew upgrade --cask portuber/tap/portato)",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -184,6 +195,10 @@ func TestDoctorUpdateLine(t *testing.T) {
 				version = tc.version
 			}
 			t.Cleanup(func() { version = oldVer })
+			doctorExecutable = func() (string, error) { return tc.exe, nil }
+			if tc.exe == "" {
+				doctorExecutable = prevExe
+			}
 
 			out := &strings.Builder{}
 			d := newDoctor(out)
