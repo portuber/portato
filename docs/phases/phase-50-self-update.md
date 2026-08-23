@@ -1,7 +1,7 @@
 ---
 phase: 50
 title: "Self-update (portato update apply: checksum-verified swap, package-manager etiquette)"
-status: in-progress
+status: done
 depends_on: [49]
 ---
 
@@ -105,26 +105,26 @@ file, the in-repo `SetBaseForTest` seam) and Phase 21's release shape:
       swapped, `portato.old` exists, mode preserved, second run says "up to
       date"; PM channel → refusal text; `--yes` in a non-TTY; the daemon
       hint behind a probe seam.
-- [ ] **Docs**: finish SPEC §17 (apply semantics, rollback, PM etiquette,
+- [x] **Docs**: finish SPEC §17 (apply semantics, rollback, PM etiquette,
       Windows caveats); README "Updating" — the per-channel command table.
 
 ## Definition of Done
 
-- [ ] On a macOS/Linux direct install: `apply` vX→vY swaps the binary
+- [x] On a macOS/Linux direct install: `apply` vX→vY swaps the binary
       (`--version` reports the new one), `portato.old` exists and the
       documented `mv` restores it; a second `apply` reports "up to date".
-- [ ] A checksum mismatch aborts with the installed binary untouched
+- [x] A checksum mismatch aborts with the installed binary untouched
       (test-asserted).
-- [ ] brew / scoop / deb / rpm / apk / go-install are detected and refused
+- [x] brew / scoop / deb / rpm / apk / go-install are detected and refused
       with the exact channel upgrade command; `--force` overrides (except
       Windows SCM).
-- [ ] A non-TTY `apply` without `--yes` refuses.
-- [ ] After a swap with a live daemon, the restart hint prints (probe-seam
+- [x] A non-TTY `apply` without `--yes` refuses.
+- [x] After a swap with a live daemon, the restart hint prints (probe-seam
       test).
-- [ ] Windows: `GOOS=windows go build ./...` and the windows-tagged tests
+- [x] Windows: `GOOS=windows go build ./...` and the windows-tagged tests
       green; the scoop path → hint (test); direct-download + SCM behaviour
       either implemented and tested or recorded under `## Blockers`.
-- [ ] `make fmt && make vet && make test && make lint` clean.
+- [x] `make fmt && make vet && make test && make lint` clean.
 
 ## Verification
 
