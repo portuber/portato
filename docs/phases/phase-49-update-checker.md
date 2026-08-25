@@ -5,6 +5,10 @@ status: done
 depends_on: [21]
 ---
 
+> **Shipped in v1.7.0** (2026-08-23). The released binary verified the
+> checker live against `releases/latest` ("up to date", cache written,
+> doctor line green) before phase 50 started.
+
 ## Goal
 
 Portato learns, on its own, when a newer release is out — without a single
