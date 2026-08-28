@@ -155,12 +155,20 @@ fixes only.
    for many tunnels to one bastion). The riskiest — it reworks the
    per-tuber reconnect / backoff / keepalive state machine onto a shared
    client — so it lands last.
-6. **Metadata-only refresh (no reconnect)** — editing *only* a tuber's
-   `tags:` currently triggers a full `Reconfigure` (SSH reconnect) because
-   `tuberChanged` lumps Tags with connection-affecting fields (the v1.4.1
-   fix). Tags are pure metadata; split a metadata-refresh path in
-   `Engine.Reload` (`UpdateMetadata`: `t.cfg = cfg` + notify, no `Restart`)
-   for tags-only changes so live-tag-edit doesn't blip a connected tunnel.
+ 6. **Metadata-only refresh (no reconnect)** — editing *only* a tuber's
+    `tags:` currently triggers a full `Reconfigure` (SSH reconnect) because
+    `tuberChanged` lumps Tags with connection-affecting fields (the v1.4.1
+    fix). Tags are pure metadata; split a metadata-refresh path in
+    `Engine.Reload` (`UpdateMetadata`: `t.cfg = cfg` + notify, no `Restart`)
+    for tags-only changes so live-tag-edit doesn't blip a connected tunnel.
+ 7. **TUI header version segment** — show the running version next to
+    `mode:` in the TUI header (`mode: attach  v1.8.1`, with the
+    `update: vX.Y.Z` hint as the sibling segment, so both sides of the
+    comparison are visible). The version is already plumbed through
+    `tui.Options.Version` (Phase 49 wired it for the hint), so this is a
+    small `feat(tui)`; needs the Phase-38-style responsive tweak (shorten
+    the update hint to `→ v1.9.0` under ~60 cols so the header line never
+    wraps) and a SPEC §11 one-liner.
 
 ## Phase summary
 
