@@ -532,7 +532,11 @@ otherwise sshd silently binds loopback and the public address stays unreachable
 | `?` / `esc`    | toggle help (`esc` also clears an active filter and cancels a confirm modal) |
 | `q` / `ctrl+c` | quit (with the "background?" modal in standalone when there are live tunnels — Connecting/Connected/Reconnecting/Error) |
 
-The header shows the mode: `standalone` or `attach` (Phase 39 dropped the
+The header shows the mode (`standalone` or `attach`), the running version
+(`v1.8.1`; `dev` verbatim on development builds — Phase 51), and — when the
+update cache holds a newer release — the `update: vX.Y.Z` hint as the
+sibling segment (shortened to `→ vX.Y.Z` on narrow terminals so the line
+never wraps). Phase 39 dropped the
 socket path that used to follow `attach`; `portato doctor` exposes it).
 
 Layout (Phases 38–39): the footer is pinned to the bottom edge regardless of

@@ -11,6 +11,7 @@ import (
 
 	"github.com/portuber/portato/internal/controller"
 	"github.com/portuber/portato/internal/logo"
+	"github.com/portuber/portato/internal/update"
 )
 
 const (
@@ -315,10 +316,40 @@ func (m Model) header() string {
 	}
 	left += " " + m.pal.dim.Render("— Port Forwarding")
 	right := m.pal.mode.Render("mode: " + m.mode)
+	if seg := m.versionSegment(); seg != "" {
+		right += "  " + m.pal.mode.Render(seg)
+	}
 	if m.updateHint != "" {
-		right += "  " + m.pal.mode.Render(m.updateHint)
+		hint := m.updateHint
+		// Phase-38 responsive rule: while the full "update: vX.Y.Z" fits the
+		// width budget next to the title/mode/version it is used; on a narrow
+		// terminal it shortens to "→ vX.Y.Z" so the header stays one line.
+		// (width 0 = pre-WindowSizeMsg/tests: the full form, the joinRight
+		// fallback owns overflow there.)
+		if m.width > 0 {
+			budget := m.width - 2*sideMargin
+			full := lipgloss.Width(left) + lipgloss.Width(right) + 2 + lipgloss.Width(m.pal.mode.Render(hint))
+			if full > budget {
+				hint = strings.Replace(m.updateHint, "update: ", "→ ", 1)
+			}
+		}
+		right += "  " + m.pal.mode.Render(hint)
 	}
 	return joinRight(left, right, m.width-2*sideMargin)
+}
+
+// versionSegment renders the running binary's version for the header: the
+// canonical v-form when parseable (the same spelling the update hint uses),
+// the raw string ("dev" on development builds) otherwise. Empty when the
+// caller passed no version (pre-Phase-51 call sites keep their old header).
+func (m Model) versionSegment() string {
+	if m.updateVer == "" {
+		return ""
+	}
+	if v, ok := update.ParseVersion(m.updateVer); ok {
+		return v.String()
+	}
+	return m.updateVer
 }
 
 func (m Model) table(maxRows int) string {
