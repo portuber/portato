@@ -66,6 +66,7 @@
 | 48  | Import forwards from ssh_config   | `[x]`  | [phase-48-ssh-config-import.md](./phases/phase-48-ssh-config-import.md) |
 | 49  | Update checker (consent-gated)    | `[x]`  | [phase-49-update-checker.md](./phases/phase-49-update-checker.md) |
 | 50  | Self-update (update apply)        | `[x]`  | [phase-50-self-update.md](./phases/phase-50-self-update.md) |
+| 51  | TUI header version segment        | `[ ]`  | [phase-51-tui-header-version.md](./phases/phase-51-tui-header-version.md) |
 
 Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 
@@ -161,14 +162,6 @@ fixes only.
     fix). Tags are pure metadata; split a metadata-refresh path in
     `Engine.Reload` (`UpdateMetadata`: `t.cfg = cfg` + notify, no `Restart`)
     for tags-only changes so live-tag-edit doesn't blip a connected tunnel.
- 7. **TUI header version segment** — show the running version next to
-    `mode:` in the TUI header (`mode: attach  v1.8.1`, with the
-    `update: vX.Y.Z` hint as the sibling segment, so both sides of the
-    comparison are visible). The version is already plumbed through
-    `tui.Options.Version` (Phase 49 wired it for the hint), so this is a
-    small `feat(tui)`; needs the Phase-38-style responsive tweak (shorten
-    the update hint to `→ v1.9.0` under ~60 cols so the header line never
-    wraps) and a SPEC §11 one-liner.
 
 ## Phase summary
 
@@ -222,6 +215,7 @@ fixes only.
 - **Phase 47** — Windows SCM autostart (done, `[x]`; shipped in v1.5.0, verified and hardened through v1.6.1): replaces the Phase-17 HKCU `Run`-key autostart with a real Service Control Manager service so the daemon starts at **boot** (not logon), runs **without anyone logged in** (SCM logs on the install-time user — the password is collected once at `portato install` and kept as an LSA secret), and `install` **starts the daemon immediately** (parity with macOS `launchctl bootstrap` / Linux `systemctl --user enable --now`). Also fixes the Scoop drift failure mode (`portato install` captures a version-pinned path that breaks on the next `scoop update`; the service path is rewritten to Scoop's stable `current` junction), makes `portato stop` graceful (sends `svc.Stop` instead of `TerminateProcess`), and keeps the Phase-17 Run-key mechanism behind `--legacy-runkey` for locked-down environments. The deferred refinement from the end of Phase 17. The final verification (real reboot, no login) surfaced and fixed three IPC gaps shipped as v1.6.1: the named pipe's explicit SDDL (an unelevated `list`/`doctor` reaches the boot-started service), pidAlive treating an unopenable session-0 PID as alive (the discovery marker is no longer culled), and `doctor` seeing the SCM service without elevation. depends_on [17].
 - **Phase 48** — import forwards from `~/.ssh/config` (done, `[x]`): `portato import` (+ a fresh-install one-time offer) scans `LocalForward` / `RemoteForward` / `DynamicForward` via the Phase-44 config reader (`GetAll`, so multi-forward hosts import fully) and creates `enabled: false` tubers — a one-time copy that never modifies ssh_config; the nudge is marker-gated (`fresh_install` / `import_offered` in the state dir), interactive-only, never repeats, and never fires for upgrading users. depends_on [44].
 - **Phase 49** — update checker (done, `[x]`): `internal/update` + `portato update check` / `update consent`; a consent-gated daily GitHub `releases/latest` poll (anonymous, 24h TTL, cache in `xdg.StateHome/portato/update.json`) surfacing "vX.Y.Z available" in the TUI header and `portato doctor`; the one-time consent ask (`defaults.update_check` absent = pending; `[Y/n]`, Enter = yes) follows the Phase-48 nudge pattern (interactive launcher + install + a green doctor; the daemon never asks), and consent lives in `config.yaml` (comment-preserving AST patch; a live edit reaches the daemon through the Phase-28 reload path). Hand-rolled semver under the strict-`vX.Y.Z` VERSIONING policy; the API base is compile-time-only (no runtime redirect); zero new dependencies. **Shipped in v1.7.0** (verified live: the released binary checks itself against releases/latest and reports "up to date"; the brew cask and scoop manifest published from the tag). depends_on [21].
+- **Phase 51** — TUI header version segment (planned, `[ ]`): the running version next to `mode:` (`mode: attach  v1.8.1`, `dev` verbatim on dev builds), with the phase-49 update hint as the sibling segment; on narrow widths the hint shortens to `→ v1.9.0` so the header never wraps. Promoted from the Post-1.0 candidate list; `tui.Options.Version` is already plumbed (Phase 49). TUI internals ⇒ PATCH. depends_on [].
 - **Phase 50** — self-update (done, `[x]`): `portato update apply [--yes|--force|--dry-run]` — download the GOOS/GOARCH archive, SHA256-verify against `checksums.txt`, atomic swap with a one-level `portato.old` rollback; package-managed installs (brew/scoop/deb/rpm/apk/go install) are detected and refused in place, printing the channel's own upgrade command (Windows Scoop/SCM included — the Phase-47 `current`-junction is never desynced); a live daemon is detected and prompted to restart. Windows direct installs swap via a staged `portato.new` completed at the next launch (pre-cobra, the Phase-47 precedent). depends_on [49].
 
 ## Current work
