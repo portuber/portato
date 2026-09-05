@@ -5,6 +5,10 @@ status: done
 depends_on: []
 ---
 
+> **Shipped in v1.8.2** (2026-09-05). Verified by the maintainer on both
+> build shapes before release: a plain `make build` shows `mode: … dev`,
+> an ldflag-injected 1.7.0 shows `mode: standalone  v1.7.0  update: v1.8.1`.
+
 ## Goal
 
 The TUI header shows the running binary's version next to `mode:` —

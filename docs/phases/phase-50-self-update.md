@@ -5,6 +5,12 @@ status: done
 depends_on: [49]
 ---
 
+> **Shipped in v1.8.0** (2026-08-28); the same-day GO-2026-6303
+> x/crypto fix followed as v1.8.1, and the GO-2026-6354 round as v1.8.3
+> (2026-09-05) — by which time the self-update path was verified live:
+> a v1.8.1 direct install applied itself to v1.8.3 in one command, and
+> the brew channel correctly deferred to `brew upgrade`.
+
 ## Goal
 
 One command updates a direct-download install end-to-end:
