@@ -1,7 +1,7 @@
 ---
 phase: 51
 title: "TUI header version segment"
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -35,23 +35,23 @@ Design locked with the maintainer:
 
 ## Tasks
 
-- [ ] `internal/tui/view.go` `header()`: render the version segment (style
+- [x] `internal/tui/view.go` `header()`: render the version segment (style
       `pal.mode`, the mode segment's sibling) between `mode:` and the
       update hint; add the width-driven hint shortening.
-- [ ] Tests: the segment always renders (release build); a `dev` build
+- [x] Tests: the segment always renders (release build); a `dev` build
       renders `dev` verbatim; the hint pairs as the sibling segment; at a
       narrow width the shortened hint keeps the header to one line.
-- [ ] SPEC §11: one line describing the header composition
+- [x] SPEC §11: one line describing the header composition
       (mode + version + update hint).
 
 ## Definition of Done
 
-- [ ] The header renders `mode: <mode>  v<version>` on every launch
+- [x] The header renders `mode: <mode>  v<version>` on every launch
       (release and `dev` builds), styled like the mode segment.
-- [ ] With a cached newer release the hint follows as the sibling segment;
+- [x] With a cached newer release the hint follows as the sibling segment;
       at narrow widths it renders `→ v1.9.0` and the header stays a single
       line (test-asserted at 60 cols).
-- [ ] `make fmt && make vet && make test && make lint` clean;
+- [x] `make fmt && make vet && make test && make lint` clean;
       `GOOS=windows go build ./...` clean.
 
 ## Verification
