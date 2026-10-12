@@ -221,18 +221,22 @@ func dialConn(ctx context.Context, cfg config.Tuber, def config.Defaults, log *s
 // cue to fall back to password auth.
 func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, provider PassphraseProvider, passSink passphraseSink) ([]ssh.AuthMethod, func() error) {
 	var (
-		methods []ssh.AuthMethod
+		signers []ssh.Signer
 		closers []io.Closer
 	)
 	if conn, ok := dialAgent(ctx, log); ok {
-		ag := agent.NewClient(conn)
-		methods = append(methods, ssh.PublicKeysCallback(ag.Signers))
+		available, err := boundedAgentSigners(ctx, conn)
+		if err != nil {
+			log.Warn("failed to list agent keys", "err", err)
+		} else {
+			signers = append(signers, available...)
+		}
 		closers = append(closers, conn)
 	}
 	if idPath := cfg.ResolvedIdentity(def); idPath != "" {
 		signer, err := loadIdentityWithPassphrase(ctx, idPath, provider, passSink)
 		if err == nil {
-			methods = append(methods, ssh.PublicKeys(signer))
+			signers = append(signers, signer)
 		} else {
 			log.Warn("failed to load identity key", "path", idPath, "err", err)
 		}
@@ -243,7 +247,31 @@ func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log
 		}
 		return nil
 	}
-	return methods, closeAgent
+	if len(signers) == 0 {
+		return nil, closeAgent
+	}
+	return []ssh.AuthMethod{ssh.PublicKeys(signers...)}, closeAgent
+}
+
+func boundedAgentSigners(ctx context.Context, conn net.Conn) ([]ssh.Signer, error) {
+	deadline := time.Now().Add(connectTimeout)
+	if contextDeadline, ok := ctx.Deadline(); ok && contextDeadline.Before(deadline) {
+		deadline = contextDeadline
+	}
+	if err := conn.SetDeadline(deadline); err != nil {
+		return nil, err
+	}
+	stopCancellation := context.AfterFunc(ctx, func() { _ = conn.Close() })
+	defer stopCancellation()
+	signers, err := agent.NewClient(conn).Signers()
+	resetError := conn.SetDeadline(time.Time{})
+	if err != nil {
+		return nil, err
+	}
+	if resetError != nil {
+		return nil, resetError
+	}
+	return signers, nil
 }
 
 func hostKeyCallback(def config.Defaults, log *slog.Logger, sink hostKeySink) (ssh.HostKeyCallback, error) {
