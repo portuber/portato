@@ -42,7 +42,7 @@ silent exits routed through `crudFail`). Three follow-ups remain:
 - [x] Verify the auth-failure visibility claim from issue #4 on the fixed
       build (TUI state + `portato logs` at info); fix if it reproduces,
       and answer in the issue either way.
-- [ ] SPEC: document the `~/.ssh/config` leniency contract (what is
+- [x] SPEC: document the `~/.ssh/config` leniency contract (what is
       tolerated vs a load error).
 
 ## Definition of Done
