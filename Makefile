@@ -153,9 +153,13 @@ optimize-assets:
 # see docs/VERSIONING.md). Pick the version one of two ways:
 #   make release-patch | release-minor | release-major  -- bump from the latest tag
 #   make release VERSION=vX.Y.Z                        -- explicit override
-# Before touching the remote it prints latest tag, the computed new tag, the
-# HEAD commit, the commits that will land on main, and asks y/N. On y it runs
-# `git push origin main`, creates an annotated tag, and pushes it.
+# Before touching the remote it runs govulncheck under the toolchain pinned in
+# go.mod (exactly what the release workflow builds) and aborts on reachable
+# vulnerabilities — the vuln DB moves between pushes, and shipping a tag the
+# 'security' workflow then flags red forces a same-day patch release (the
+# v1.9.2/v1.9.3 double release). It then prints latest tag, the computed new
+# tag, the HEAD commit, the commits that will land on main, and asks y/N. On y
+# it runs `git push origin main`, creates an annotated tag, and pushes it.
 release-patch:
 	@$(MAKE) --no-print-directory release LEVEL=patch
 
@@ -184,6 +188,15 @@ release:
 	fi; \
 	case "$$newtag" in v[0-9]*.[0-9]*.[0-9]*) ;; *) echo "invalid tag '$$newtag' (want vX.Y.Z)"; exit 1;; esac; \
 	(git rev-parse -q --verify "refs/tags/$$newtag" >/dev/null) && { echo "$$newtag already exists"; exit 1; } || true; \
+	pinned=$$(awk '/^toolchain /{print $$2}' go.mod); \
+	govulncheck_bin=$$(command -v govulncheck || echo "$$(go env GOPATH)/bin/govulncheck"); \
+	[ -x "$$govulncheck_bin" ] || go install golang.org/x/vuln/cmd/govulncheck@latest || { echo "govulncheck unavailable; install it: go install golang.org/x/vuln/cmd/govulncheck@latest"; exit 1; }; \
+	echo "vuln scan  : govulncheck ./... under $$pinned (the toolchain the release ships)"; \
+	if ! scan=$$(GOTOOLCHAIN=$$pinned $$govulncheck_bin ./... 2>&1); then \
+		printf '%s\n' "$$scan" | tail -15; \
+		echo "aborting: reachable vulnerabilities under $$pinned — bump the toolchain and cut ONE release with both"; \
+		exit 1; \
+	fi; \
 	echo "latest tag : $$latest"; \
 	echo "new tag    : $$newtag"; \
 	echo "main HEAD  : $$(git rev-parse --short HEAD) - $$(git log -1 --format='%s')"; \
