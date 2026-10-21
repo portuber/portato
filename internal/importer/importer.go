@@ -6,6 +6,8 @@ package importer
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -13,6 +15,8 @@ import (
 	"strings"
 
 	ssh_config "github.com/kevinburke/ssh_config"
+
+	"github.com/portuber/portato/internal/config"
 )
 
 // Candidate is one forward directive from ssh_config mapped to a would-be
@@ -44,7 +48,10 @@ func DefaultPath() string {
 // Load decodes an ssh config file ("" = the default ~/.ssh/config). A missing
 // file is not an error (nil, nil) — mirroring the Phase-44 reader, so a
 // machine without ~/.ssh/config simply has nothing to import; an existing
-// unreadable or unparseable file is a clear error. A leading ~ is expanded.
+// unreadable or unparseable file is a clear error. The text goes through
+// config.LenientSSHConfig first (phase 60), so Match blocks portato cannot
+// evaluate are skipped with a warning instead of failing the import. A
+// leading ~ is expanded.
 func Load(path string) (*ssh_config.Config, error) {
 	if path == "" {
 		path = DefaultPath()
@@ -58,7 +65,12 @@ func Load(path string) (*ssh_config.Config, error) {
 		return nil, fmt.Errorf("read ssh config %s: %w", path, err)
 	}
 	defer f.Close()
-	cfg, err := ssh_config.Decode(f)
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("read ssh config %s: %w", path, err)
+	}
+	filtered := config.LenientSSHConfig(data, path, func(msg string) { slog.Warn(msg) })
+	cfg, err := ssh_config.DecodeBytes(filtered)
 	if err != nil {
 		return nil, fmt.Errorf("parse ssh config %s: %w", path, err)
 	}
@@ -90,8 +102,10 @@ func expandTilde(p string) string {
 // also collects values from every other block whose patterns match the alias
 // (notably Host *), leaking global forwards into each host's candidates. All
 // occurrences within a block are kept (the multi-forward intent of "GetAll,
-// not Get" — Get would return only the first). Skipped: Match blocks (the
-// library does not support Match, Phase 44's documented limitation),
+// not Get" — Get would return only the first). Skipped: Match blocks (their
+// criteria are never evaluated here, so their forwards are nobody's
+// candidate; the unevaluable ones are already stripped by the lenient
+// reader, phase 60),
 // wildcard-only blocks (Host * / ?-patterns — their forwards apply to every
 // host, so they are nobody's candidate), negated patterns, and a file's
 // global preamble (same reasoning as Host *). Blocks reached through Include

@@ -80,6 +80,10 @@ func runDaemon(ctx context.Context) error {
 	}
 	defer closer.Close()
 
+	// Route slog default users (e.g. the ssh-config leniency warnings on
+	// reload, phase 60) into the daemon log instead of bare stderr.
+	slog.SetDefault(logger)
+
 	srv, err := daemon.New(cfg, path, logger, ring)
 	if err != nil {
 		// A concurrent start that lost the single-instance flock exits 0 with a

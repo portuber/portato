@@ -33,7 +33,7 @@ silent exits routed through `crudFail`). Three follow-ups remain:
 
 ## Tasks
 
-- [ ] Tolerate unsupported-but-harmless `~/.ssh/config` directives (at
+- [x] Tolerate unsupported-but-harmless `~/.ssh/config` directives (at
       minimum `Match exec`): skip-with-warn instead of failing
       `config.Load`; alias resolution ignores what it cannot use.
 - [ ] Audit every `SilenceErrors` command's error returns: no path exits
@@ -47,7 +47,7 @@ silent exits routed through `crudFail`). Three follow-ups remain:
 
 ## Definition of Done
 
-- [ ] A `~/.ssh/config` containing a `Match exec …` block loads cleanly,
+- [x] A `~/.ssh/config` containing a `Match exec …` block loads cleanly,
       `portato doctor` is green, and a warning names the skipped block.
 - [ ] The `SilenceErrors` audit is complete; every fixed silent path has a
       regression test (clean paths are noted as audited).

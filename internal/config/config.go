@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"os"
 	"os/user"
@@ -558,9 +560,12 @@ func expandIdentityTokens(idf, sshUser, host string) string {
 // loadUserSSHConfig reads ~/.ssh/config for ssh-config resolution. A missing
 // file is not an error (resolution is simply skipped → unchanged behaviour);
 // an existing but unreadable file is, so a permission/IO problem surfaces as a
-// clear load error rather than a silent dial failure. The lenient parser does
-// not reject odd but salvageable input (mirroring OpenSSH), so a "parse error"
-// in the strict sense is not produced; Include directives are followed.
+// clear load error rather than a silent dial failure. The text is passed
+// through LenientSSHConfig first (phase 60): Match blocks portato cannot
+// evaluate are skipped with a warning — mirroring OpenSSH, where such a block
+// simply never matches — and Includes are expanded by the filter so included
+// files get the same treatment. Malformed input beyond that remains a hard
+// load error; Include directives are otherwise followed by the decoder.
 func loadUserSSHConfig() (*ssh_config.Config, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -575,7 +580,12 @@ func loadUserSSHConfig() (*ssh_config.Config, error) {
 		return nil, fmt.Errorf("read ssh config %s: %w", p, err)
 	}
 	defer f.Close()
-	cfg, err := ssh_config.Decode(f)
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return nil, fmt.Errorf("read ssh config %s: %w", p, err)
+	}
+	filtered := LenientSSHConfig(data, p, func(msg string) { slog.Warn(msg) })
+	cfg, err := ssh_config.DecodeBytes(filtered)
 	if err != nil {
 		return nil, fmt.Errorf("parse ssh config %s: %w", p, err)
 	}

@@ -104,6 +104,10 @@ func runStandalone() error {
 	}
 	defer closer.Close()
 
+	// Route slog default users into the standalone logger, mirroring the
+	// daemon (phase 60).
+	slog.SetDefault(logger)
+
 	ctrl := controller.NewLocal(cfg, path, logger, ring)
 	defer ctrl.Close()
 

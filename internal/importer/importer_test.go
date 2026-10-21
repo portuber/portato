@@ -336,3 +336,23 @@ func TestBlocks_DistinctInOrder(t *testing.T) {
 		t.Fatalf("got %v, want [db web]", got)
 	}
 }
+
+func TestLoadToleratesMatchExec(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "ssh_config")
+	conf := "Match exec \"only_on_laptop\"\n  User dead\n\nHost db\n  HostName 10.0.0.5\n  LocalForward 5432 10.0.0.6:5432\n"
+	if err := os.WriteFile(p, []byte(conf), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(p)
+	if err != nil {
+		t.Fatalf("Load: %v (the issue #4 regression)", err)
+	}
+	if cfg == nil {
+		t.Fatal("cfg = nil, want a parsed config")
+	}
+	cands := Scan(cfg)
+	if len(cands) != 1 || cands[0].SSHHost != "db" {
+		t.Fatalf("candidates = %+v, want the db forward", cands)
+	}
+}
