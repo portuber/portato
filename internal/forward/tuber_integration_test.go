@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -839,6 +840,26 @@ func TestTuberDynamicTrafficAndReconnect(t *testing.T) {
 	}
 }
 
+// syncedBuffer is a mutex-guarded bytes.Buffer: the tuber under test keeps
+// logging from its dial goroutine (the reconnect loop) while the test reads,
+// which a plain Buffer turns into a data race under -race.
+type syncedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
 // genKeyPair writes an ed25519 private key to dir/name and returns its path
 // and public key.
 func genKeyPair(t *testing.T, dir, name string) (string, ssh.PublicKey) {
@@ -877,7 +898,7 @@ func TestTuberAuthFailureStateAndLogVisible(t *testing.T) {
 	srv.Start()
 	defer srv.Stop()
 
-	var buf bytes.Buffer
+	var buf syncedBuffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	off := false
@@ -955,7 +976,7 @@ func TestTuberPasswordWaitIsVisibleInLog(t *testing.T) {
 	srv.Start()
 	defer srv.Stop()
 
-	var buf bytes.Buffer
+	var buf syncedBuffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
 
 	cfg := config.Tuber{
