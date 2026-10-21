@@ -1,7 +1,7 @@
 ---
 phase: 60
 title: "ssh-config leniency + CLI failure visibility"
-status: todo
+status: in-progress
 depends_on: []
 ---
 
