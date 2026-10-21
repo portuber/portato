@@ -55,19 +55,34 @@ func freePort(t *testing.T) int {
 	return port
 }
 
-// startTestAgent serves an in-process ssh-agent on a unix socket with the
-// given private key loaded, so the agent-auth path can be exercised without
-// touching the host's SSH_AUTH_SOCK.
-func startTestAgent(t *testing.T, priv any) (sock string, cleanup func()) {
+// mustMkdirTemp is t.TempDir with a short directory name: unix-domain socket
+// paths are capped (104 bytes on macOS) and t.TempDir's test-name-derived
+// paths can exceed that for long test names.
+func mustMkdirTemp(t *testing.T, pattern string) string {
 	t.Helper()
-	sock = filepath.Join(t.TempDir(), "agent.sock")
+	dir, err := os.MkdirTemp("", pattern)
+	if err != nil {
+		t.Fatalf("mktemp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(dir) })
+	return dir
+}
+
+// startTestAgent serves an in-process ssh-agent on a unix socket with the
+// given private keys loaded (none for an empty agent), so the agent-auth path
+// can be exercised without touching the host's SSH_AUTH_SOCK.
+func startTestAgent(t *testing.T, privs ...any) (sock string, cleanup func()) {
+	t.Helper()
+	sock = filepath.Join(mustMkdirTemp(t, "pta"), "agent.sock")
 	ln, err := net.Listen("unix", sock)
 	if err != nil {
 		t.Fatalf("agent listen: %v", err)
 	}
 	keyring := agent.NewKeyring()
-	if err := keyring.Add(agent.AddedKey{PrivateKey: priv}); err != nil {
-		t.Fatalf("agent add key: %v", err)
+	for _, priv := range privs {
+		if err := keyring.Add(agent.AddedKey{PrivateKey: priv}); err != nil {
+			t.Fatalf("agent add key: %v", err)
+		}
 	}
 	go func() {
 		for {
@@ -421,6 +436,128 @@ func TestTuberAuthViaAgent(t *testing.T) {
 	}
 	if !bytes.Equal(buf, msg) {
 		t.Errorf("echo %q, want %q", buf, msg)
+	}
+}
+
+// TestTuberAuthEmptyAgentFallsBackToIdentity is the issue #4 regression test:
+// an ssh-agent that holds NO identities must not block the identity-key
+// fallback. x/crypto/ssh skips further methods with the same RFC name once one
+// failed, so the pre-fix two-method chain (agent, then identity) never offered
+// the identity after the empty agent's publickey attempt failed.
+func TestTuberAuthEmptyAgentFallsBackToIdentity(t *testing.T) {
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen client key: %v", err)
+	}
+	authorizedKey, _ := ssh.NewPublicKey(pub)
+	block, err := ssh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		t.Fatalf("marshal client priv: %v", err)
+	}
+	dir := t.TempDir()
+	idPath := filepath.Join(dir, "id_ed25519")
+	if err := os.WriteFile(idPath, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write identity: %v", err)
+	}
+
+	sock, stopAgent := startTestAgent(t) // empty: zero identities
+	defer stopAgent()
+	t.Setenv("SSH_AUTH_SOCK", sock)
+
+	srv := sshtest.NewSSHD(t, authorizedKey)
+	srv.Start()
+	defer srv.Stop()
+
+	knownHosts := filepath.Join(dir, "known_hosts")
+	cfg := config.Tuber{
+		Name:     "empty-agent",
+		Type:     "local",
+		Local:    strconv.Itoa(freePort(t)),
+		Remote:   echoAddr,
+		SSH:      "u@" + srv.Addr(),
+		User:     "u",
+		Host:     "127.0.0.1",
+		Port:     srv.Port,
+		Identity: idPath,
+	}
+	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	if !waitForState(tun, Connected, 5*time.Second) {
+		s := tun.Status()
+		t.Fatalf("empty agent + identity did not reach Connected: state=%s err=%q", s.State, s.Error)
+	}
+}
+
+// TestTuberAuthWrongAgentKeyFallsBackToIdentity widens the issue #4 case: an
+// agent holding a key the server does NOT authorize must also fall back to the
+// configured identity (same pre-fix mechanism as the empty agent).
+func TestTuberAuthWrongAgentKeyFallsBackToIdentity(t *testing.T) {
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	_, wrongPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen wrong key: %v", err)
+	}
+	_, idPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen identity key: %v", err)
+	}
+	idPub, _ := ssh.NewPublicKey(idPriv.Public())
+	block, err := ssh.MarshalPrivateKey(idPriv, "")
+	if err != nil {
+		t.Fatalf("marshal identity priv: %v", err)
+	}
+	dir := t.TempDir()
+	idPath := filepath.Join(dir, "id_ed25519")
+	if err := os.WriteFile(idPath, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write identity: %v", err)
+	}
+
+	sock, stopAgent := startTestAgent(t, wrongPriv) // a key the server rejects
+	defer stopAgent()
+	t.Setenv("SSH_AUTH_SOCK", sock)
+
+	srv := sshtest.NewSSHD(t, idPub) // authorizes the identity key only
+	srv.Start()
+	defer srv.Stop()
+
+	knownHosts := filepath.Join(dir, "known_hosts")
+	cfg := config.Tuber{
+		Name:     "wrong-agent-key",
+		Type:     "local",
+		Local:    strconv.Itoa(freePort(t)),
+		Remote:   echoAddr,
+		SSH:      "u@" + srv.Addr(),
+		User:     "u",
+		Host:     "127.0.0.1",
+		Port:     srv.Port,
+		Identity: idPath,
+	}
+	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	if !waitForState(tun, Connected, 5*time.Second) {
+		s := tun.Status()
+		t.Fatalf("rejected agent key + identity did not reach Connected: state=%s err=%q", s.State, s.Error)
 	}
 }
 

@@ -209,30 +209,34 @@ func dialConn(ctx context.Context, cfg config.Tuber, def config.Defaults, log *s
 	return final, nil
 }
 
-// authMethods builds the public-key auth-method chain (ssh-agent then the
-// configured identity). It returns only key methods — never a password method
+// authMethods builds the public-key auth method: ssh-agent signers and the
+// configured identity's signer, concatenated in that order inside ONE
+// PublicKeysCallback. x/crypto/ssh skips further methods with the same RFC
+// name once one failed, so a separate identity method would never be tried
+// after a failed agent method (an empty agent, or keys the server rejects) —
+// issue #4. It returns only the key method — never a password method
 // (Phase 35 handles that separately in dialWithPasswordPrompt). The returned
 // closer must be invoked once the SSH handshake is done; it keeps the
 // ssh-agent connection open for the lifetime of the agent-backed signers (which
 // sign lazily during the handshake) and is a no-op when no agent is used.
 // provider/passSink enable passphrase-protected identity loading (Phase 19); all
-// may be nil. An empty method slice (no agent, no loadable identity) is returned
+// may be nil. A nil method slice (no agent, no loadable identity) is returned
 // without error: the caller decides whether that is fatal (key-only dial) or a
 // cue to fall back to password auth.
 func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log *slog.Logger, provider PassphraseProvider, passSink passphraseSink) ([]ssh.AuthMethod, func() error) {
 	var (
-		methods []ssh.AuthMethod
+		sources []func() ([]ssh.Signer, error)
 		closers []io.Closer
 	)
 	if conn, ok := dialAgent(ctx, log); ok {
 		ag := agent.NewClient(conn)
-		methods = append(methods, ssh.PublicKeysCallback(ag.Signers))
+		sources = append(sources, ag.Signers)
 		closers = append(closers, conn)
 	}
 	if idPath := cfg.ResolvedIdentity(def); idPath != "" {
 		signer, err := loadIdentityWithPassphrase(ctx, idPath, provider, passSink)
 		if err == nil {
-			methods = append(methods, ssh.PublicKeys(signer))
+			sources = append(sources, func() ([]ssh.Signer, error) { return []ssh.Signer{signer}, nil })
 		} else {
 			log.Warn("failed to load identity key", "path", idPath, "err", err)
 		}
@@ -243,6 +247,23 @@ func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log
 		}
 		return nil
 	}
+	if len(sources) == 0 {
+		return nil, closeAgent
+	}
+	methods := []ssh.AuthMethod{ssh.PublicKeysCallback(func() ([]ssh.Signer, error) {
+		var out []ssh.Signer
+		for _, src := range sources {
+			ss, err := src()
+			if err != nil {
+				// A broken source (e.g. a dead agent) must not take the
+				// usable ones down with it.
+				log.Warn("ssh signer source failed; trying the remaining ones", "err", err)
+				continue
+			}
+			out = append(out, ss...)
+		}
+		return out, nil
+	})}
 	return methods, closeAgent
 }
 
