@@ -83,12 +83,11 @@ Legend: `[ ]` pending · `[~]` in progress · `[x]` done
 **Phases 52–59 are registered from the September 2026 multi-model feature
 analysis.** Done `[x]`: 52 editor round-trip integrity (fixes a silent
 field-loss bug), 53 CLI CRUD (`add`/`set`/`rm`), 55 metadata-only refresh,
-56 port preflight. In progress `[~]`: 60 ssh-config leniency + CLI
-failure visibility, started from issue #4 follow-ups. Pending `[ ]`: 54
-status/exit codes, then the engine batch — 57 foundation (unified
-reconnect driver + typed events) gating 58 fast reconnect and 59
-hooks/notifications. Per-tunnel stats is deferred pending real demand
-(see the note at the candidate list).
+56 port preflight, 60 ssh-config leniency + CLI failure visibility (from
+issue #4 follow-ups). Pending `[ ]`: 54 status/exit codes, then the engine
+batch — 57 foundation (unified reconnect driver + typed events) gating 58
+fast reconnect and 59 hooks/notifications. Per-tunnel stats is deferred
+pending real demand (see the note at the candidate list).
 
 **Phases 0–51 are all `[x]`.** The last one to close was 51 (TUI header
 version segment): the running version next to `mode:`, with the phase-49
@@ -245,7 +244,7 @@ is deferred (per-tunnel stats — see its note).
 - **Phase 57** — Engine foundation (pending, `[ ]`): no user-visible change — unify the duplicated `run()`/`runRemote()` reconnect loops into one driver (parity-tested), and give the change event a typed payload (name, old/new state, error) instead of today's bare `struct{}{}` that forces every consumer to re-`List()`. The prerequisite layer for 58–59. depends_on [].
 - **Phase 58** — Fast reconnect on wake / network change (pending, `[ ]`): wall-clock-jump detection in the keepalive ticker (sleep ⇒ immediate reconnect + backoff reset), backoff jitter (the first failed-dial pause is 2s, not 1s — `attempt++` precedes `nextBackoff`), configurable `keepalive_interval`/`connect_timeout`. depends_on [57].
 - **Phase 59** — State-change hooks + notifications (pending, `[ ]`): promoted from the candidate list (item 4) — per-tuber `on_connect:`/`on_error:` commands (env-var context, no shell, timeout, never fatal) and desktop notifications, fired on state transitions with an anti-flap cooldown, on 57's typed event. depends_on [57].
-- **Phase 60** — ssh-config leniency + CLI failure visibility (in progress, `[~]`): registered from issue #4 follow-ups after its hotfix (the agent/identity auth merge and the CRUD silent exits) — a `Match exec` block in `~/.ssh/config` stops failing `config.Load` for every command (skip-with-warn, OpenSSH-faithful), every `SilenceErrors` command is audited so no error path exits non-zero without printing, and the issue's auth-failure-visibility claim (TUI stuck on `connecting`, `portato logs` silent) is verified or fixed. depends_on [].
+- **Phase 60** — ssh-config leniency + CLI failure visibility (done, `[x]`): registered from issue #4 follow-ups after its hotfix (the agent/identity auth merge and the CRUD silent exits) — a `Match exec` block in `~/.ssh/config` stops failing `config.Load` for every command (skip-with-warn, OpenSSH-faithful), every `SilenceErrors` command is audited so no error path exits non-zero without printing, and the issue's auth-failure-visibility claim (TUI stuck on `connecting`, `portato logs` silent) is verified or fixed. depends_on [].
 
 ## Current work
 

@@ -1,7 +1,7 @@
 ---
 phase: 60
 title: "ssh-config leniency + CLI failure visibility"
-status: in-progress
+status: done
 depends_on: []
 ---
 
@@ -51,9 +51,9 @@ silent exits routed through `crudFail`). Three follow-ups remain:
       `portato doctor` is green, and a warning names the skipped block.
 - [x] The `SilenceErrors` audit is complete; every fixed silent path has a
       regression test (clean paths are noted as audited).
-- [ ] The visibility question from issue #4 is answered in the issue
+- [x] The visibility question from issue #4 is answered in the issue
       (verified-fixed or reproduced-and-fixed).
-- [ ] `make fmt && make vet && make test && make lint` clean.
+- [x] `make fmt && make vet && make test && make lint` clean.
 
 ## Verification
 
