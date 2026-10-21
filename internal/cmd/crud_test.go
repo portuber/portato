@@ -168,6 +168,46 @@ func TestAdd_DuplicateFails(t *testing.T) {
 	}
 }
 
+// TestCRUDErrorsPrintToStderr is the issue #4 regression test: add/set/rm run
+// with SilenceErrors, so an error returned without being printed exited 1 with
+// no output. Every failure path must reach stderr.
+func TestCRUDErrorsPrintToStderr(t *testing.T) {
+	t.Run("add load error", func(t *testing.T) {
+		path := crudFixture(t)
+		if err := os.WriteFile(path, []byte("tubers: ["), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		crudSSH, crudLocal, crudRemote = "u@h:22", "8080", "web:80"
+		c, _, errOut := captureCmd()
+		if err := addRunE(c, []string{"web"}); err == nil {
+			t.Fatal("broken config must fail")
+		}
+		if !strings.Contains(errOut.String(), "load config") {
+			t.Errorf("stderr = %q, want it to mention the load error", errOut.String())
+		}
+	})
+	t.Run("set unknown tuber", func(t *testing.T) {
+		crudFixture(t)
+		c, _, errOut := captureCmd()
+		if err := setRunE(c, []string{"nope"}); err == nil {
+			t.Fatal("unknown tuber must fail")
+		}
+		if !strings.Contains(errOut.String(), `not found`) {
+			t.Errorf("stderr = %q, want it to mention not-found", errOut.String())
+		}
+	})
+	t.Run("add missing --ssh", func(t *testing.T) {
+		crudFixture(t)
+		c, _, errOut := captureCmd()
+		if err := addRunE(c, []string{"web"}); err == nil {
+			t.Fatal("missing --ssh must fail")
+		}
+		if !strings.Contains(errOut.String(), "--ssh is required") {
+			t.Errorf("stderr = %q, want it to name the missing flag", errOut.String())
+		}
+	})
+}
+
 func TestAdd_DaemonPathSkipsFile(t *testing.T) {
 	path := crudFixture(t)
 	d := &fakeCRUDDaemon{}
