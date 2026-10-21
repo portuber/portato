@@ -234,5 +234,23 @@ func Execute() error {
 	for _, sub := range rootCmd.Commands() {
 		sub.SetHelpTemplate(defaultHelpTemplate)
 	}
-	return rootCmd.Execute()
+	cmd, err := rootCmd.ExecuteC()
+	printSilencedError(cmd, err)
+	return err
+}
+
+// printSilencedError prints err for commands that opted out of cobra's own
+// error printing with SilenceErrors (phase 60: a non-zero exit must never be
+// silent). It mirrors cobra's ExecuteC condition exactly — cobra prints when
+// neither the command nor the root silences errors — so every error is
+// printed exactly once: this covers RunE returns, argument validators and
+// flag parsing alike, which no per-path print could.
+func printSilencedError(cmd *cobra.Command, err error) {
+	if err == nil || cmd == nil {
+		return
+	}
+	if !cmd.SilenceErrors || rootCmd.SilenceErrors {
+		return
+	}
+	fmt.Fprintln(cmd.ErrOrStderr(), err)
 }

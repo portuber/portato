@@ -179,7 +179,7 @@ func TestCRUDErrorsPrintToStderr(t *testing.T) {
 		}
 		crudSSH, crudLocal, crudRemote = "u@h:22", "8080", "web:80"
 		c, _, errOut := captureCmd()
-		if err := addRunE(c, []string{"web"}); err == nil {
+		if err := execSilenced(c, addRunE(c, []string{"web"})); err == nil {
 			t.Fatal("broken config must fail")
 		}
 		if !strings.Contains(errOut.String(), "load config") {
@@ -189,7 +189,7 @@ func TestCRUDErrorsPrintToStderr(t *testing.T) {
 	t.Run("set unknown tuber", func(t *testing.T) {
 		crudFixture(t)
 		c, _, errOut := captureCmd()
-		if err := setRunE(c, []string{"nope"}); err == nil {
+		if err := execSilenced(c, setRunE(c, []string{"nope"})); err == nil {
 			t.Fatal("unknown tuber must fail")
 		}
 		if !strings.Contains(errOut.String(), `not found`) {
@@ -199,7 +199,7 @@ func TestCRUDErrorsPrintToStderr(t *testing.T) {
 	t.Run("add missing --ssh", func(t *testing.T) {
 		crudFixture(t)
 		c, _, errOut := captureCmd()
-		if err := addRunE(c, []string{"web"}); err == nil {
+		if err := execSilenced(c, addRunE(c, []string{"web"})); err == nil {
 			t.Fatal("missing --ssh must fail")
 		}
 		if !strings.Contains(errOut.String(), "--ssh is required") {

@@ -40,8 +40,7 @@ The background check is an anonymous GET to api.github.com at most once per
 24h and only after consent; nothing but the latest tag is recorded. Self-
 update (download + swap) arrives in a later release; today the command only
 reports.`,
-	SilenceUsage:  true,
-	SilenceErrors: true,
+	SilenceUsage: true,
 }
 
 var updateCheckCmd = &cobra.Command{

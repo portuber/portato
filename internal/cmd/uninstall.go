@@ -20,7 +20,6 @@ func uninstallRunE(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 	if err := newServiceInstaller().Uninstall(opts); err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
 		return err
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "Removed autostart entry.")

@@ -138,14 +138,6 @@ func parsePassAuth(s string) (*bool, error) {
 	}
 }
 
-// crudFail prints err to the command's stderr before returning it. The CRUD
-// commands run with SilenceErrors, so returning without printing would exit 1
-// with no output at all (issue #4).
-func crudFail(cmd *cobra.Command, err error) error {
-	fmt.Fprintln(cmd.ErrOrStderr(), err)
-	return err
-}
-
 // crudTuberFromFlags builds the tuber for `add` from the flag set.
 func crudTuberFromFlags(name string) (config.Tuber, error) {
 	t := config.Tuber{
@@ -262,29 +254,29 @@ func (d *daemonCRUDClient) DeleteTuber(name string) error { return d.c.DeleteTub
 func addRunE(cmd *cobra.Command, args []string) error {
 	path := crudConfigPath()
 	if _, err := config.EnsureExample(path); err != nil {
-		return crudFail(cmd, fmt.Errorf("create config: %w", err))
+		return fmt.Errorf("create config: %w", err)
 	}
 	cfg, err := config.Load(path)
 	if err != nil {
-		return crudFail(cmd, fmt.Errorf("load config: %w", err))
+		return fmt.Errorf("load config: %w", err)
 	}
 	t, err := crudTuberFromFlags(args[0])
 	if err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	if err := crudValidateTuber(t, true); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	// Fail fast on the prospective config before any write path.
 	if _, err := cfg.WithTuberAdded(t); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	if d := newDaemonCRUD(); d != nil {
 		if err := d.AddTuber(t); err != nil {
-			return crudFail(cmd, err)
+			return err
 		}
 	} else if err := config.AddTuberNode(path, t); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "added: %s\n", t.Name)
 	return nil
@@ -295,7 +287,7 @@ func setRunE(cmd *cobra.Command, args []string) error {
 	path := crudConfigPath()
 	cfg, err := config.Load(path)
 	if err != nil {
-		return crudFail(cmd, fmt.Errorf("load config: %w", err))
+		return fmt.Errorf("load config: %w", err)
 	}
 	var cur *config.Tuber
 	for i := range cfg.Tubers {
@@ -305,24 +297,24 @@ func setRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if cur == nil {
-		return crudFail(cmd, fmt.Errorf("tuber %q not found", name))
+		return fmt.Errorf("tuber %q not found", name)
 	}
 	t := *cur
 	if err := applySetFlags(cmd, &t); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	if err := crudValidateTuber(t, true); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	if _, err := cfg.WithTuberReplaced(name, t); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	if d := newDaemonCRUD(); d != nil {
 		if err := d.UpdateTuber(name, t); err != nil {
-			return crudFail(cmd, err)
+			return err
 		}
 	} else if err := config.ReplaceTuberNode(path, name, t); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "updated: %s\n", t.Name)
 	return nil
@@ -333,7 +325,7 @@ func rmRunE(cmd *cobra.Command, args []string) error {
 	path := crudConfigPath()
 	cfg, err := config.Load(path)
 	if err != nil {
-		return crudFail(cmd, fmt.Errorf("load config: %w", err))
+		return fmt.Errorf("load config: %w", err)
 	}
 	found := false
 	for _, t := range cfg.Tubers {
@@ -343,21 +335,21 @@ func rmRunE(cmd *cobra.Command, args []string) error {
 		}
 	}
 	if !found {
-		return crudFail(cmd, fmt.Errorf("tuber %q not found", name))
+		return fmt.Errorf("tuber %q not found", name)
 	}
 	if !crudYes && !confirmRemove(fmt.Sprintf("remove tuber %q from config.yaml", name)) {
 		fmt.Fprintln(cmd.OutOrStdout(), "aborted")
 		return nil
 	}
 	if _, err := cfg.WithTuberRemoved(name); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	if d := newDaemonCRUD(); d != nil {
 		if err := d.DeleteTuber(name); err != nil {
-			return crudFail(cmd, err)
+			return err
 		}
 	} else if err := config.DeleteTuberNode(path, name); err != nil {
-		return crudFail(cmd, err)
+		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "removed: %s\n", name)
 	return nil

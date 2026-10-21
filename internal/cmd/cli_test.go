@@ -3,6 +3,7 @@ package cmd
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -239,7 +240,7 @@ func TestEnable_UnknownTuber(t *testing.T) {
 	useStub(t, s)
 
 	c, out, errOut := captureCmd()
-	if err := enableRunE(c, []string{"nope"}); err == nil {
+	if err := execSilenced(c, enableRunE(c, []string{"nope"})); err == nil {
 		t.Fatal("expected error for unknown tuber")
 	}
 	if !strings.Contains(errOut.String(), "unknown tuber") {
@@ -247,6 +248,43 @@ func TestEnable_UnknownTuber(t *testing.T) {
 	}
 	if out.String() != "" {
 		t.Errorf("stdout should be empty on error; got %q", out.String())
+	}
+}
+
+// execSilenced emulates root.Execute()'s centralized printing (phase 60) for
+// RunE funcs invoked directly in tests: it flags the throwaway command as
+// silenced and routes the returned error through printSilencedError.
+func execSilenced(c *cobra.Command, err error) error {
+	c.SilenceErrors = true
+	printSilencedError(c, err)
+	return err
+}
+
+// TestSilencedErrorPrintedExactlyOnce pins the phase-60 invariant at the
+// mechanism level: a silenced command's error is printed by
+// printSilencedError, a cobra-handled command's is not (cobra already
+// printed it), and success prints nothing.
+func TestSilencedErrorPrintedExactlyOnce(t *testing.T) {
+	boom := errors.New("boom")
+
+	c, _, errOut := captureCmd()
+	c.SilenceErrors = true
+	printSilencedError(c, boom)
+	if !strings.Contains(errOut.String(), "boom") {
+		t.Errorf("silenced command: stderr = %q, want the error printed once", errOut.String())
+	}
+
+	c, _, errOut = captureCmd()
+	printSilencedError(c, boom)
+	if errOut.String() != "" {
+		t.Errorf("cobra-handled command: stderr = %q, want nothing (cobra prints it)", errOut.String())
+	}
+
+	c, _, errOut = captureCmd()
+	c.SilenceErrors = true
+	printSilencedError(c, nil)
+	if errOut.String() != "" {
+		t.Errorf("nil error: stderr = %q, want nothing", errOut.String())
 	}
 }
 
@@ -267,7 +305,7 @@ func TestCLI_DaemonDownHint(t *testing.T) {
 	}
 	for _, tc := range cases {
 		c, out, errOut := captureCmd()
-		if err := tc.run(c, tc.args); err == nil {
+		if err := execSilenced(c, tc.run(c, tc.args)); err == nil {
 			t.Errorf("%s: expected error when daemon down", tc.name)
 		}
 		if !strings.Contains(errOut.String(), "portato daemon is not running") {

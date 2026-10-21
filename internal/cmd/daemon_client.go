@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"errors"
-	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -15,8 +14,10 @@ import (
 const daemonDownHint = "portato daemon is not running.\n" +
 	"Start it with 'portato daemon' or set up autostart with 'portato install'."
 
-// errDaemonDown is returned (and silenced) so cobra still yields exit code 1.
-var errDaemonDown = errors.New("daemon is not running")
+// errDaemonDown is returned when a CLI subcommand cannot reach the daemon.
+// It carries the full Phase 5 hint text so the centralized silenced-error
+// printing (see printSilencedError) yields a self-explanatory message.
+var errDaemonDown = errors.New(daemonDownHint)
 
 // dialDaemon resolves the socket and confirms the daemon is alive. Overridable
 // in tests; production wiring lives in defaultDialDaemon.
@@ -38,12 +39,11 @@ func defaultDialDaemon() (*client.Client, error) {
 }
 
 // requireDaemon is the shared preamble of the list/enable/disable/restart
-// subcommands: it dials the daemon, prints the friendly hint on failure and
-// returns (nil, false) so the caller can bail out with exit code 1.
-func requireDaemon(cmd *cobra.Command) (*client.Client, bool) {
+// subcommands: it dials the daemon and returns (nil, false) on failure so the
+// caller can bail out with errDaemonDown (whose text is the friendly hint).
+func requireDaemon(_ *cobra.Command) (*client.Client, bool) {
 	c, err := dialDaemon()
 	if err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), daemonDownHint)
 		return nil, false
 	}
 	return c, true

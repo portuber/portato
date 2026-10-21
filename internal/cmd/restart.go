@@ -31,7 +31,6 @@ func restartRunE(cmd *cobra.Command, args []string) error {
 	}
 	for _, name := range names {
 		if err := c.Restart(name); err != nil {
-			fmt.Fprintln(cmd.ErrOrStderr(), err)
 			return err
 		}
 		fmt.Fprintf(cmd.OutOrStdout(), "restarted: %s\n", name)

@@ -26,7 +26,6 @@ func installRunE(cmd *cobra.Command, _ []string) error {
 	}
 	path, err := newServiceInstaller().Install(opts)
 	if err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
 		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "%s\nSee: %s\n", installMessage(opts), path)

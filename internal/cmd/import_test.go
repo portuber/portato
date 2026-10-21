@@ -52,7 +52,7 @@ Host *
 func runImport(t *testing.T, args []string) (string, string, error) {
 	t.Helper()
 	c, out, errOut := captureCmd()
-	err := importRunE(c, args)
+	err := execSilenced(c, importRunE(c, args))
 	return out.String(), errOut.String(), err
 }
 

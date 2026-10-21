@@ -92,7 +92,6 @@ func importRunE(cmd *cobra.Command, args []string) error {
 	}
 	plan, err := importer.PlanImport(cfg, sshCfg, cands)
 	if err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
 		return err
 	}
 
@@ -123,8 +122,8 @@ func importRunE(cmd *cobra.Command, args []string) error {
 // importCandidates loads the ssh config and applies the pattern/--all
 // selection. A nil candidate slice with a nil error means "nothing to do"
 // (the no-forwards message is already printed). Guidance errors (a pattern
-// matching nothing, or a bare call without patterns/--all) are printed to
-// stderr and returned — they teach the command instead of dead-ending.
+// matching nothing, or a bare call without patterns/--all) teach the command
+// instead of dead-ending; they are printed once by printSilencedError.
 func importCandidates(cmd *cobra.Command, args []string) (*ssh_config.Config, []importer.Candidate, error) {
 	sshPath := importFrom
 	if sshPath == "" {
@@ -132,7 +131,6 @@ func importCandidates(cmd *cobra.Command, args []string) (*ssh_config.Config, []
 	}
 	sshCfg, err := importer.Load(importFrom)
 	if err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
 		return nil, nil, err
 	}
 	all := importer.Scan(sshCfg)
@@ -144,18 +142,14 @@ func importCandidates(cmd *cobra.Command, args []string) (*ssh_config.Config, []
 	if len(args) > 0 {
 		cands := importer.Filter(all, args)
 		if len(cands) == 0 {
-			err := fmt.Errorf("no forwards found for pattern(s) %s; blocks with forwards: %s",
+			return nil, nil, fmt.Errorf("no forwards found for pattern(s) %s; blocks with forwards: %s",
 				strings.Join(args, ", "), strings.Join(blocks, ", "))
-			fmt.Fprintln(cmd.ErrOrStderr(), err)
-			return nil, nil, err
 		}
 		return sshCfg, cands, nil
 	}
 	if !importAll {
-		err := fmt.Errorf("specify a host pattern or --all; found %d importable block(s): %s",
+		return nil, nil, fmt.Errorf("specify a host pattern or --all; found %d importable block(s): %s",
 			len(blocks), strings.Join(blocks, ", "))
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
-		return nil, nil, err
 	}
 	return sshCfg, all, nil
 }

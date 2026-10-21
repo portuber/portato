@@ -34,7 +34,6 @@ func listRunE(cmd *cobra.Command, _ []string) error {
 	}
 	statuses, err := c.List()
 	if err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
 		return err
 	}
 	if listJSON {

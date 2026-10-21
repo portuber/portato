@@ -36,7 +36,7 @@ silent exits routed through `crudFail`). Three follow-ups remain:
 - [x] Tolerate unsupported-but-harmless `~/.ssh/config` directives (at
       minimum `Match exec`): skip-with-warn instead of failing
       `config.Load`; alias resolution ignores what it cannot use.
-- [ ] Audit every `SilenceErrors` command's error returns: no path exits
+- [x] Audit every `SilenceErrors` command's error returns: no path exits
       non-zero without printing (extend the `crudFail` pattern or
       centralize the printing).
 - [ ] Verify the auth-failure visibility claim from issue #4 on the fixed
@@ -49,7 +49,7 @@ silent exits routed through `crudFail`). Three follow-ups remain:
 
 - [x] A `~/.ssh/config` containing a `Match exec …` block loads cleanly,
       `portato doctor` is green, and a warning names the skipped block.
-- [ ] The `SilenceErrors` audit is complete; every fixed silent path has a
+- [x] The `SilenceErrors` audit is complete; every fixed silent path has a
       regression test (clean paths are noted as audited).
 - [ ] The visibility question from issue #4 is answered in the issue
       (verified-fixed or reproduced-and-fixed).

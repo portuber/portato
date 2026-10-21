@@ -32,7 +32,7 @@ func TestReload_DaemonDown(t *testing.T) {
 	t.Cleanup(func() { dialDaemon = prev })
 
 	c, out, errOut := captureCmd()
-	if err := reloadRunE(c, nil); err == nil {
+	if err := execSilenced(c, reloadRunE(c, nil)); err == nil {
 		t.Fatal("expected error when daemon down")
 	}
 	if !strings.Contains(errOut.String(), "portato daemon is not running") {
@@ -49,7 +49,7 @@ func TestReload_DaemonError(t *testing.T) {
 	useStub(t, s)
 
 	c, out, errOut := captureCmd()
-	if err := reloadRunE(c, nil); err == nil {
+	if err := execSilenced(c, reloadRunE(c, nil)); err == nil {
 		t.Fatal("expected error when daemon reload fails")
 	}
 	if !strings.Contains(errOut.String(), "reload config") {

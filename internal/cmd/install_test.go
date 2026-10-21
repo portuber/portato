@@ -127,7 +127,7 @@ func TestInstall_SurfacesInstallerError(t *testing.T) {
 	f.installErr = errFed("boom")
 
 	c, out, errOut := captureCmd()
-	if err := installRunE(c, nil); err == nil {
+	if err := execSilenced(c, installRunE(c, nil)); err == nil {
 		t.Fatal("expected error to propagate")
 	}
 	if !strings.Contains(errOut.String(), "boom") {

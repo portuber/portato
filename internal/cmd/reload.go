@@ -24,7 +24,6 @@ func reloadRunE(cmd *cobra.Command, _ []string) error {
 		return errDaemonDown
 	}
 	if err := c.Reload(); err != nil {
-		fmt.Fprintln(cmd.ErrOrStderr(), err)
 		return err
 	}
 	fmt.Fprintln(cmd.OutOrStdout(), "config reloaded")
