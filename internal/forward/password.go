@@ -141,7 +141,10 @@ func dialWithPasswordPrompt(
 			}
 			pw, ok = pwProvider.Wait(ctx, account)
 			if !ok {
-				return nil, ctx.Err()
+				if err := ctx.Err(); err != nil {
+					return nil, err
+				}
+				return nil, fmt.Errorf("ssh auth failed: no password provided for %s", account)
 			}
 		}
 		client, err := dialConn(ctx, cfg, def, log, sink, keyMethods, []ssh.AuthMethod{ssh.Password(pw)})

@@ -389,6 +389,12 @@ func (t *Tuber) passphraseSink(path string) {
 		t.pendingPassphrase = path
 	}
 	t.mu.Unlock()
+	if path != "" {
+		// Phase-60 visibility: the dial is about to block until a passphrase
+		// arrives; without this line the tuber sits on "connecting" with
+		// nothing in the log (issue #4's headless case).
+		t.log.Warn("identity passphrase required — waiting for interactive input (attach with `portato` to answer, or store it with `portato add-identity <path>`)", "identity", path)
+	}
 	t.notifyChange()
 }
 
@@ -423,6 +429,12 @@ func (t *Tuber) passwordSink(account string) {
 		t.pendingPassword = account
 	}
 	t.mu.Unlock()
+	if account != "" {
+		// Phase-60 visibility: the dial is about to block until a password
+		// arrives; without this line the tuber sits on "connecting" with
+		// nothing in the log (issue #4's headless case).
+		t.log.Warn("ssh password required — waiting for interactive input (attach with `portato` to answer, or disable password_auth to stay key-only)", "account", account)
+	}
 	t.notifyChange()
 }
 

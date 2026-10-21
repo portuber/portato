@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -836,4 +837,172 @@ func TestTuberDynamicTrafficAndReconnect(t *testing.T) {
 		c.Close()
 		t.Error("local port still open after Stop")
 	}
+}
+
+// genKeyPair writes an ed25519 private key to dir/name and returns its path
+// and public key.
+func genKeyPair(t *testing.T, dir, name string) (string, ssh.PublicKey) {
+	t.Helper()
+	_, priv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen key: %v", err)
+	}
+	block, err := ssh.MarshalPrivateKey(priv, "")
+	if err != nil {
+		t.Fatalf("marshal priv: %v", err)
+	}
+	p := filepath.Join(dir, name)
+	if err := os.WriteFile(p, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write key: %v", err)
+	}
+	pub, _ := ssh.NewPublicKey(priv.Public())
+	return p, pub
+}
+
+// TestTuberAuthFailureStateAndLogVisible pins issue #4's visibility claim on
+// the fixed build: when no key authenticates and password auth is off, the
+// tuber must sit in the Error state with the auth failure as its message (not
+// "connecting"), and the failure must be visible in the log at info level —
+// `portato logs --tuber <name>` answers "what happened" without a TUI.
+func TestTuberAuthFailureStateAndLogVisible(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	dir := mustMkdirTemp(t, "authfail-*")
+	_, idPub := genKeyPair(t, dir, "authorized")
+	offeredPath, _ := genKeyPair(t, dir, "offered") // the tuber offers this one
+
+	srv := sshtest.NewSSHD(t, idPub) // authorizes the other key only
+	srv.Start()
+	defer srv.Stop()
+
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	off := false
+	cfg := config.Tuber{
+		Name:         "auth-fail",
+		Type:         "local",
+		Local:        strconv.Itoa(freePort(t)),
+		Remote:       echoAddr,
+		SSH:          "u@" + srv.Addr(),
+		User:         "u",
+		Host:         "127.0.0.1",
+		Port:         srv.Port,
+		Identity:     offeredPath,
+		PasswordAuth: &off,
+	}
+	def := config.Defaults{KnownHosts: filepath.Join(dir, "known_hosts"), AcceptNewHosts: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTuber(ctx, cfg, def, logger, nil, nil)
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	if !waitForState(tun, Error, 5*time.Second) {
+		s := tun.Status()
+		t.Fatalf("rejected key must land in Error, not stay connecting: state=%s err=%q", s.State, s.Error)
+	}
+	if msg := tun.Status().Error; !strings.Contains(msg, "authenticate") {
+		t.Errorf("Status().Error = %q, want the auth failure surfaced", msg)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "level=ERROR") || !strings.Contains(logged, "authenticate") {
+		t.Errorf("log at info level must carry the auth failure; got:\n%s", logged)
+	}
+	if !strings.Contains(logged, "tuber=auth-fail") {
+		t.Errorf("log must be attributable to the tuber (--tuber filter); got:\n%s", logged)
+	}
+}
+
+// blockingPasswordProvider reports every Wait call on its channel and blocks
+// until the context dies — modelling a daemon with nobody attached to answer.
+type blockingPasswordProvider struct {
+	waited chan string
+}
+
+func (p *blockingPasswordProvider) Get(string) (string, bool) { return "", false }
+func (p *blockingPasswordProvider) Wait(ctx context.Context, account string) (string, bool) {
+	select {
+	case p.waited <- account:
+	case <-ctx.Done():
+		return "", false
+	}
+	<-ctx.Done() // stay blocked until the tuber is stopped, like a real wait
+	return "", false
+}
+func (p *blockingPasswordProvider) Delete(string) error { return nil }
+
+// TestTuberPasswordWaitIsVisibleInLog covers the headless half of issue #4's
+// visibility claim: when the keys are rejected and the dial blocks waiting
+// for an interactive password nobody will type, the tuber must not sit on
+// "connecting" silently — the log carries a warn naming the account, and
+// Status().PendingPassword exposes the prompt for the UI.
+func TestTuberPasswordWaitIsVisibleInLog(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	dir := mustMkdirTemp(t, "pwwait-*")
+	_, idPub := genKeyPair(t, dir, "authorized")
+	offeredPath, _ := genKeyPair(t, dir, "offered")
+
+	srv := sshtest.NewSSHD(t, idPub)
+	srv.Start()
+	defer srv.Stop()
+
+	var buf bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelInfo}))
+
+	cfg := config.Tuber{
+		Name:     "pw-wait",
+		Type:     "local",
+		Local:    strconv.Itoa(freePort(t)),
+		Remote:   echoAddr,
+		SSH:      "u@" + srv.Addr(),
+		User:     "u",
+		Host:     "127.0.0.1",
+		Port:     srv.Port,
+		Identity: offeredPath,
+	}
+	def := config.Defaults{KnownHosts: filepath.Join(dir, "known_hosts"), AcceptNewHosts: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	pw := &blockingPasswordProvider{waited: make(chan string, 1)}
+	tun := NewTuber(ctx, cfg, def, logger, nil, pw)
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	select {
+	case account := <-pw.waited:
+		want := cfg.PasswordAccountKey()
+		if account != want {
+			t.Errorf("Wait account = %q, want %q", account, want)
+		}
+		if got := tun.Status().PendingPassword; got != want {
+			t.Errorf("Status().PendingPassword = %q, want %q", got, want)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("dial never reached the password wait")
+	}
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(buf.String(), "ssh password required") {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	logged := buf.String()
+	if !strings.Contains(logged, "level=WARN") || !strings.Contains(logged, "ssh password required") || !strings.Contains(logged, "tuber=pw-wait") {
+		t.Errorf("the password wait must warn in the log (headless visibility); got:\n%s", logged)
+	}
+	cancel() // release the Wait
 }

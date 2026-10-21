@@ -39,7 +39,7 @@ silent exits routed through `crudFail`). Three follow-ups remain:
 - [x] Audit every `SilenceErrors` command's error returns: no path exits
       non-zero without printing (extend the `crudFail` pattern or
       centralize the printing).
-- [ ] Verify the auth-failure visibility claim from issue #4 on the fixed
+- [x] Verify the auth-failure visibility claim from issue #4 on the fixed
       build (TUI state + `portato logs` at info); fix if it reproduces,
       and answer in the issue either way.
 - [ ] SPEC: document the `~/.ssh/config` leniency contract (what is
