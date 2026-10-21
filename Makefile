@@ -7,7 +7,7 @@ run:
 	go run ./cmd/portato
 
 test:
-	go test ./...
+	go test -race ./...
 
 # cover runs the tests with a coverage profile and prints the total.
 cover:
