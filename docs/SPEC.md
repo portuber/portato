@@ -60,6 +60,10 @@ portato disable <name> -> CLI: disable a tunnel on the daemon
 portato restart <name> -> CLI: restart a tunnel
 portato reload         -> CLI: force the running daemon to re-read config.yaml (Phase 28)
 portato stop           -> CLI: gracefully stop the running daemon — SIGTERM via the marker PID (Phase 27)
+portato socket-path    -> CLI: print where the daemon IPC socket and token file live plus the binary
+                           version (client discovery precedence: --socket/PORTATO_SOCKET -> marker ->
+                           runtime path; computed without a running daemon). `--json`: one JSON document
+                           `{"socket","token_path","version"}`
 
 portato add <name>     -> CLI: create a tuber from flags (type/ssh/local/remote, jump, tags, socks5,
                            password-auth, enabled). Validates the prospective config, then applies

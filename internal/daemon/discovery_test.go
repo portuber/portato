@@ -307,6 +307,52 @@ func TestProbeSocketLiveAndSilent(t *testing.T) {
 	}
 }
 
+// TestResolveSocketStatic pins the no-daemon resolution `portato socket-path`
+// uses: the override wins, a readable marker is reported as-is (no liveness
+// probe, no cleanup side effects), and without a marker the canonical runtime
+// path is returned.
+func TestResolveSocketStatic(t *testing.T) {
+	t.Run("override wins", func(t *testing.T) {
+		withIsolatedDiscovery(t)
+		t.Setenv("PORTATO_SOCKET", "/tmp/pt-static-override.sock")
+		got, err := ResolveSocketStatic()
+		if err != nil {
+			t.Fatalf("ResolveSocketStatic: %v", err)
+		}
+		if got != "/tmp/pt-static-override.sock" {
+			t.Fatalf("ResolveSocketStatic = %q, want the override", got)
+		}
+	})
+
+	t.Run("marker reported as-is", func(t *testing.T) {
+		mp, _ := withIsolatedDiscovery(t)
+		if err := WriteMarker(mp, "/tmp/pt-static-marker.sock", os.Getpid()); err != nil {
+			t.Fatal(err)
+		}
+		got, err := ResolveSocketStatic()
+		if err != nil {
+			t.Fatalf("ResolveSocketStatic: %v", err)
+		}
+		if got != "/tmp/pt-static-marker.sock" {
+			t.Fatalf("ResolveSocketStatic = %q, want the marker socket", got)
+		}
+		if _, err := os.Stat(mp); err != nil {
+			t.Fatalf("static resolution must not remove the marker: %v", err)
+		}
+	})
+
+	t.Run("no marker falls back to runtime path", func(t *testing.T) {
+		_, rp := withIsolatedDiscovery(t)
+		got, err := ResolveSocketStatic()
+		if err != nil {
+			t.Fatalf("ResolveSocketStatic: %v", err)
+		}
+		if got != rp {
+			t.Fatalf("ResolveSocketStatic = %q, want runtime path %q", got, rp)
+		}
+	})
+}
+
 // startAuthHealthzServer serves /healthz at path but requires the bearer token,
 // standing in for an authenticated daemon so probeSocket's token handling can
 // be exercised without a full Server.

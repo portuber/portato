@@ -184,6 +184,26 @@ func ResolveSocket() (string, error) {
 	return "", nil
 }
 
+// ResolveSocketStatic returns the socket path a client would dial, using the
+// same precedence as ResolveSocket — the override (--socket / PORTATO_SOCKET),
+// then the discovery marker, then the canonical runtime path — but without
+// liveness probes or stale-marker cleanup: it only computes the path, so it
+// works with no daemon running (`portato socket-path`). A marker is reported
+// as-is; only ResolveSocket's probe can tell it is stale.
+func ResolveSocketStatic() (string, error) {
+	if ov := SocketOverride(); ov != "" {
+		return ov, nil
+	}
+	markerPath, err := DiscoveryPath()
+	if err != nil {
+		return "", err
+	}
+	if m, rerr := ReadMarker(markerPath); rerr == nil {
+		return m.Socket, nil
+	}
+	return RuntimeSocketPath()
+}
+
 // probeSocket reports whether a portato daemon answers GET /healthz at the
 // given unix socket path. It is the authoritative liveness check for discovery:
 // a socket that answers is alive regardless of what any marker/PID claims, and

@@ -219,6 +219,7 @@ func Execute() error {
 		uninstallCmd,
 		forwardCmd,
 		doctorCmd,
+		socketPathCmd,
 		importCmd,
 		addCmd,
 		setCmd,
