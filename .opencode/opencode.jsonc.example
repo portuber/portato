@@ -1,0 +1,9 @@
+// Copy to .opencode/opencode.json and adjust the paths to where you keep
+// the sibling repo. The real opencode.json is gitignored.
+{
+  "$schema": "https://opencode.ai/config.json",
+  "permissions": [
+    { "action": "external_directory", "resource": "~/path/to/portato-vscode/*", "effect": "allow" },
+    { "action": "read", "resource": "~/path/to/portato-vscode/*", "effect": "allow" }
+  ]
+}

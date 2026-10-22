@@ -103,6 +103,17 @@ Non-trivial commits include a body: **what changed and why**.
   `/releases/latest`; an exact `vX.Y.Z` lives only in git tags and the per-phase
   historical "shipped in vX.Y.Z" notes (which are facts, not the current version).
 
+## Sibling repo (read-only, no prompt)
+
+`../portato-vscode` — the VS Code extension repo, a client of this daemon.
+Reading it is allowed without a prompt where a local
+`.opencode/opencode.json` exists (gitignored; copy
+`.opencode/opencode.jsonc.example` and adjust the paths); editing it from
+this session is not — changes there land in its own session. When the
+daemon IPC contract changes (`internal/daemon/server.go`,
+`internal/forward/state.go`), remember that `portato-vscode/src/types.ts`
+mirrors it and needs a matching update in that repo.
+
 ## Current focus
 
 See `docs/ROADMAP.md` — "Current focus" and the phase status table.

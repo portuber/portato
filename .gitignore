@@ -33,3 +33,6 @@ desktop.ini
 
 # E2E fixture binary
 e2e/systemd-docker/portato
+
+# opencode local config (see .opencode/opencode.jsonc.example)
+.opencode/opencode.json
