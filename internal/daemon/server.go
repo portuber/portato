@@ -34,6 +34,14 @@ var ipcTokenDisabled bool
 // from the root command's daemon run when --ipc-token off / the env var is set.
 func SetIpcTokenDisabled(disabled bool) { ipcTokenDisabled = disabled }
 
+// daemonVersion is the build version GET /healthz reports. Set by the cmd
+// package (which owns the ldflags-stamped value) before the daemon starts;
+// the "dev" fallback keeps test servers and `go run` builds honest.
+var daemonVersion = "dev"
+
+// SetVersion installs the version string served by GET /healthz.
+func SetVersion(v string) { daemonVersion = v }
+
 // tuberer is the subset of *forward.Engine the server depends on. Kept
 // unexported so the concrete Engine stays the production type while tests
 // can substitute a fake (the SSH path itself is covered in the forward pkg).
@@ -403,7 +411,10 @@ func (s *Server) authmw(next http.Handler) http.Handler {
 }
 
 func (s *Server) handleHealthz(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]bool{"ok": true})
+	writeJSON(w, http.StatusOK, struct {
+		OK      bool   `json:"ok"`
+		Version string `json:"version"`
+	}{OK: true, Version: daemonVersion})
 }
 
 func (s *Server) handleList(w http.ResponseWriter, _ *http.Request) {

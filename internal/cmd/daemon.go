@@ -62,8 +62,10 @@ func runDaemon(ctx context.Context) error {
 		daemon.SetIpcTokenDisabled(true)
 	}
 	// The background update poll identifies itself as this binary's version
-	// (Phase 49); set before any goroutine could fire a check.
+	// (Phase 49); set before any goroutine could fire a check. The same
+	// version is what GET /healthz reports to IPC clients.
 	daemon.SetUpdateUserAgent("portato/" + version)
+	daemon.SetVersion(version)
 
 	path := cfgFile
 	if path == "" {

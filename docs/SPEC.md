@@ -277,7 +277,7 @@ Implementations:
 | `DELETE` | `/tubers/{name}`                 | remove a tunnel (active one is stopped) — Phase 10 |
 | `GET`    | `/logs?name=`                     | recent in-memory log entries for a tunnel (Phase 11 TUI logs screen) |
 | `POST`   | `/tubers/{name}/accept-host`     | append the tunnel's pending unknown-host key + restart (Phase 11 TOFU) |
-| `GET`    | `/healthz`                        | liveness probe (smart-launcher)   |
+| `GET`    | `/healthz`                        | liveness probe (smart-launcher); body `{"ok":true,"version":"<build version>"}` (`"dev"` on local builds) |
 
 `GET /events` (Phase 9) is a `text/event-stream`: the daemon subscribes a
 client to the Engine's event broker and writes a signal-only `data: {}` frame

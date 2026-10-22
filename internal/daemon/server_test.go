@@ -5,6 +5,7 @@ package daemon
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net"
@@ -619,6 +620,37 @@ func TestServer_AuthDisabledByDefault(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200 (auth disabled)", resp.StatusCode)
+	}
+}
+
+// TestServer_HealthzReportsVersion pins the /healthz body contract: ok stays
+// true and the response carries the daemon's build version — the "dev"
+// package default until cmd stamps the ldflags version in via SetVersion.
+func TestServer_HealthzReportsVersion(t *testing.T) {
+	_, sock, tok := startAuthServer(t)
+
+	healthz := func() (bool, string) {
+		t.Helper()
+		resp := unixHTTPDo(t, sock, http.MethodGet, "/healthz", "Bearer "+tok)
+		defer resp.Body.Close()
+		var body struct {
+			OK      bool   `json:"ok"`
+			Version string `json:"version"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			t.Fatalf("decode healthz body: %v", err)
+		}
+		return body.OK, body.Version
+	}
+
+	if ok, v := healthz(); !ok || v != "dev" {
+		t.Fatalf("healthz = (ok=%v, version=%q), want (true, %q) before SetVersion", ok, v, "dev")
+	}
+
+	SetVersion("v0.0.0-test")
+	t.Cleanup(func() { SetVersion("dev") })
+	if ok, v := healthz(); !ok || v != "v0.0.0-test" {
+		t.Fatalf("healthz = (ok=%v, version=%q), want (true, %q) after SetVersion", ok, v, "v0.0.0-test")
 	}
 }
 
