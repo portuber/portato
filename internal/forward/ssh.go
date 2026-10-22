@@ -272,9 +272,9 @@ func hostKeyCallback(def config.Defaults, log *slog.Logger, sink hostKeySink) (s
 	if err := ensureKnownHostsFile(hosts); err != nil {
 		return nil, err
 	}
-	base, err := knownhosts.New(hosts)
+	base, err := loadKnownHosts(hosts, log)
 	if err != nil {
-		return nil, fmt.Errorf("load known_hosts %s: %w", hosts, err)
+		return nil, err
 	}
 	return wrapHostKey(hosts, base, def.AcceptNewHosts, log, sink), nil
 }
