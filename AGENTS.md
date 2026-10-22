@@ -89,6 +89,15 @@ spec. Quick reference:
 
 Non-trivial commits include a body: **what changed and why**.
 
+## Releases
+
+The agent never cuts or pushes release tags — releases are the maintainer's
+manual step, always through the Makefile: `make release-patch` /
+`make release-minor` / `make release-major` (or `make release VERSION=vX.Y.Z`
+for an explicit tag). The target runs govulncheck, prints the planned tag and
+the commits landing on main, asks y/N, then pushes `main`, creates the
+annotated tag and pushes it. Pick the level per `docs/VERSIONING.md`.
+
 ## Operating rules
 
 - **Do not push** to any remote unless explicitly asked. Local commits only.
