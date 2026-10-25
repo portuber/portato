@@ -272,20 +272,37 @@ install -m 0755 portato ~/.local/bin/portato</code></pre>
   <section class="quickstart" id="quickstart">
     <div class="container">
       <h2>Quick start</h2>
+      <p class="note"><strong>Config location.</strong> macOS: <code>~/Library/Application Support/portato/config.yaml</code>; Linux: <code>~/.config/portato/config.yaml</code> (or <code>$XDG_CONFIG_HOME/portato/config.yaml</code>); Windows: <code>%AppData%\portato\config.yaml</code>.</p>
       <div class="code-block">
-        <button type="button" class="copy" aria-label="Copy quick start">Copy</button>
-        <pre><code># macOS / Linux: ~/.config/portato/config.yaml
-# Windows:        %AppData%\portato\config.yaml
-tubers:
+        <button type="button" class="copy" aria-label="Copy config example">Copy</button>
+        <pre><code class="language-yaml">tubers:
   - name: redis
     type: local          # -L: listen here, forward to the host
     local: 6379
     remote: 6379
     ssh: user@bastion.example.com
-
-portato          # TUI (smart launcher: attaches to a running daemon or starts standalone)
+    enabled: true        # tunnels are disabled by default</code></pre>
+      </div>
+      <div class="code-block" style="margin-top:16px;">
+        <button type="button" class="copy" aria-label="Copy commands">Copy</button>
+        <pre><code class="language-sh">portato          # TUI (smart launcher: attaches to a running daemon or starts standalone)
 portato daemon   # background daemon + IPC server
 portato list     # status on stdout</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <section class="vscode" id="vscode">
+    <div class="container">
+      <h2>VS Code extension</h2>
+      <p class="lede" style="text-align:left;margin:0 0 1rem;">Manage tunnels from a tree view: create and edit tunnels in a form, toggle or restart them, drag-and-drop to reorder, group and filter by tags, and watch live logs with a level filter. Plus a status-bar quick pick with an attention indicator, SSH config import, doctor, and a Get Started walkthrough.</p>
+      <!-- TODO: add a tree-view screenshot here once a suitable asset exists -->
+      <p class="note"><strong>Requirements.</strong> VS Code 1.90+, macOS or Linux, and the portato daemon 1.11.0+ (the extension checks the version and warns).</p>
+      <div class="cta" style="justify-content:flex-start;">
+        <a class="btn btn-primary" href="https://marketplace.visualstudio.com/items?itemName=portuber.portato-vscode">Install on VS Code Marketplace</a>
+        <!-- TODO: uncomment once open-vsx.org publishes portuber/portato-vscode (under review, ETA unknown)
+        <a class="btn" href="https://open-vsx.org/extension/portuber/portato-vscode">Open VSX</a>
+        -->
       </div>
     </div>
   </section>
