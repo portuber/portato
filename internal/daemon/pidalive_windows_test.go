@@ -19,17 +19,16 @@ func TestPidAlive_SelfAndBogus(t *testing.T) {
 
 // TestPidAlive_NonexistentPID covers the ERROR_INVALID_PARAMETER path: a PID
 // that exists in neither table must report dead, so stale-marker cleanup
-// still works. PIDs on Windows are a multiple of 4; scanning a few recent
-// multiples that are not the test's own process finds a free one.
+// still works. PIDs on Windows are a multiple of 4; the runner may have live
+// processes in any single slot, so scan candidates until one reports dead
+// instead of asserting on the first.
 func TestPidAlive_NonexistentPID(t *testing.T) {
 	self := uint32(os.Getpid())
 	for pid := self + 60; pid < self+6000; pid += 4 {
-		if pid == self {
+		if pidAlive(int(pid)) {
 			continue
 		}
-		if pidAlive(int(pid)) {
-			t.Errorf("pidAlive(%d) = true for a nonexistent pid, want false", pid)
-		}
-		break
+		return
 	}
+	t.Fatalf("every pid in [%d,%d) reported alive; pidAlive never hit the nonexistent-pid path", self+60, self+6000)
 }

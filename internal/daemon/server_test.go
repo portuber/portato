@@ -532,7 +532,13 @@ func startAuthServer(t *testing.T) (s *Server, sock, tok string) {
 	if err := waitForFile(sock, 2*time.Second); err != nil {
 		t.Fatalf("socket not created: %v", err)
 	}
-	tok, err := ipctoken.ReadToken(ipctoken.TokenPath(sock))
+	// The token is written shortly after the socket starts accepting; wait
+	// for the file so ReadToken does not race its creation.
+	tokPath := ipctoken.TokenPath(sock)
+	if err := waitForFile(tokPath, 2*time.Second); err != nil {
+		t.Fatalf("token file not created: %v", err)
+	}
+	tok, err := ipctoken.ReadToken(tokPath)
 	if err != nil {
 		t.Fatalf("read token: %v", err)
 	}

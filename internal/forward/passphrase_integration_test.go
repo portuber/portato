@@ -182,10 +182,20 @@ func TestPassphraseIdentity_WrongThenRight(t *testing.T) {
 	if err := store.Set(idPath, "wrong"); err != nil {
 		t.Fatal(err)
 	}
-	// After a wrong value the dial Deletes it and loops back to Wait, so the
-	// pending need re-appears.
-	if !waitForPendingPassphrase(t, tun, 60*time.Second) {
-		t.Fatal("dial should re-block after a wrong passphrase")
+	// The dial's rejection path Deletes the value before looping back to
+	// Wait. PendingPassphrase is not cleared between re-prompts, so waiting
+	// on it cannot prove the wrong value was consumed — and setting the
+	// correct one before the Delete would let the Delete wipe it. Wait for
+	// the store to drop the wrong value first.
+	deadline := time.Now().Add(60 * time.Second)
+	for {
+		if _, ok := store.Get(idPath); !ok {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("dial did not invalidate the wrong passphrase")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 	// Correct passphrase: connects.
 	if err := store.Set(idPath, "correct"); err != nil {
