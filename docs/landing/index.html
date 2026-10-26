@@ -10,11 +10,25 @@
   <meta property="og:description" content="SSH port-forwarding manager with a TUI. Single binary, native SSH, macOS / Linux / Windows.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://portuber.github.io/portato/">
+  <meta property="og:site_name" content="Portato">
   <meta name="twitter:card" content="summary_large_image">
   <meta property="og:image" content="https://portuber.github.io/portato/assets/help.png">
   <meta name="twitter:image" content="https://portuber.github.io/portato/assets/help.png">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%94%3C/text%3E%3C/svg%3E">
   <noscript><style>.tabs, .tab-panels { display: none; }</style></noscript>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Portato",
+    "operatingSystem": "macOS, Linux, Windows",
+    "applicationCategory": "DeveloperApplication",
+    "description": "SSH port-forwarding manager with a TUI.",
+    "url": "https://portuber.github.io/portato/",
+    "downloadUrl": "https://github.com/portuber/portato/releases/latest",
+    "license": "https://github.com/portuber/portato/blob/main/LICENSE"
+  }
+  </script>
   <style>
     :root {
       --bg: #ffffff;
@@ -75,6 +89,8 @@
     .card { background: var(--bg-soft); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
     .card h3 { margin: 0 0 .4rem; font-size: 1.05rem; }
     .card p { margin: 0; color: var(--fg-muted); font-size: .95rem; }
+    .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 16px; }
+    .gallery img { width: 100%; height: auto; border: 1px solid var(--border); border-radius: var(--radius); }
     .table-wrap { overflow-x: auto; }
     .why-table { width: 100%; border-collapse: collapse; font-size: .95rem; min-width: 480px; }
     .why-table th, .why-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
@@ -142,8 +158,16 @@
           <p><code>-L</code>, <code>-R</code> and <code>-D</code> tunnels. A dynamic forward runs a SOCKS5 proxy so you can reach any internal address through the bastion without a forward per port.</p>
         </div>
         <div class="card">
+          <h3>Jump hosts (ProxyJump <code>-J</code>)</h3>
+          <p>Reach targets through bastions: <code>jump:</code> takes a single <code>user@host[:port]</code> hop or a comma-separated chain (<code>user@edge,user@bastion</code>), like OpenSSH <code>-J</code>.</p>
+        </div>
+        <div class="card">
           <h3>Migrate from <code>~/.ssh/config</code></h3>
           <p>Forwards already live in your ssh config? <code>portato import</code> copies every <code>LocalForward</code> / <code>RemoteForward</code> / <code>DynamicForward</code> into Portato as disabled tunnels — one command, your ssh config is read, never written.</p>
+        </div>
+        <div class="card">
+          <h3>Tags for grouping</h3>
+          <p>Group tunnels with <code>tags: [prod, db]</code> and drive them in bulk: <code>enable/disable/restart --tag prod</code>, the <code>#tag</code> filter in the TUI, or enable/disable right over a filtered view.</p>
         </div>
         <div class="card">
           <h3>Background daemon + seamless hand-off</h3>
@@ -161,6 +185,11 @@
           <h3>Dark / Light / Mono themes</h3>
           <p>Auto-detected from <code>NO_COLOR</code> / <code>COLORFGBG</code>; force one with <code>PORTATO_THEME</code>. The light theme paints a real light surface across the whole TUI.</p>
         </div>
+      </div>
+      <div class="gallery">
+        <img src="assets/editor.png" width="1200" height="650" loading="lazy" alt="Portato TUI: tunnel editor form">
+        <img src="assets/log.png" width="1200" height="650" loading="lazy" alt="Portato TUI: per-tunnel live log">
+        <img src="assets/help.png" width="1200" height="650" loading="lazy" alt="Portato TUI: built-in help screen">
       </div>
     </div>
   </section>
@@ -383,6 +412,17 @@ portato list     # status on stdout</code></pre>
           }
         });
       });
+      // Pre-select the install tab by visitor OS (best effort; the Homebrew
+      // tab stays the default when detection fails).
+      var plat = "";
+      if (navigator.userAgentData && navigator.userAgentData.platform) plat = navigator.userAgentData.platform;
+      else if (navigator.platform) plat = navigator.platform;
+      plat = plat.toLowerCase();
+      var osTab = "brew";
+      if (plat.indexOf("win") !== -1) osTab = "scoop";
+      else if (plat.indexOf("linux") !== -1) osTab = "deb";
+      else if (plat.indexOf("mac") !== -1) osTab = "brew";
+      setTab(osTab, false);
     })();
   </script>
 </body>
