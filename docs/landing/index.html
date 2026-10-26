@@ -69,7 +69,9 @@
     h1, h2, h3 { line-height: 1.2; }
     h2 { font-size: 1.5rem; margin: 0 0 1.2rem; }
     section { padding: 56px 0; border-top: 1px solid var(--border); }
-    .hero { border-top: none; padding-top: 84px; padding-bottom: 56px; text-align: center; }
+    .hero { border-top: none; padding-top: 52px; padding-bottom: 56px; text-align: center; }
+    .hero-hint { margin: 14px 0 0; font-size: .95rem; color: var(--fg-muted); }
+    .demo-section { padding-top: 24px; }
     .wordmark { font-size: clamp(2.6rem, 7vw, 4rem); margin: 0 0 .35rem; letter-spacing: -.02em; font-weight: 800; }
     .wordmark .potato { font-size: .9em; vertical-align: -.04em; }
     .tagline { font-size: 1.3rem; margin: 0 0 .7rem; font-weight: 600; }
@@ -123,23 +125,20 @@
     <div class="container">
       <h1 class="wordmark"><span class="potato">🥔</span> Portato</h1>
       <p class="tagline">SSH port-forwarding manager with a TUI.</p>
-      <p class="lede">One binary that manages all your SSH forwards — native SSH (no system <code>ssh</code>), runs standalone or as a background daemon that keeps tunnels alive across logout. macOS, Linux, and Windows from the same release.</p>
+      <p class="lede">Toggle, restart and watch every SSH tunnel from one screen. A background daemon keeps them up through sleep, dropped links and logout.</p>
       <div class="badges">
-        <a href="https://github.com/portuber/portato/actions/workflows/ci.yml"><img src="https://github.com/portuber/portato/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-        <a href="https://github.com/portuber/portato/actions/workflows/security.yml"><img src="https://github.com/portuber/portato/actions/workflows/security.yml/badge.svg" alt="security"></a>
         <a href="https://github.com/portuber/portato/releases"><img src="https://img.shields.io/github/v/release/portuber/portato" alt="Release"></a>
         <a href="https://github.com/portuber/portato/blob/main/LICENSE"><img src="https://img.shields.io/github/license/portuber/portato" alt="License: MIT"></a>
-        <a href="https://github.com/portuber/portato/blob/main/go.mod"><img src="https://img.shields.io/github/go-mod/go-version/portuber/portato" alt="Go Version"></a>
-        <a href="https://www.codefactor.io/repository/github/portuber/portato"><img src="https://www.codefactor.io/repository/github/portuber/portato/badge" alt="Codefactor"></a>
       </div>
       <div class="cta">
         <a class="btn btn-primary" href="#install">Install</a>
-        <a class="btn" href="https://github.com/portuber/portato">Source</a>
+        <a class="btn" href="https://github.com/portuber/portato">GitHub</a>
       </div>
+      <p class="hero-hint">Prefer VS Code? <a href="#vscode">There's an extension</a>.</p>
     </div>
   </header>
 
-  <section aria-label="Demo">
+  <section class="demo-section" aria-label="Demo">
     <div class="container">
       <img class="demo-img" src="assets/hero.gif" width="1200" height="650" alt="Portato TUI demo: toggle tunnels, live log, editor, help, and reorder a tunnel with Ctrl+K">
     </div>
@@ -150,8 +149,8 @@
       <h2>What it does</h2>
       <div class="grid">
         <div class="card">
-          <h3>One screen for every tunnel</h3>
-          <p>Toggle, restart and watch all your SSH forwards from a single TUI — running standalone, or attached to a background daemon that keeps them alive.</p>
+          <h3>Auto-reconnect</h3>
+          <p>Built-in backoff brings every tunnel back after sleep or a dropped link. No autossh, no per-tunnel processes.</p>
         </div>
         <div class="card">
           <h3>Local, Remote, Dynamic SOCKS5</h3>
@@ -361,6 +360,7 @@ portato list     # status on stdout</code></pre>
   <footer>
     <div class="container">
       <p>Not working? Run <code>portato doctor</code>, or see the <a href="https://github.com/portuber/portato#troubleshooting">Troubleshooting</a> section in the README.</p>
+      <p><a href="https://github.com/portuber/portato/actions/workflows/ci.yml">CI</a> | <a href="https://github.com/portuber/portato/actions/workflows/security.yml">Security scan</a> | <a href="https://www.codefactor.io/repository/github/portuber/portato">CodeFactor</a></p>
       <p>Distributed under the <a href="https://github.com/portuber/portato/blob/main/LICENSE">MIT License</a>. © 2026 Valerii Kipkaev.</p>
       <p><a href="https://github.com/portuber/portato">github.com/portuber/portato</a></p>
     </div>
