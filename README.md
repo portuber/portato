@@ -121,6 +121,7 @@ restart, drag-and-drop reorder, tag grouping and filter, live logs with
 a level filter, a status-bar quick pick, SSH config import, doctor, and
 a Get Started walkthrough. Requires VS Code 1.90+, macOS or Linux, and
 the portato daemon 1.11.0+ (the extension checks the version and warns).
+Also available on [Open VSX](https://open-vsx.org/extension/portuber/portato-vscode).
 
 ## Shell completion
 
