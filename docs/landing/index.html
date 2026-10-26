@@ -142,7 +142,7 @@
         </div>
         <div class="card">
           <h3>Background daemon + seamless hand-off</h3>
-          <p>Start standalone, then hand off to the daemon without dropping a connection — already-bound local listeners are passed over SCM_RIGHTS, so the port never goes down.</p>
+          <p>Start standalone, then hand off to the daemon without dropping a connection — already-bound local listeners are passed over SCM_RIGHTS, so the port never goes down (macOS/Linux; on Windows the port is briefly rebound).</p>
         </div>
         <div class="card">
           <h3>Cross-platform</h3>
@@ -176,7 +176,7 @@
             <tr><td>Forwards already in <code>~/.ssh/config</code></td><td>re-type them by hand</td><td><code>portato import</code> — one command, disabled by default</td></tr>
             <tr><td>Survive logout</td><td>hand-rolled systemd / launchd unit</td><td><code>portato install</code> — launchd / systemd / Windows service</td></tr>
             <tr><td>Toggle without re-running</td><td>—</td><td><code>space</code> in the TUI</td></tr>
-            <tr><td>Don't drop the port on hand-off</td><td>—</td><td>FD-passing — standalone→daemon, port stays up</td></tr>
+            <tr><td>Don't drop the port on hand-off</td><td>—</td><td>FD-passing (macOS/Linux) — standalone→daemon, port stays up</td></tr>
           </tbody>
         </table>
       </div>
@@ -199,7 +199,7 @@
         <div class="tab-panel active" id="panel-brew" role="tabpanel" aria-labelledby="tab-brew" data-tab="brew">
           <div class="code-block">
             <button type="button" class="copy" aria-label="Copy install command">Copy</button>
-            <pre><code># macOS / Linuxbrew
+            <pre><code># macOS (Homebrew cask; on Linux use deb/rpm/tarball)
 brew install --cask portuber/tap/portato</code></pre>
           </div>
         </div>
@@ -248,7 +248,7 @@ go install github.com/portuber/portato/cmd/portato@latest</code></pre>
       <noscript>
         <div class="noscript-install">
           <h3>All install methods</h3>
-          <p>Homebrew (macOS / Linuxbrew)</p>
+          <p>Homebrew (macOS)</p>
           <pre><code>brew install --cask portuber/tap/portato</code></pre>
           <p>Scoop (Windows)</p>
           <pre><code># If Scoop reports git is required: scoop install git
@@ -279,7 +279,7 @@ install -m 0755 portato ~/.local/bin/portato</code></pre>
   - name: redis
     type: local          # -L: listen here, forward to the host
     local: 6379
-    remote: 6379
+    remote: 127.0.0.1:6379
     ssh: user@bastion.example.com
     enabled: true        # tunnels are disabled by default</code></pre>
       </div>

@@ -53,7 +53,7 @@ The single binary works in several modes:
 
 All channels are built from the same release for macOS, Linux, and Windows.
 
-**Homebrew** (macOS / Linuxbrew):
+**Homebrew** (macOS only; on Linux use deb/rpm/tarball):
 
 ```sh
 brew install --cask portuber/tap/portato
