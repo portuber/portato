@@ -35,6 +35,14 @@ layout, build, and conventions. This file covers the process layer.
 Follow [Conventional Commits](./docs/CONVENTIONS.md) — e.g. `fix(forward): …`,
 `feat(tui): …`, `docs(readme): …`.
 
+## Pull request lifecycle
+
+A PR is a conversation. If a pull request sits **without activity for 30 days**
+— especially with an open change request — it may be closed as stale with a
+courtesy note. That is never a rejection of the person or the idea: reopen it
+or open a fresh one (usually after a rebase) and it will be re-reviewed. If
+you simply need more time, a one-line comment saying so keeps the PR open.
+
 ## Licensing
 
 Portato is MIT-licensed (see [LICENSE](./LICENSE)). By submitting a pull request
