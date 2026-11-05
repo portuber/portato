@@ -101,6 +101,30 @@ func startTestAgent(t *testing.T, privs ...any) (sock string, cleanup func()) {
 	return sock, func() { _ = ln.Close() }
 }
 
+// startSilentAgent listens on a unix socket but never answers a key listing —
+// an agent that accepted the connection and wedged.
+func startSilentAgent(t *testing.T) (sock string, cleanup func()) {
+	t.Helper()
+	sock = filepath.Join(mustMkdirTemp(t, "pta"), "agent.sock")
+	ln, err := net.Listen("unix", sock)
+	if err != nil {
+		t.Fatalf("agent listen: %v", err)
+	}
+	go func() {
+		for {
+			c, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			go func(c net.Conn) {
+				defer c.Close()
+				_, _ = io.Copy(io.Discard, c)
+			}(c)
+		}
+	}()
+	return sock, func() { _ = ln.Close() }
+}
+
 func waitForState(t *Tuber, want State, timeout time.Duration) bool {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
@@ -560,6 +584,65 @@ func TestTuberAuthWrongAgentKeyFallsBackToIdentity(t *testing.T) {
 	if !waitForState(tun, Connected, 5*time.Second) {
 		s := tun.Status()
 		t.Fatalf("rejected agent key + identity did not reach Connected: state=%s err=%q", s.State, s.Error)
+	}
+}
+
+// TestTuberAuthWedgedAgentFallsBackToIdentity pins the bounded agent key
+// listing: an agent socket that accepts but never answers must fail the
+// source fast (warn + continue) instead of killing the dial, so the identity
+// file still authenticates.
+func TestTuberAuthWedgedAgentFallsBackToIdentity(t *testing.T) {
+	echoAddr, stopEcho := startEcho(t)
+	defer stopEcho()
+
+	_, idPriv, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("gen identity key: %v", err)
+	}
+	idPub, _ := ssh.NewPublicKey(idPriv.Public())
+	block, err := ssh.MarshalPrivateKey(idPriv, "")
+	if err != nil {
+		t.Fatalf("marshal identity priv: %v", err)
+	}
+	dir := t.TempDir()
+	idPath := filepath.Join(dir, "id_ed25519")
+	if err := os.WriteFile(idPath, pem.EncodeToMemory(block), 0o600); err != nil {
+		t.Fatalf("write identity: %v", err)
+	}
+
+	sock, stopAgent := startSilentAgent(t)
+	defer stopAgent()
+	t.Setenv("SSH_AUTH_SOCK", sock)
+
+	srv := sshtest.NewSSHD(t, idPub)
+	srv.Start()
+	defer srv.Stop()
+
+	knownHosts := filepath.Join(dir, "known_hosts")
+	cfg := config.Tuber{
+		Name:     "wedged-agent",
+		Type:     "local",
+		Local:    strconv.Itoa(freePort(t)),
+		Remote:   echoAddr,
+		SSH:      "u@" + srv.Addr(),
+		User:     "u",
+		Host:     "127.0.0.1",
+		Port:     srv.Port,
+		Identity: idPath,
+	}
+	def := config.Defaults{KnownHosts: knownHosts, AcceptNewHosts: true}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	tun := NewTuber(ctx, cfg, def, slog.Default(), nil, nil)
+	if err := tun.Start(ctx); err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+	defer tun.Stop()
+
+	if !waitForState(tun, Connected, 10*time.Second) {
+		s := tun.Status()
+		t.Fatalf("wedged agent + identity did not reach Connected: state=%s err=%q", s.State, s.Error)
 	}
 }
 

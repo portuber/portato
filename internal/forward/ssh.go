@@ -26,6 +26,14 @@ import (
 
 const connectTimeout = 5 * time.Second
 
+// agentQueryTimeout bounds the ssh-agent key listing. It is deliberately well
+// under connectTimeout: the listing runs inside the handshake, so an equal
+// bound would let a wedged agent consume the whole handshake budget and the
+// identity fallback would never get a chance to authenticate (caught by
+// TestTuberAuthWedgedAgentFallsBackToIdentity). A local agent normally
+// answers in microseconds.
+const agentQueryTimeout = 2 * time.Second
+
 // hostKeySink receives a rejected unknown host key so the caller (the Tuber,
 // and through Status the TUI) can offer to accept it. The arguments are the
 // hostname as dialed, the key fingerprint, and a ready-to-append known_hosts
@@ -230,7 +238,9 @@ func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log
 	)
 	if conn, ok := dialAgent(ctx, log); ok {
 		ag := agent.NewClient(conn)
-		sources = append(sources, ag.Signers)
+		sources = append(sources, func() ([]ssh.Signer, error) {
+			return boundedAgentSigners(ctx, conn, ag)
+		})
 		closers = append(closers, conn)
 	}
 	if idPath := cfg.ResolvedIdentity(def); idPath != "" {
@@ -265,6 +275,29 @@ func authMethods(ctx context.Context, cfg config.Tuber, def config.Defaults, log
 		return out, nil
 	})}
 	return methods, closeAgent
+}
+
+// boundedAgentSigners lists the agent's keys with a deadline. Without it a
+// wedged agent socket (accepts the connection, never answers) would block the
+// auth callback inside the handshake until the surrounding dial times out and
+// the whole attempt fails; bounded, the source fails fast and the identity
+// source is still offered within the remaining handshake budget. ctx
+// cancellation aborts an in-flight listing immediately. The deadline is
+// cleared afterwards: agent-backed signers sign lazily over the same conn
+// during the handshake.
+func boundedAgentSigners(ctx context.Context, conn net.Conn, ag agent.ExtendedAgent) ([]ssh.Signer, error) {
+	deadline := time.Now().Add(agentQueryTimeout)
+	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
+		deadline = d
+	}
+	stop := context.AfterFunc(ctx, func() { conn.SetDeadline(time.Now().Add(-time.Second)) })
+	defer stop()
+	if err := conn.SetDeadline(deadline); err != nil {
+		return nil, err
+	}
+	signers, err := ag.Signers()
+	conn.SetDeadline(time.Time{})
+	return signers, err
 }
 
 func hostKeyCallback(def config.Defaults, log *slog.Logger, sink hostKeySink) (ssh.HostKeyCallback, error) {

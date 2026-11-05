@@ -1,6 +1,7 @@
 package forward
 
 import (
+	"context"
 	"crypto/ed25519"
 	crand "crypto/rand"
 	"net"
@@ -8,8 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"golang.org/x/crypto/ssh"
+	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
 )
 
@@ -251,5 +254,50 @@ func TestAppendKnownHostLine_CreatesFile(t *testing.T) {
 	}
 	if info, _ := os.Stat(hostsFile); info.Mode().Perm() != 0o600 {
 		t.Errorf("perm = %o, want 0600", info.Mode().Perm())
+	}
+}
+
+func TestAgentQueryHonorsCancellation(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		buf := make([]byte, 4096)
+		_, _ = server.Read(buf)
+		cancel()
+	}()
+	ag := agent.NewClient(client)
+	started := time.Now()
+	if _, err := boundedAgentSigners(ctx, client, ag); err == nil {
+		t.Fatal("expected cancellation error")
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("agent query did not honor cancellation")
+	}
+}
+
+func TestAgentQueryHonorsDeadline(t *testing.T) {
+	client, server := net.Pipe()
+	defer client.Close()
+	defer server.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			if _, err := server.Read(buf); err != nil {
+				return
+			}
+		}
+	}()
+	ag := agent.NewClient(client)
+	started := time.Now()
+	if _, err := boundedAgentSigners(ctx, client, ag); err == nil {
+		t.Fatal("expected deadline error")
+	}
+	if time.Since(started) > time.Second {
+		t.Fatal("agent query did not honor deadline")
 	}
 }
